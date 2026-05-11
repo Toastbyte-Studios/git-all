@@ -1,0 +1,5 @@
+# Cloudflare Workers local dev secrets (copy to .dev.vars and fill in values)
+# See https://developers.cloudflare.com/workers/configuration/secrets/
+
+# Required for GitHub contributions API (GraphQL API needs a token even for public data)
+GITHUB_TOKEN=ghp_your_token_here
