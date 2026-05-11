@@ -10,6 +10,7 @@ const GITHUB_USERNAME_PATTERN = /^(?!-)[A-Za-z0-9-]{1,39}(?<!-)$/;
 const CONTRIBUTIONS_QUERY = `
   query($username: String!, $from: DateTime, $to: DateTime) {
     user(login: $username) {
+      login
       contributionsCollection(from: $from, to: $to) {
         contributionCalendar {
           totalContributions
@@ -211,7 +212,7 @@ export async function GET(request: NextRequest) {
 
     const payload: GithubContributionResponse = {
       platform: 'github',
-      username,
+      username: user.login,
       totalContributions: calendar.totalContributions,
       dateRange: {
         from: days[0]?.date ?? null,
