@@ -47,77 +47,84 @@ export async function GET(request: NextRequest) {
     return createErrorRedirect(request, 'invalid_state');
   }
 
-  const redirectUri = new URL('/api/auth/callback', request.nextUrl.origin);
+  try {
+    const redirectUri = new URL('/api/auth/callback', request.nextUrl.origin);
 
-  const tokenResponse = await fetch(
-    'https://github.com/login/oauth/access_token',
-    {
-      method: 'POST',
+    const tokenResponse = await fetch(
+      'https://github.com/login/oauth/access_token',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': APP_USER_AGENT,
+        },
+        body: JSON.stringify({
+          client_id: process.env.GITHUB_CLIENT_ID,
+          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          code,
+          redirect_uri: redirectUri.toString(),
+          state,
+        }),
+      },
+    );
+
+    const tokenData = await tokenResponse.json();
+    if (!tokenResponse.ok || tokenData.error || !tokenData.access_token) {
+      console.error('GitHub OAuth token exchange failed', {
+        status: tokenResponse.status,
+        error: tokenData.error ?? null,
+        errorDescription: tokenData.error_description ?? null,
+      });
+      return createErrorRedirect(request, 'token_exchange_failed');
+    }
+
+    const userResponse = await fetch('https://api.github.com/user', {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenData.access_token}`,
+        Accept: 'application/vnd.github+json',
         'User-Agent': APP_USER_AGENT,
       },
-      body: JSON.stringify({
-        client_id: process.env.GITHUB_CLIENT_ID,
-        client_secret: process.env.GITHUB_CLIENT_SECRET,
-        code,
-        redirect_uri: redirectUri.toString(),
-        state,
-      }),
-    },
-  );
-
-  const tokenData = await tokenResponse.json();
-  if (!tokenResponse.ok || tokenData.error || !tokenData.access_token) {
-    console.error('GitHub OAuth token exchange failed', {
-      status: tokenResponse.status,
-      error: tokenData.error ?? null,
-      errorDescription: tokenData.error_description ?? null,
     });
-    return createErrorRedirect(request, 'token_exchange_failed');
+
+    if (!userResponse.ok) {
+      return createErrorRedirect(request, 'user_fetch_failed');
+    }
+
+    const userData = await userResponse.json();
+    if (!userData?.login || !userData?.avatar_url) {
+      return createErrorRedirect(request, 'invalid_user_data');
+    }
+
+    const serializedSession = encodeAuthSession({
+      accessToken: tokenData.access_token,
+      user: {
+        login: userData.login,
+        avatarUrl: userData.avatar_url,
+      },
+    });
+
+    if (!serializedSession) {
+      return createErrorRedirect(request, 'session_create_failed');
+    }
+
+    const response = NextResponse.redirect(
+      new URL('/', request.nextUrl.origin),
+    );
+    response.cookies.set({
+      name: SESSION_COOKIE_NAME,
+      value: serializedSession,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    });
+    clearStateCookie(response);
+
+    return response;
+  } catch (error) {
+    console.error('GitHub OAuth callback failed unexpectedly', error);
+    return createErrorRedirect(request, 'oauth_callback_failed');
   }
-
-  const userResponse = await fetch('https://api.github.com/user', {
-    headers: {
-      Authorization: `Bearer ${tokenData.access_token}`,
-      Accept: 'application/vnd.github+json',
-      'User-Agent': APP_USER_AGENT,
-    },
-  });
-
-  if (!userResponse.ok) {
-    return createErrorRedirect(request, 'user_fetch_failed');
-  }
-
-  const userData = await userResponse.json();
-  if (!userData?.login || !userData?.avatar_url) {
-    return createErrorRedirect(request, 'invalid_user_data');
-  }
-
-  const serializedSession = encodeAuthSession({
-    accessToken: tokenData.access_token,
-    user: {
-      login: userData.login,
-      avatarUrl: userData.avatar_url,
-    },
-  });
-
-  if (!serializedSession) {
-    return createErrorRedirect(request, 'session_create_failed');
-  }
-
-  const response = NextResponse.redirect(new URL('/', request.nextUrl.origin));
-  response.cookies.set({
-    name: SESSION_COOKIE_NAME,
-    value: serializedSession,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: SESSION_MAX_AGE_SECONDS,
-  });
-  clearStateCookie(response);
-
-  return response;
 }

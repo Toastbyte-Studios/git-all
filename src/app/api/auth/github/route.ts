@@ -8,13 +8,9 @@ import {
 
 export async function GET(request: NextRequest) {
   if (!hasGithubOAuthConfig()) {
-    return NextResponse.json(
-      {
-        error:
-          'Server misconfiguration: GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are required.',
-      },
-      { status: 500, headers: { 'Cache-Control': 'no-store' } },
-    );
+    const url = new URL('/', request.nextUrl.origin);
+    url.searchParams.set('auth_error', 'oauth_not_configured');
+    return NextResponse.redirect(url);
   }
 
   const state = createOAuthState();

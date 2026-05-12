@@ -10,10 +10,19 @@ const CACHE_CONTROL_HEADER = `public, s-maxage=${CACHE_TTL_SECONDS}, stale-while
 const GITHUB_USERNAME_PATTERN = /^(?!-)[A-Za-z0-9-]{1,39}(?<!-)$/;
 
 const CONTRIBUTIONS_QUERY = `
-  query($username: String!, $from: DateTime, $to: DateTime) {
+  query(
+    $username: String!
+    $from: DateTime
+    $to: DateTime
+    $includePrivateContributions: Boolean!
+  ) {
     user(login: $username) {
       login
-      contributionsCollection(from: $from, to: $to) {
+      contributionsCollection(
+        from: $from
+        to: $to
+        includePrivateContributions: $includePrivateContributions
+      ) {
         contributionCalendar {
           totalContributions
           weeks {
@@ -168,6 +177,9 @@ export async function GET(request: NextRequest) {
   const authSession = getAuthSessionFromRequest(request);
   const token = authSession?.accessToken ?? process.env.GITHUB_TOKEN;
   const shouldBypassCache = Boolean(authSession);
+  const includePrivateContributions = Boolean(
+    authSession && authSession.user.login.toLowerCase() === username,
+  );
 
   if (!token) {
     return NextResponse.json(
@@ -184,6 +196,9 @@ export async function GET(request: NextRequest) {
     // Keep the key shaped as platform:username so the cache structure can stay
     // consistent if other contribution sources adopt the same strategy later.
     const cacheKey = `github:${username}`;
+    const inFlightKey = shouldBypassCache
+      ? `github:auth:${authSession?.user.login.toLowerCase()}:${username}:${includePrivateContributions ? '1' : '0'}`
+      : cacheKey;
     if (!shouldBypassCache) {
       const cached = getCachedContribution(cacheKey);
       if (!refresh && cached) {
@@ -209,6 +224,7 @@ export async function GET(request: NextRequest) {
             username,
             from: oneYearAgo.toISOString(),
             to: now.toISOString(),
+            includePrivateContributions,
           },
         }),
       });
@@ -265,12 +281,10 @@ export async function GET(request: NextRequest) {
       return freshPayload;
     };
 
-    const payload = shouldBypassCache
-      ? await loadContribution()
-      : await getOrCreateInFlightContributionRequest(
-          cacheKey,
-          loadContribution,
-        );
+    const payload = await getOrCreateInFlightContributionRequest(
+      inFlightKey,
+      loadContribution,
+    );
 
     if (!payload) {
       return NextResponse.json(

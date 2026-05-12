@@ -57,6 +57,7 @@ export function encodeAuthSession(session: AuthSession) {
     return null;
   }
 
+  // AES-GCM is standardized with a 96-bit (12-byte) nonce/IV.
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const payload: StoredAuthSession = {

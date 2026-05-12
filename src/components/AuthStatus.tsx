@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 interface AuthSessionResponse {
   authenticated: boolean;
+  oauthEnabled: boolean;
   user?: {
     login: string;
     avatarUrl: string;
@@ -31,7 +32,7 @@ export function AuthStatus() {
       })
       .catch(() => {
         if (isMounted) {
-          setSession({ authenticated: false });
+          setSession({ authenticated: false, oauthEnabled: false });
         }
       });
 
@@ -39,6 +40,14 @@ export function AuthStatus() {
       isMounted = false;
     };
   }, []);
+
+  if (!session) {
+    return null;
+  }
+
+  if (!session.oauthEnabled) {
+    return null;
+  }
 
   if (session?.authenticated && session.user) {
     return (
@@ -53,13 +62,15 @@ export function AuthStatus() {
         <span style={{ color: 'var(--text-secondary)' }}>
           @{session.user.login}
         </span>
-        <a
-          href="/api/auth/logout"
-          style={{ color: 'var(--accent)' }}
-          className="hover:underline"
-        >
-          Log out
-        </a>
+        <form method="post" action="/api/auth/logout">
+          <button
+            type="submit"
+            style={{ color: 'var(--accent)' }}
+            className="hover:underline cursor-pointer"
+          >
+            Log out
+          </button>
+        </form>
       </div>
     );
   }
