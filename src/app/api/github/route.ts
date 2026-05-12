@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
+import { getAuthSessionFromRequest } from '@/lib/auth-session';
 
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -164,10 +165,16 @@ export async function GET(request: NextRequest) {
 
   const username = requestedUsername.toLowerCase();
 
-  const token = process.env.GITHUB_TOKEN;
+  const authSession = getAuthSessionFromRequest(request);
+  const token = authSession?.accessToken ?? process.env.GITHUB_TOKEN;
+  const shouldBypassCache = Boolean(authSession);
+
   if (!token) {
     return NextResponse.json(
-      { error: 'Server misconfiguration: GITHUB_TOKEN is not set.' },
+      {
+        error:
+          'Server misconfiguration: neither a user session token nor GITHUB_TOKEN is available.',
+      },
       { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
@@ -177,89 +184,93 @@ export async function GET(request: NextRequest) {
     // Keep the key shaped as platform:username so the cache structure can stay
     // consistent if other contribution sources adopt the same strategy later.
     const cacheKey = `github:${username}`;
-    const cached = getCachedContribution(cacheKey);
-
-    if (!refresh && cached) {
-      return createCachedResponse(cached, 'HIT');
+    if (!shouldBypassCache) {
+      const cached = getCachedContribution(cacheKey);
+      if (!refresh && cached) {
+        return createCachedResponse(cached, 'HIT');
+      }
     }
 
-    const payload = await getOrCreateInFlightContributionRequest(
-      cacheKey,
-      async () => {
-        const now = new Date();
-        const oneYearAgo = new Date(now);
-        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const loadContribution = async () => {
+      const now = new Date();
+      const oneYearAgo = new Date(now);
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-        const response = await fetch(GITHUB_GRAPHQL_URL, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'User-Agent': APP_USER_AGENT,
+      const response = await fetch(GITHUB_GRAPHQL_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': APP_USER_AGENT,
+        },
+        body: JSON.stringify({
+          query: CONTRIBUTIONS_QUERY,
+          variables: {
+            username,
+            from: oneYearAgo.toISOString(),
+            to: now.toISOString(),
           },
-          body: JSON.stringify({
-            query: CONTRIBUTIONS_QUERY,
-            variables: {
-              username,
-              from: oneYearAgo.toISOString(),
-              to: now.toISOString(),
-            },
-          }),
-        });
+        }),
+      });
 
-        if (!response.ok) {
-          throw new Error(`GitHub API returned ${response.status}`);
-        }
+      if (!response.ok) {
+        throw new Error(`GitHub API returned ${response.status}`);
+      }
 
-        const json = await response.json();
+      const json = await response.json();
 
-        if (json.errors) {
-          throw new Error(
-            json.errors.map((e: { message: string }) => e.message).join('; '),
-          );
-        }
-
-        const user = json.data?.user;
-        if (!user) {
-          return null;
-        }
-
-        const calendar = user.contributionsCollection.contributionCalendar;
-        const days = calendar.weeks.flatMap(
-          (w: {
-            contributionDays: Array<{
-              date: string;
-              contributionCount: number;
-              color: string;
-            }>;
-          }) => w.contributionDays,
+      if (json.errors) {
+        throw new Error(
+          json.errors.map((e: { message: string }) => e.message).join('; '),
         );
+      }
 
-        const freshPayload: GithubContributionResponse = {
-          platform: 'github',
-          username: user.login,
-          totalContributions: calendar.totalContributions,
-          dateRange: {
-            from: days[0]?.date ?? null,
-            to: days[days.length - 1]?.date ?? null,
-          },
-          calendar: days.map(
-            (d: {
-              date: string;
-              contributionCount: number;
-              color: string;
-            }) => ({
-              date: d.date,
-              count: d.contributionCount,
-              level: COLOR_TO_LEVEL[d.color.toLowerCase()] ?? 0,
-            }),
-          ),
-        };
+      const user = json.data?.user;
+      if (!user) {
+        return null;
+      }
 
+      const calendar = user.contributionsCollection.contributionCalendar;
+      const days = calendar.weeks.flatMap(
+        (w: {
+          contributionDays: Array<{
+            date: string;
+            contributionCount: number;
+            color: string;
+          }>;
+        }) => w.contributionDays,
+      );
+
+      const freshPayload: GithubContributionResponse = {
+        platform: 'github',
+        username: user.login,
+        totalContributions: calendar.totalContributions,
+        dateRange: {
+          from: days[0]?.date ?? null,
+          to: days[days.length - 1]?.date ?? null,
+        },
+        calendar: days.map(
+          (d: { date: string; contributionCount: number; color: string }) => ({
+            date: d.date,
+            count: d.contributionCount,
+            level: COLOR_TO_LEVEL[d.color.toLowerCase()] ?? 0,
+          }),
+        ),
+      };
+
+      if (!shouldBypassCache) {
         setCachedContribution(cacheKey, freshPayload);
-        return freshPayload;
-      },
-    );
+      }
+
+      return freshPayload;
+    };
+
+    const payload = shouldBypassCache
+      ? await loadContribution()
+      : await getOrCreateInFlightContributionRequest(
+          cacheKey,
+          loadContribution,
+        );
 
     if (!payload) {
       return NextResponse.json(
@@ -268,7 +279,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return createCachedResponse(payload, refresh ? 'BYPASS' : 'MISS');
+    return createCachedResponse(
+      payload,
+      shouldBypassCache || refresh ? 'BYPASS' : 'MISS',
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json(

@@ -21,6 +21,21 @@ cp .env.example .env.local
 
 A GitHub personal access token is needed to call the GraphQL API (even for public data). No special scopes required — a classic token with zero permissions works.
 
+### Optional: Sign in with GitHub OAuth
+
+OAuth is optional. Anonymous users can still use the app normally, but signed-in users can use their own GitHub API rate limit and unlock private contribution data on their own profile.
+
+1. Create a GitHub OAuth App: **GitHub Settings → Developer settings → OAuth Apps → New OAuth App**
+2. Set **Authorization callback URL** to:
+   - `http://localhost:3000/api/auth/callback` for local dev
+   - `https://your-domain/api/auth/callback` in production
+3. Add these values to `.env.local`:
+
+```bash
+GITHUB_CLIENT_ID=your_oauth_app_client_id
+GITHUB_CLIENT_SECRET=your_oauth_app_client_secret
+```
+
 ```bash
 npm run dev
 ```

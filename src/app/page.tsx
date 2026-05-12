@@ -1,3 +1,4 @@
+import { AuthStatus } from '@/components/AuthStatus';
 import { ContributionExplorer } from '@/components/ContributionExplorer';
 import { GitAllLogo } from '@/components/GitAllLogo';
 import { FAQ_ITEMS } from '@/lib/faq';
@@ -12,6 +13,9 @@ export default function Home() {
         <p style={{ color: 'var(--text-secondary)' }}>
           See GitHub &amp; GitLab contributions in one place.
         </p>
+        <div className="mt-3 flex justify-center">
+          <AuthStatus />
+        </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 pb-12">
