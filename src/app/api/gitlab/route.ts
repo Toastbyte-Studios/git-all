@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { APP_USER_AGENT } from '@/lib/app-metadata';
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     // the GitLab profile UI uses. No authentication required for public profiles.
     const calendarResponse = await fetch(
       `${baseUrl}/users/${encodeURIComponent(username)}/calendar.json`,
-      { headers: { 'User-Agent': 'git-all/0.1.0' } },
+      { headers: { 'User-Agent': APP_USER_AGENT } },
     );
 
     if (calendarResponse.status === 404) {
