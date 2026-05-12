@@ -175,11 +175,10 @@ export async function GET(request: NextRequest) {
   const username = requestedUsername.toLowerCase();
 
   const authSession = getAuthSessionFromRequest(request);
+  const authSessionLogin = authSession?.user.login.toLowerCase() ?? null;
   const token = authSession?.accessToken ?? process.env.GITHUB_TOKEN;
   const shouldBypassCache = Boolean(authSession);
-  const includePrivateContributions = Boolean(
-    authSession && authSession.user.login.toLowerCase() === username,
-  );
+  const includePrivateContributions = authSessionLogin === username;
 
   if (!token) {
     return NextResponse.json(
@@ -197,7 +196,7 @@ export async function GET(request: NextRequest) {
     // consistent if other contribution sources adopt the same strategy later.
     const cacheKey = `github:${username}`;
     const inFlightKey = shouldBypassCache
-      ? `github:auth:${authSession?.user.login.toLowerCase()}:${username}:${includePrivateContributions ? '1' : '0'}`
+      ? `github:auth:${authSessionLogin}:${username}:${includePrivateContributions ? '1' : '0'}`
       : cacheKey;
     if (!shouldBypassCache) {
       const cached = getCachedContribution(cacheKey);

@@ -66,7 +66,7 @@ export function AuthStatus() {
           <button
             type="submit"
             style={{ color: 'var(--accent)' }}
-            className="hover:underline cursor-pointer"
+            className="hover:underline cursor-pointer bg-transparent border-0 p-0 text-xs"
           >
             Log out
           </button>
