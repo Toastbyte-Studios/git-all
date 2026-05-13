@@ -9,20 +9,14 @@ const MAX_CACHE_ENTRIES = 500;
 const CACHE_CONTROL_HEADER = `public, s-maxage=${CACHE_TTL_SECONDS}, stale-while-revalidate=86400`;
 const GITHUB_USERNAME_PATTERN = /^(?!-)[A-Za-z0-9-]{1,39}(?<!-)$/;
 
+// Private contributions are included automatically when the authenticated
+// user's own token is used to query their own profile. There is no explicit
+// `includePrivateContributions` argument on the GraphQL schema.
 const CONTRIBUTIONS_QUERY = `
-  query(
-    $username: String!
-    $from: DateTime
-    $to: DateTime
-    $includePrivateContributions: Boolean!
-  ) {
+  query($username: String!, $from: DateTime, $to: DateTime) {
     user(login: $username) {
       login
-      contributionsCollection(
-        from: $from
-        to: $to
-        includePrivateContributions: $includePrivateContributions
-      ) {
+      contributionsCollection(from: $from, to: $to) {
         contributionCalendar {
           totalContributions
           weeks {
@@ -178,7 +172,7 @@ export async function GET(request: NextRequest) {
   const authSessionLogin = authSession?.user.login.toLowerCase() ?? null;
   const token = authSession?.accessToken ?? process.env.GITHUB_TOKEN;
   const shouldBypassCache = Boolean(authSession);
-  const includePrivateContributions = authSessionLogin === username;
+  const isSelfLookup = authSessionLogin === username;
 
   if (!token) {
     return NextResponse.json(
@@ -196,7 +190,7 @@ export async function GET(request: NextRequest) {
     // consistent if other contribution sources adopt the same strategy later.
     const cacheKey = `github:${username}`;
     const inFlightKey = shouldBypassCache
-      ? `github:auth:${authSessionLogin}:${username}:${includePrivateContributions ? '1' : '0'}`
+      ? `github:auth:${authSessionLogin}:${username}:${isSelfLookup ? '1' : '0'}`
       : cacheKey;
     if (!shouldBypassCache) {
       const cached = getCachedContribution(cacheKey);
@@ -223,7 +217,6 @@ export async function GET(request: NextRequest) {
             username,
             from: oneYearAgo.toISOString(),
             to: now.toISOString(),
-            includePrivateContributions,
           },
         }),
       });
