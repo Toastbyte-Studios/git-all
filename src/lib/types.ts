@@ -16,3 +16,15 @@ export interface ContributionData {
 }
 
 export type ViewMode = 'side-by-side' | 'integrated';
+
+export interface UserEntry {
+  id: string;
+  platform: 'github' | 'gitlab';
+  username: string;
+}
+
+export interface UserResult {
+  entry: UserEntry;
+  data: ContributionData | null;
+  error: string | null;
+}

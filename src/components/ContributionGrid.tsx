@@ -5,7 +5,7 @@ import type { ContributionData } from '@/lib/types';
 
 interface ContributionGridProps {
   data: ContributionData;
-  platform: 'github' | 'gitlab' | 'integrated';
+  colorKey: string;
 }
 
 const CELL_SIZE = 11;
@@ -27,17 +27,22 @@ const MONTH_LABELS = [
   'Dec',
 ];
 
-function getLevelColor(level: number, platform: string): string {
-  if (platform === 'gitlab') {
-    return `var(--gl-level-${level})`;
-  }
-  if (platform === 'integrated') {
-    return `var(--ga-level-${level})`;
-  }
-  return `var(--level-${level})`;
+const COLOR_KEY_PREFIX: Record<string, string> = {
+  github: 'level',
+  'github-1': 'gh1-level',
+  'github-2': 'gh2-level',
+  gitlab: 'gl-level',
+  'gitlab-1': 'gl1-level',
+  'gitlab-2': 'gl2-level',
+  integrated: 'ga-level',
+};
+
+function getLevelColor(level: number, colorKey: string): string {
+  const prefix = COLOR_KEY_PREFIX[colorKey] ?? 'level';
+  return `var(--${prefix}-${level})`;
 }
 
-export function ContributionGrid({ data, platform }: ContributionGridProps) {
+export function ContributionGrid({ data, colorKey }: ContributionGridProps) {
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
@@ -146,7 +151,7 @@ export function ContributionGrid({ data, platform }: ContributionGridProps) {
                 width={CELL_SIZE}
                 height={CELL_SIZE}
                 rx={2}
-                fill={getLevelColor(day.level, platform)}
+                fill={getLevelColor(day.level, colorKey)}
                 className="transition-colors"
                 style={{ cursor: 'pointer' }}
                 onMouseEnter={(e) => {

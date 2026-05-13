@@ -1,30 +1,63 @@
-import type { ContributionData } from '@/lib/types';
+'use client';
+
+import { useState } from 'react';
+import type { UserResult } from '@/lib/types';
 
 interface StatsBarProps {
-  github: ContributionData | null;
-  gitlab: ContributionData | null;
+  results: UserResult[];
 }
 
-export function StatsBar({ github, gitlab }: StatsBarProps) {
-  const ghTotal = github?.totalContributions ?? 0;
-  const glTotal = gitlab?.totalContributions ?? 0;
-  const combined = ghTotal + glTotal;
+const COLLAPSE_THRESHOLD = 4;
+
+export function StatsBar({ results }: StatsBarProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const withData = results.filter((r) => r.data !== null);
+  const total = withData.reduce(
+    (sum, r) => sum + (r.data?.totalContributions ?? 0),
+    0,
+  );
+
+  if (withData.length === 0) return null;
+
+  const showToggle = withData.length > COLLAPSE_THRESHOLD;
+  const visible =
+    showToggle && !expanded ? withData.slice(0, COLLAPSE_THRESHOLD) : withData;
 
   return (
-    <div className="flex gap-4 text-sm">
-      {github && (
-        <span style={{ color: 'var(--level-4)' }}>
-          GitHub: <strong>{ghTotal.toLocaleString()}</strong>
+    <div className="flex flex-wrap gap-4 text-sm items-center">
+      {visible.map((r) => (
+        <span
+          key={r.entry.id}
+          style={{
+            color:
+              r.entry.platform === 'github'
+                ? 'var(--level-4)'
+                : 'var(--gl-level-4)',
+          }}
+        >
+          {r.entry.platform === 'github' ? 'GH' : 'GL'}:{' '}
+          <span style={{ color: 'var(--text-secondary)' }}>
+            @{r.entry.username}
+          </span>{' '}
+          <strong>{r.data!.totalContributions.toLocaleString()}</strong>
         </span>
+      ))}
+      {showToggle && (
+        <button
+          type="button"
+          onClick={() => setExpanded((x) => !x)}
+          className="text-xs cursor-pointer bg-transparent border-0 p-0"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          {expanded
+            ? 'Show less'
+            : `+${withData.length - COLLAPSE_THRESHOLD} more`}
+        </button>
       )}
-      {gitlab && (
-        <span style={{ color: 'var(--gl-level-4)' }}>
-          GitLab: <strong>{glTotal.toLocaleString()}</strong>
-        </span>
-      )}
-      {github && gitlab && (
+      {withData.length > 1 && (
         <span style={{ color: 'var(--text-secondary)' }}>
-          Total: <strong>{combined.toLocaleString()}</strong>
+          Total: <strong>{total.toLocaleString()}</strong>
         </span>
       )}
     </div>
