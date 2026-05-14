@@ -6,7 +6,6 @@ import {
   getContributionDateRange,
   isRangeWithinOneYear,
   normalizeCustomDateRange,
-  toEndOfDayIso,
   toStartOfDayIso,
 } from '@/lib/contribution-period';
 
@@ -230,7 +229,7 @@ export async function GET(request: NextRequest) {
           variables: {
             username,
             from: toStartOfDayIso(requestedRange.from),
-            to: toEndOfDayIso(requestedRange.to),
+            to: toStartOfDayIso(requestedRange.to),
           },
         }),
       });

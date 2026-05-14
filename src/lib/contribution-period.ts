@@ -206,7 +206,3 @@ export function getPeriodSelectionFromSearchParams(
 export function toStartOfDayIso(date: string) {
   return `${date}T00:00:00.000Z`;
 }
-
-export function toEndOfDayIso(date: string) {
-  return `${date}T23:59:59.999Z`;
-}

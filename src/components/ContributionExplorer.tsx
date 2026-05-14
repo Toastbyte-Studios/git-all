@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContributionGrid } from '@/components/ContributionGrid';
 import { MultiUserForm } from '@/components/MultiUserForm';
 import { SearchForm } from '@/components/SearchForm';
@@ -23,11 +23,6 @@ import type {
   UserResult,
   ViewMode,
 } from '@/lib/types';
-
-const DEFAULT_RANGE = getContributionDateRange(
-  DEFAULT_CONTRIBUTION_PERIOD,
-  getTodayUtc(),
-);
 
 /** Map a user's (platform, same-platform index) to a CSS color key. */
 function getColorKey(
@@ -58,6 +53,7 @@ export function ContributionExplorer() {
   );
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -96,7 +92,7 @@ export function ContributionExplorer() {
 
   const selectedRange = useMemo(() => {
     if (authenticated !== true) {
-      return DEFAULT_RANGE;
+      return getDefaultRange();
     }
 
     if (period === 'custom') {
@@ -107,7 +103,7 @@ export function ContributionExplorer() {
   }, [authenticated, customRange, period]);
   const appliedDateRange = useMemo(() => {
     if (authenticated !== true) {
-      return DEFAULT_RANGE;
+      return getDefaultRange();
     }
 
     if (appliedSelection.period === 'custom') {
@@ -115,7 +111,7 @@ export function ContributionExplorer() {
         normalizeCustomDateRange(
           appliedSelection.customFrom,
           appliedSelection.customTo,
-        ) ?? DEFAULT_RANGE
+        ) ?? getDefaultRange()
       );
     }
 
@@ -200,6 +196,7 @@ export function ContributionExplorer() {
     }
 
     setLastEntries(deduped);
+    const requestId = ++requestSequence.current;
 
     // Seed results so callers can see per-entry loading state if needed.
     setResults(deduped.map((entry) => ({ entry, data: null, error: null })));
@@ -230,6 +227,10 @@ export function ContributionExplorer() {
         }),
       );
 
+      if (requestId !== requestSequence.current) {
+        return;
+      }
+
       setResults(settled);
 
       if (settled.length > 0 && settled.every((r) => r.error !== null)) {
@@ -238,7 +239,9 @@ export function ContributionExplorer() {
         );
       }
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -268,7 +271,27 @@ export function ContributionExplorer() {
     }
     // Anonymous users intentionally stay on the default trailing 12-month view
     // because period selection is only available for authenticated sessions.
-    await fetchEntries(entries, DEFAULT_RANGE);
+    await fetchEntries(entries, getDefaultRange());
+  };
+
+  const handleMultiUserSearch = async (entries: UserEntry[]) => {
+    if (period === 'custom') {
+      if (!customRange) {
+        setRangeError('Enter a valid custom date range.');
+        return;
+      }
+
+      if (!isRangeWithinOneYear(customRange)) {
+        setRangeError('Custom ranges can span at most 1 year.');
+        return;
+      }
+
+      updatePeriodInUrl('custom', customRange);
+      await fetchEntries(entries, customRange);
+      return;
+    }
+
+    await fetchEntries(entries, getContributionDateRange(period));
   };
 
   const handlePeriodChange = (nextPeriod: ContributionPeriod) => {
@@ -327,13 +350,13 @@ export function ContributionExplorer() {
     (period === 'last-year' ||
       (period === 'custom' &&
         customRange !== null &&
-        customRange.from < DEFAULT_RANGE.from));
+        customRange.from < getDefaultRange().from));
 
   return (
     <>
       {showMultiUser ? (
         <>
-          <MultiUserForm onSearch={fetchEntries} loading={loading} />
+          <MultiUserForm onSearch={handleMultiUserSearch} loading={loading} />
           <TimePeriodSelector
             period={period}
             customFrom={customFrom}
@@ -466,6 +489,10 @@ export function ContributionExplorer() {
       )}
     </>
   );
+}
+
+function getDefaultRange() {
+  return getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD, getTodayUtc());
 }
 
 function mergeAllContributions(
