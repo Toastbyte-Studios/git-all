@@ -137,7 +137,7 @@ export function getContributionDateRange(
     case 'last-12-months':
     default:
       return {
-        from: formatUtcDate(addUtcYears(today, -1)),
+        from: formatUtcDate(addUtcDays(addUtcYears(today, -1), 1)),
         to: formatUtcDate(today),
       };
   }
@@ -168,7 +168,7 @@ export function isRangeWithinOneYear(range: ContributionDateRange) {
     return false;
   }
 
-  return fromDate >= addUtcYears(toDate, -1);
+  return fromDate > addUtcYears(toDate, -1);
 }
 
 export function getPeriodSelectionFromSearchParams(
@@ -205,4 +205,8 @@ export function getPeriodSelectionFromSearchParams(
 
 export function toStartOfDayIso(date: string) {
   return `${date}T00:00:00.000Z`;
+}
+
+export function toEndOfDayIso(date: string) {
+  return `${date}T23:59:59.999Z`;
 }

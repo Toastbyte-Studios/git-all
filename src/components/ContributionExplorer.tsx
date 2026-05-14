@@ -99,7 +99,7 @@ export function ContributionExplorer() {
       return customRange;
     }
 
-    return getContributionDateRange(period);
+    return getContributionDateRange(period, getTodayUtc());
   }, [authenticated, customRange, period]);
   const appliedDateRange = useMemo(() => {
     if (authenticated !== true) {
@@ -115,7 +115,7 @@ export function ContributionExplorer() {
       );
     }
 
-    return getContributionDateRange(appliedSelection.period);
+    return getContributionDateRange(appliedSelection.period, getTodayUtc());
   }, [appliedSelection, authenticated]);
 
   useEffect(() => {
@@ -291,7 +291,10 @@ export function ContributionExplorer() {
       return;
     }
 
-    await fetchEntries(entries, getContributionDateRange(period));
+    await fetchEntries(
+      entries,
+      getContributionDateRange(period, getTodayUtc()),
+    );
   };
 
   const handlePeriodChange = (nextPeriod: ContributionPeriod) => {
@@ -302,7 +305,7 @@ export function ContributionExplorer() {
       return;
     }
 
-    const nextRange = getContributionDateRange(nextPeriod);
+    const nextRange = getContributionDateRange(nextPeriod, getTodayUtc());
     updatePeriodInUrl(nextPeriod, nextRange);
 
     if (lastEntries.length > 0) {
