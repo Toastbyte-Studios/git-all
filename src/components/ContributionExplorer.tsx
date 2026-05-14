@@ -1,77 +1,154 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ContributionGrid } from '@/components/ContributionGrid';
+import { MultiUserForm } from '@/components/MultiUserForm';
 import { SearchForm } from '@/components/SearchForm';
 import { StatsBar } from '@/components/StatsBar';
-import type { ContributionData, ViewMode } from '@/lib/types';
+import type {
+  ContributionData,
+  UserEntry,
+  UserResult,
+  ViewMode,
+} from '@/lib/types';
+
+/** Map a user's (platform, same-platform index) to a CSS color key. */
+function getColorKey(
+  platform: 'github' | 'gitlab',
+  samePlatformIndex: number,
+): string {
+  if (samePlatformIndex === 0) return platform;
+  // Cycle through variant suffixes 1 and 2 for any additional same-platform users.
+  const variant = ((samePlatformIndex - 1) % 2) + 1;
+  return `${platform}-${variant}`;
+}
 
 export function ContributionExplorer() {
-  const [githubData, setGithubData] = useState<ContributionData | null>(null);
-  const [gitlabData, setGitlabData] = useState<ContributionData | null>(null);
+  // null = auth check in progress; true/false once resolved
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [results, setResults] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('side-by-side');
 
-  const handleSearch = async (
-    githubUsername: string,
-    gitlabUsername: string,
-  ) => {
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (isMounted) setAuthenticated(data.authenticated === true);
+      })
+      .catch(() => {
+        if (isMounted) setAuthenticated(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  /** Shared fetch logic used by both form variants. */
+  const fetchEntries = async (entries: UserEntry[]) => {
     setLoading(true);
-    setError(null);
-    setGithubData(null);
-    setGitlabData(null);
+    setGlobalError(null);
+
+    // Deduplicate by platform + lowercase username; keep first occurrence.
+    const seen = new Set<string>();
+    const deduped: UserEntry[] = [];
+    for (const e of entries) {
+      const key = `${e.platform}:${e.username.toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(e);
+      }
+    }
+
+    // Seed results so callers can see per-entry loading state if needed.
+    setResults(deduped.map((entry) => ({ entry, data: null, error: null })));
 
     try {
-      const promises: Promise<void>[] = [];
+      const settled = await Promise.all(
+        deduped.map(async (entry): Promise<UserResult> => {
+          try {
+            const api = entry.platform === 'github' ? 'github' : 'gitlab';
+            const res = await fetch(
+              `/api/${api}?username=${encodeURIComponent(entry.username)}`,
+            );
+            const data = await res.json();
+            if (data.error) {
+              return { entry, data: null, error: String(data.error) };
+            }
+            return { entry, data, error: null };
+          } catch (err) {
+            return {
+              entry,
+              data: null,
+              error: err instanceof Error ? err.message : 'Request failed',
+            };
+          }
+        }),
+      );
 
-      if (githubUsername.trim()) {
-        promises.push(
-          fetch(
-            `/api/github?username=${encodeURIComponent(githubUsername.trim())}`,
-          )
-            .then((res) => res.json())
-            .then((data) => {
-              if (data.error) throw new Error(`GitHub: ${data.error}`);
-              setGithubData(data);
-            }),
+      setResults(settled);
+
+      if (settled.length > 0 && settled.every((r) => r.error !== null)) {
+        setGlobalError(
+          'All lookups failed. Check the usernames and try again.',
         );
       }
-
-      if (gitlabUsername.trim()) {
-        promises.push(
-          fetch(
-            `/api/gitlab?username=${encodeURIComponent(gitlabUsername.trim())}`,
-          )
-            .then((res) => res.json())
-            .then((data) => {
-              if (data.error) throw new Error(`GitLab: ${data.error}`);
-              setGitlabData(data);
-            }),
-        );
-      }
-
-      if (promises.length === 0) {
-        setError('Enter at least one username.');
-        setLoading(false);
-        return;
-      }
-
-      await Promise.all(promises);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setLoading(false);
     }
   };
 
-  const hasData = githubData || gitlabData;
+  /** Handler for the simple anonymous two-input form. */
+  const handleSimpleSearch = async (
+    githubUsername: string,
+    gitlabUsername: string,
+  ) => {
+    const entries: UserEntry[] = [];
+    if (githubUsername.trim()) {
+      entries.push({
+        id: 'anon-github',
+        platform: 'github',
+        username: githubUsername.trim(),
+      });
+    }
+    if (gitlabUsername.trim()) {
+      entries.push({
+        id: 'anon-gitlab',
+        platform: 'gitlab',
+        username: gitlabUsername.trim(),
+      });
+    }
+    if (entries.length === 0) {
+      setGlobalError('Enter at least one username.');
+      return;
+    }
+    await fetchEntries(entries);
+  };
+
+  const hasData = results.some((r) => r.data !== null);
+
+  // Assign each user a color key based on how many same-platform users appear before it.
+  const platformCounts: Record<string, number> = {};
+  const resultsWithColorKey = results.map((r) => {
+    const platform = r.entry.platform;
+    const idx = platformCounts[platform] ?? 0;
+    platformCounts[platform] = idx + 1;
+    return { ...r, colorKey: getColorKey(platform, idx) };
+  });
+
+  const showMultiUser = authenticated === true;
 
   return (
     <>
-      <SearchForm onSearch={handleSearch} loading={loading} />
+      {showMultiUser ? (
+        <MultiUserForm onSearch={fetchEntries} loading={loading} />
+      ) : (
+        <SearchForm onSearch={handleSimpleSearch} loading={loading} />
+      )}
 
-      {error && (
+      {globalError && (
         <div
           className="mt-6 p-4 rounded-lg border text-sm"
           style={{
@@ -80,14 +157,14 @@ export function ContributionExplorer() {
             backgroundColor: 'rgba(248,81,73,0.1)',
           }}
         >
-          {error}
+          {globalError}
         </div>
       )}
 
       {hasData && (
         <div className="mt-10">
           <div className="flex items-center justify-between mb-6">
-            <StatsBar github={githubData} gitlab={gitlabData} />
+            <StatsBar results={results} />
             <div
               className="flex gap-1 p-1 rounded-lg"
               style={{ backgroundColor: 'var(--bg-surface)' }}
@@ -115,28 +192,31 @@ export function ContributionExplorer() {
 
           {viewMode === 'side-by-side' ? (
             <div className="space-y-8">
-              {githubData && (
-                <div>
+              {resultsWithColorKey.map((r) => (
+                <div key={r.entry.id}>
                   <h2
                     className="text-sm font-medium mb-3"
                     style={{ color: 'var(--text-secondary)' }}
                   >
-                    GitHub — @{githubData.username}
+                    {r.entry.platform === 'github' ? 'GitHub' : 'GitLab'} — @
+                    {r.entry.username}
                   </h2>
-                  <ContributionGrid data={githubData} platform="github" />
+                  {r.data ? (
+                    <ContributionGrid data={r.data} colorKey={r.colorKey} />
+                  ) : (
+                    <div
+                      className="p-4 rounded-lg border text-sm"
+                      style={{
+                        borderColor: '#f85149',
+                        color: '#f85149',
+                        backgroundColor: 'rgba(248,81,73,0.1)',
+                      }}
+                    >
+                      {r.error ?? 'No data available.'}
+                    </div>
+                  )}
                 </div>
-              )}
-              {gitlabData && (
-                <div>
-                  <h2
-                    className="text-sm font-medium mb-3"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    GitLab — @{gitlabData.username}
-                  </h2>
-                  <ContributionGrid data={gitlabData} platform="gitlab" />
-                </div>
-              )}
+              ))}
             </div>
           ) : (
             <div>
@@ -145,15 +225,15 @@ export function ContributionExplorer() {
                 style={{ color: 'var(--text-secondary)' }}
               >
                 Combined Activity
-                {githubData && gitlabData
-                  ? ` — @${githubData.username} + @${gitlabData.username}`
-                  : githubData
-                    ? ` — @${githubData.username}`
-                    : ` — @${gitlabData!.username}`}
+                {results.filter((r) => r.data).length > 0 &&
+                  ` \u2014 ${results
+                    .filter((r) => r.data)
+                    .map((r) => `@${r.entry.username}`)
+                    .join(' + ')}`}
               </h2>
               <ContributionGrid
-                data={mergeContributions(githubData, gitlabData)}
-                platform="integrated"
+                data={mergeAllContributions(results.map((r) => r.data))}
+                colorKey="integrated"
               />
             </div>
           )}
@@ -163,17 +243,16 @@ export function ContributionExplorer() {
   );
 }
 
-function mergeContributions(
-  github: ContributionData | null,
-  gitlab: ContributionData | null,
+function mergeAllContributions(
+  sources: (ContributionData | null)[],
 ): ContributionData {
   const map = new Map<string, number>();
 
-  for (const entry of github?.calendar ?? []) {
-    map.set(entry.date, (map.get(entry.date) ?? 0) + entry.count);
-  }
-  for (const entry of gitlab?.calendar ?? []) {
-    map.set(entry.date, (map.get(entry.date) ?? 0) + entry.count);
+  for (const data of sources) {
+    if (!data) continue;
+    for (const entry of data.calendar) {
+      map.set(entry.date, (map.get(entry.date) ?? 0) + entry.count);
+    }
   }
 
   const calendar = Array.from(map.entries())
@@ -184,7 +263,10 @@ function mergeContributions(
 
   return {
     platform: 'integrated',
-    username: [github?.username, gitlab?.username].filter(Boolean).join(' + '),
+    username: sources
+      .filter((d): d is ContributionData => d !== null)
+      .map((d) => d.username)
+      .join(' + '),
     totalContributions,
     dateRange: {
       from: calendar[0]?.date ?? null,
