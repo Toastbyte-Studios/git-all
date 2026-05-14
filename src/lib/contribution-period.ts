@@ -12,6 +12,12 @@ export interface ContributionDateRange {
   to: string;
 }
 
+interface RequestedContributionRangeOptions {
+  invalidRangeError?: string;
+  rangeTooLargeError: string;
+  today?: Date;
+}
+
 export const DEFAULT_CONTRIBUTION_PERIOD: ContributionPeriod = 'last-12-months';
 
 export const CONTRIBUTION_PERIOD_OPTIONS: Array<{
@@ -158,6 +164,31 @@ export function normalizeCustomDateRange(
     from: formatUtcDate(fromDate),
     to: formatUtcDate(toDate),
   };
+}
+
+export function normalizeRequestedContributionRange(
+  from: string | null,
+  to: string | null,
+  {
+    invalidRangeError = 'Invalid date range. Provide valid from and to values.',
+    rangeTooLargeError,
+    today = getTodayUtc(),
+  }: RequestedContributionRangeOptions,
+): ContributionDateRange | { error: string } {
+  if (!from && !to) {
+    return getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD, today);
+  }
+
+  const range = normalizeCustomDateRange(from, to);
+  if (!range) {
+    return { error: invalidRangeError };
+  }
+
+  if (!isRangeWithinOneYear(range)) {
+    return { error: rangeTooLargeError };
+  }
+
+  return range;
 }
 
 export function isRangeWithinOneYear(range: ContributionDateRange) {

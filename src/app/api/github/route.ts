@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
 import { getAuthSessionFromRequest } from '@/lib/auth-session';
 import {
-  DEFAULT_CONTRIBUTION_PERIOD,
-  getContributionDateRange,
-  isRangeWithinOneYear,
-  normalizeCustomDateRange,
+  normalizeRequestedContributionRange,
   toExclusiveUpperBoundIso,
   toStartOfDayIso,
 } from '@/lib/contribution-period';
@@ -317,21 +314,12 @@ function normalizeRequestedRange(request: NextRequest):
   | {
       error: string;
     } {
-  const from = request.nextUrl.searchParams.get('from');
-  const to = request.nextUrl.searchParams.get('to');
-
-  if (!from && !to) {
-    return getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD);
-  }
-
-  const range = normalizeCustomDateRange(from, to);
-  if (!range) {
-    return { error: 'Invalid date range. Provide valid from and to values.' };
-  }
-
-  if (!isRangeWithinOneYear(range)) {
-    return { error: 'GitHub contribution lookups can span at most 1 year.' };
-  }
-
-  return range;
+  return normalizeRequestedContributionRange(
+    request.nextUrl.searchParams.get('from'),
+    request.nextUrl.searchParams.get('to'),
+    {
+      rangeTooLargeError:
+        'GitHub contribution lookups can span at most 1 year.',
+    },
+  );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContributionGrid } from '@/components/ContributionGrid';
 import { MultiUserForm } from '@/components/MultiUserForm';
 import { SearchForm } from '@/components/SearchForm';
@@ -54,6 +54,7 @@ export function ContributionExplorer() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const requestSequence = useRef(0);
+  const lastFetchedRange = useRef<ContributionDateRange | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -165,85 +166,98 @@ export function ContributionExplorer() {
   };
 
   /** Shared fetch logic used by both form variants. */
-  const fetchEntries = async (
-    entries: UserEntry[],
-    rangeOverride?: ContributionDateRange,
-  ) => {
-    const requestRange = rangeOverride ?? selectedRange;
+  const fetchEntries = useCallback(
+    async (entries: UserEntry[], rangeOverride?: ContributionDateRange) => {
+      const requestRange = rangeOverride ?? selectedRange;
 
-    if (!requestRange) {
-      setGlobalError('Enter a valid custom date range before searching.');
-      return;
-    }
-
-    if (!isRangeWithinOneYear(requestRange)) {
-      setGlobalError('Date ranges can span at most 1 year.');
-      return;
-    }
-
-    setLoading(true);
-    setGlobalError(null);
-
-    // Deduplicate by platform + lowercase username; keep first occurrence.
-    const seen = new Set<string>();
-    const deduped: UserEntry[] = [];
-    for (const entry of entries) {
-      const key = `${entry.platform}:${entry.username.toLowerCase()}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        deduped.push(entry);
-      }
-    }
-
-    setLastEntries(deduped);
-    const requestId = ++requestSequence.current;
-
-    // Seed results so callers can see per-entry loading state if needed.
-    setResults(deduped.map((entry) => ({ entry, data: null, error: null })));
-
-    try {
-      const settled = await Promise.all(
-        deduped.map(async (entry): Promise<UserResult> => {
-          try {
-            const api = entry.platform === 'github' ? 'github' : 'gitlab';
-            const params = new URLSearchParams({
-              username: entry.username,
-              from: requestRange.from,
-              to: requestRange.to,
-            });
-            const res = await fetch(`/api/${api}?${params.toString()}`);
-            const data = await res.json();
-            if (data.error) {
-              return { entry, data: null, error: String(data.error) };
-            }
-            return { entry, data, error: null };
-          } catch (err) {
-            return {
-              entry,
-              data: null,
-              error: err instanceof Error ? err.message : 'Request failed',
-            };
-          }
-        }),
-      );
-
-      if (requestId !== requestSequence.current) {
+      if (!requestRange) {
+        setGlobalError('Enter a valid custom date range before searching.');
         return;
       }
 
-      setResults(settled);
+      if (!isRangeWithinOneYear(requestRange)) {
+        setGlobalError('Date ranges can span at most 1 year.');
+        return;
+      }
 
-      if (settled.length > 0 && settled.every((r) => r.error !== null)) {
-        setGlobalError(
-          'All lookups failed. Check the usernames and try again.',
+      setLoading(true);
+      setGlobalError(null);
+
+      // Deduplicate by platform + lowercase username; keep first occurrence.
+      const seen = new Set<string>();
+      const deduped: UserEntry[] = [];
+      for (const entry of entries) {
+        const key = `${entry.platform}:${entry.username.toLowerCase()}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(entry);
+        }
+      }
+
+      const requestId = ++requestSequence.current;
+      lastFetchedRange.current = requestRange;
+      setLastEntries(deduped);
+
+      // Seed results so callers can see per-entry loading state if needed.
+      setResults(deduped.map((entry) => ({ entry, data: null, error: null })));
+
+      try {
+        const settled = await Promise.all(
+          deduped.map(async (entry): Promise<UserResult> => {
+            try {
+              const api = entry.platform === 'github' ? 'github' : 'gitlab';
+              const params = new URLSearchParams({
+                username: entry.username,
+                from: requestRange.from,
+                to: requestRange.to,
+              });
+              const res = await fetch(`/api/${api}?${params.toString()}`);
+              const data = await res.json();
+              if (data.error) {
+                return { entry, data: null, error: String(data.error) };
+              }
+              return { entry, data, error: null };
+            } catch (err) {
+              return {
+                entry,
+                data: null,
+                error: err instanceof Error ? err.message : 'Request failed',
+              };
+            }
+          }),
         );
+
+        if (requestId !== requestSequence.current) {
+          return;
+        }
+
+        setResults(settled);
+
+        if (settled.length > 0 && settled.every((r) => r.error !== null)) {
+          setGlobalError(
+            'All lookups failed. Check the usernames and try again.',
+          );
+        }
+      } finally {
+        if (requestId === requestSequence.current) {
+          setLoading(false);
+        }
       }
-    } finally {
-      if (requestId === requestSequence.current) {
-        setLoading(false);
-      }
+    },
+    [selectedRange],
+  );
+
+  useEffect(() => {
+    if (authenticated !== true || lastEntries.length === 0) {
+      return;
     }
-  };
+
+    if (isSameRange(lastFetchedRange.current, appliedDateRange)) {
+      return;
+    }
+
+    void fetchEntries(lastEntries, appliedDateRange);
+  }, [appliedDateRange, authenticated, fetchEntries, lastEntries]);
 
   /** Handler for the simple anonymous two-input form. */
   const handleSimpleSearch = async (
@@ -301,7 +315,13 @@ export function ContributionExplorer() {
     setPeriod(nextPeriod);
     setGlobalError(null);
 
-    if (nextPeriod === 'custom' || authenticated !== true) {
+    if (nextPeriod === 'custom') {
+      requestSequence.current += 1;
+      setLoading(false);
+      return;
+    }
+
+    if (authenticated !== true) {
       return;
     }
 
@@ -496,6 +516,13 @@ export function ContributionExplorer() {
 
 function getDefaultRange() {
   return getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD, getTodayUtc());
+}
+
+function isSameRange(
+  left: ContributionDateRange | null,
+  right: ContributionDateRange | null,
+) {
+  return left?.from === right?.from && left?.to === right?.to;
 }
 
 function mergeAllContributions(
