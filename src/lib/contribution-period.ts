@@ -207,12 +207,19 @@ export function toStartOfDayIso(date: string) {
   return `${date}T00:00:00.000Z`;
 }
 
+/**
+ * Convert a YYYY-MM-DD `to` date into an exclusive upper-bound DateTime.
+ *
+ * Uses start-of-next-day rather than end-of-same-day to avoid expanding
+ * the DateTime span past GitHub's one-year contributionsCollection limit
+ * when the date range is already at the boundary.
+ */
 export function toExclusiveUpperBoundIso(date: string) {
-  const nextDay = parseDateInput(date);
-  if (!nextDay) {
+  const parsedDate = parseDateInput(date);
+  if (!parsedDate) {
     throw new Error('Invalid date string. Expected format: YYYY-MM-DD.');
   }
 
-  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-  return nextDay.toISOString();
+  parsedDate.setUTCDate(parsedDate.getUTCDate() + 1);
+  return parsedDate.toISOString();
 }
