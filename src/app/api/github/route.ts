@@ -6,6 +6,7 @@ import {
   getContributionDateRange,
   isRangeWithinOneYear,
   normalizeCustomDateRange,
+  toExclusiveUpperBoundIso,
   toStartOfDayIso,
 } from '@/lib/contribution-period';
 
@@ -150,19 +151,6 @@ function getOrCreateInFlightContributionRequest(
 
   inFlightContributionRequests.set(cacheKey, request);
   return request;
-}
-
-/**
- * Convert a YYYY-MM-DD `to` date into an exclusive upper-bound DateTime.
- *
- * Uses start-of-next-day rather than end-of-same-day to avoid expanding
- * the DateTime span past GitHub's one-year contributionsCollection limit
- * when the date range is already at the boundary.
- */
-function toExclusiveUpperBoundIso(date: string): string {
-  const d = new Date(`${date}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString();
 }
 
 export async function GET(request: NextRequest) {

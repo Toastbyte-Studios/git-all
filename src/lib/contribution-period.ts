@@ -207,6 +207,12 @@ export function toStartOfDayIso(date: string) {
   return `${date}T00:00:00.000Z`;
 }
 
-export function toEndOfDayIso(date: string) {
-  return `${date}T23:59:59.999Z`;
+export function toExclusiveUpperBoundIso(date: string) {
+  const nextDay = parseDateInput(date);
+  if (!nextDay) {
+    throw new Error('Invalid date string. Expected format: YYYY-MM-DD.');
+  }
+
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  return nextDay.toISOString();
 }
