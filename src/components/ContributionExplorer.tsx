@@ -17,6 +17,11 @@ import {
   type ContributionDateRange,
   type ContributionPeriod,
 } from '@/lib/contribution-period';
+import {
+  DEFAULT_GITEA_INSTANCE_URL,
+  getInstanceName,
+  normalizeInstanceUrl,
+} from '@/lib/gitea';
 import type {
   ContributionData,
   UserEntry,
@@ -26,7 +31,7 @@ import type {
 
 /** Map a user's (platform, same-platform index) to a CSS color key. */
 function getColorKey(
-  platform: 'github' | 'gitlab' | 'bitbucket',
+  platform: UserEntry['platform'],
   samePlatformIndex: number,
 ): string {
   if (samePlatformIndex === 0) return platform;
@@ -192,7 +197,7 @@ export function ContributionExplorer() {
       const seen = new Set<string>();
       const deduped: UserEntry[] = [];
       for (const entry of entries) {
-        const key = `${entry.platform}:${entry.username.toLowerCase()}`;
+        const key = `${entry.platform}:${entry.username.toLowerCase()}:${entry.platform === 'gitea' ? (normalizeInstanceUrl(entry.instanceUrl ?? '') ?? '') : ''}`;
         if (!seen.has(key)) {
           seen.add(key);
           deduped.push(entry);
@@ -218,6 +223,9 @@ export function ContributionExplorer() {
                 from: requestRange.from,
                 to: requestRange.to,
               });
+              if (entry.platform === 'gitea' && entry.instanceUrl) {
+                params.set('instanceUrl', entry.instanceUrl);
+              }
               const res = await fetch(
                 `/api/${entry.platform}?${params.toString()}`,
               );
@@ -284,6 +292,8 @@ export function ContributionExplorer() {
     githubUsername: string,
     gitlabUsername: string,
     bitbucketUsername: string,
+    giteaUsername: string,
+    giteaInstanceUrl: string,
   ) => {
     const entries: UserEntry[] = [];
     if (githubUsername.trim()) {
@@ -305,6 +315,14 @@ export function ContributionExplorer() {
         id: 'anon-bitbucket',
         platform: 'bitbucket',
         username: bitbucketUsername.trim(),
+      });
+    }
+    if (giteaUsername.trim()) {
+      entries.push({
+        id: 'anon-gitea',
+        platform: 'gitea',
+        username: giteaUsername.trim(),
+        instanceUrl: giteaInstanceUrl.trim() || DEFAULT_GITEA_INSTANCE_URL,
       });
     }
     if (entries.length === 0) {
@@ -474,8 +492,7 @@ export function ContributionExplorer() {
                     className="text-sm font-medium mb-3"
                     style={{ color: 'var(--text-secondary)' }}
                   >
-                    {getPlatformLabel(result.entry.platform)} — @
-                    {result.entry.username}
+                    {formatResultLabel(result)}
                   </h2>
                   {result.data ? (
                     <>
@@ -532,7 +549,7 @@ export function ContributionExplorer() {
                 {results.filter((result) => result.data).length > 0 &&
                   ` \u2014 ${results
                     .filter((result) => result.data)
-                    .map((result) => `@${result.entry.username}`)
+                    .map((result) => formatResultLabel(result))
                     .join(' + ')}`}
               </h2>
               <ContributionGrid
@@ -549,10 +566,19 @@ export function ContributionExplorer() {
   );
 }
 
-function getPlatformLabel(platform: 'github' | 'gitlab' | 'bitbucket') {
+function getPlatformLabel(platform: UserEntry['platform']) {
   if (platform === 'github') return 'GitHub';
   if (platform === 'gitlab') return 'GitLab';
-  return 'Bitbucket';
+  if (platform === 'bitbucket') return 'Bitbucket';
+  return 'Gitea / Forgejo';
+}
+
+function formatResultLabel(result: UserResult) {
+  if (result.entry.platform !== 'gitea') {
+    return `${getPlatformLabel(result.entry.platform)} — @${result.entry.username}`;
+  }
+
+  return `${getInstanceName(result.entry.instanceUrl)} — @${result.entry.username}`;
 }
 
 function getDefaultRange() {

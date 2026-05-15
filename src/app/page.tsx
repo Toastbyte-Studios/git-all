@@ -12,7 +12,8 @@ export default function Home() {
           <GitAllLogo />
         </h1>
         <p style={{ color: 'var(--text-secondary)' }}>
-          See GitHub, GitLab &amp; Bitbucket contributions in one place.
+          See GitHub, GitLab, Bitbucket, and Gitea/Forgejo contributions in one
+          place.
         </p>
         <div className="mt-3 flex justify-center">
           <AuthStatus />
@@ -44,10 +45,9 @@ export default function Home() {
             style={{ color: 'var(--text-secondary)' }}
           >
             GitAll is a free developer tool that aggregates your contribution
-            graphs from GitHub, GitLab, and Bitbucket into one unified heatmap.
-            Gitea/Forgejo support is coming soon. Enter your username on any
-            supported platform and instantly see your combined git activity — no
-            account needed.
+            graphs from GitHub, GitLab, Bitbucket, and Gitea/Forgejo into one
+            unified heatmap. Enter your username on any supported platform and
+            instantly see your combined git activity — no account needed.
           </p>
         </section>
 
@@ -79,8 +79,8 @@ export default function Home() {
                 1
               </span>
               <span>
-                Enter your GitHub, GitLab, Bitbucket, or multiple usernames in
-                the search form above.
+                Enter your GitHub, GitLab, Bitbucket, and Gitea/Forgejo
+                usernames in the search form above.
               </span>
             </li>
             <li className="flex gap-3">
@@ -150,9 +150,8 @@ export default function Home() {
                 name: 'Gitea / Forgejo',
                 desc: 'Lightweight self-hosted git servers',
                 color: 'var(--gt-accent)',
-                soon: true,
               },
-            ].map(({ name, desc, color, soon }) => (
+            ].map(({ name, desc, color }) => (
               <li
                 key={name}
                 className="p-3 rounded-lg text-sm"
@@ -163,14 +162,6 @@ export default function Home() {
               >
                 <span className="font-medium block mb-0.5" style={{ color }}>
                   {name}
-                  {soon && (
-                    <span
-                      className="ml-2 text-xs font-normal"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      coming soon
-                    </span>
-                  )}
                 </span>
                 <span style={{ color: 'var(--text-secondary)' }}>{desc}</span>
               </li>
