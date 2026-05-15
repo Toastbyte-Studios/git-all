@@ -1,0 +1,105 @@
+# GitAll — Full Reference
+
+> Unified contribution heatmap viewer for GitHub, GitLab, Bitbucket, and Gitea/Forgejo
+
+**URL:** https://gitall.app
+**Built by:** Toastbyte Studios (https://toastbyte.studio)
+
+---
+
+## Overview
+
+GitAll is a free, open-source developer tool that aggregates contribution graphs from
+all major git platforms into one unified heatmap. Enter usernames for any supported
+platform and instantly see combined git activity — no account or login required.
+
+---
+
+## Supported Platforms
+
+- **GitHub** — github.com (the world's largest code hosting platform)
+- **GitLab** — gitlab.com (self-hosted and cloud git repositories)
+- **Bitbucket** — bitbucket.org (Atlassian's git collaboration platform)
+- **Gitea** — gitea.com and any self-hosted Gitea instance
+- **Forgejo** — codeberg.org and any self-hosted Forgejo instance
+- **Codeberg** — codeberg.org (a popular Forgejo-based instance, supported by default)
+
+---
+
+## Features
+
+- View contribution graphs from GitHub, GitLab, Bitbucket, and Gitea/Forgejo side by side
+- Merge contributions from all platforms into a single integrated cross-platform heatmap
+- Multi-user comparison — compare contribution activity across multiple developers
+- Custom time ranges — select any date range for contribution analysis
+- Sign in with GitHub OAuth for access to private contribution data
+- No account required for public contribution data — anonymous lookup supported
+- Free to use, no paid tiers
+- Custom Gitea/Forgejo instance URL support — point to any self-hosted instance
+
+---
+
+## How It Works
+
+1. Enter your username(s) for each supported platform in the search form
+2. GitAll fetches public contribution data directly from each platform's API
+3. View contributions side by side or as a single integrated cross-platform heatmap
+
+---
+
+## API Endpoints
+
+GitAll proxies platform APIs to avoid CORS restrictions and cache responses:
+
+- `GET /api/github?username=<user>` — GitHub contribution data
+- `GET /api/gitlab?username=<user>` — GitLab contribution data
+- `GET /api/bitbucket?username=<user>` — Bitbucket contribution data
+- `GET /api/gitea?username=<user>&instance=<url>` — Gitea/Forgejo contribution data
+
+---
+
+## Use Cases
+
+- Developers who contribute across multiple git platforms want a single unified view
+- Recruiters and engineering managers assessing developer activity across platforms
+- Open-source contributors active on both GitHub and GitLab/Gitea/Codeberg
+- Anyone who wants to compare their contribution history across platforms
+- Teams comparing developer activity for multiple contributors side by side
+
+---
+
+## Technical Details
+
+- Built with Next.js 15 + React 19, deployed on Cloudflare Workers via OpenNext
+- Contribution data is fetched directly from platform APIs; no data is stored server-side
+- Response caching via in-memory cache with 15-minute TTL and stale-while-revalidate
+- Theme: supports light/dark mode via CSS custom properties and `data-theme` attribute
+
+---
+
+## FAQ
+
+**Q: Does GitAll support Bitbucket?**
+A: Yes. Bitbucket is fully supported. Enter your Bitbucket username to see your contribution data.
+
+**Q: Does GitAll support Gitea or Forgejo?**
+A: Yes. GitAll supports Gitea and Forgejo, including Codeberg. You can also enter a custom instance URL for any self-hosted Gitea or Forgejo server.
+
+**Q: Is GitAll free?**
+A: Yes, GitAll is completely free to use.
+
+**Q: Do I need an account?**
+A: No. Public contribution data is fetched anonymously. Sign in with GitHub only if you want to include private contributions.
+
+**Q: How many platforms does GitAll support?**
+A: GitAll supports 4 major platforms: GitHub, GitLab, Bitbucket, and Gitea/Forgejo (including Codeberg).
+
+---
+
+## Competitive Advantages
+
+- Supports 4+ platforms (most competitors only support GitHub + GitLab)
+- Multi-user comparison across all platforms
+- Custom time ranges for contribution analysis
+- OAuth integration for private GitHub contributions
+- Self-hosted Gitea/Forgejo instance support

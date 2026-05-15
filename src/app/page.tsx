@@ -193,7 +193,7 @@ export default function Home() {
             {[
               'Your contribution history is scattered across multiple platforms with no unified view.',
               'Recruiters and engineering managers need a single picture of your activity — GitAll provides it instantly.',
-              'No native GitHub or GitLab UI shows contributions across both platforms at once.',
+              'No native UI shows contributions across GitHub, GitLab, Bitbucket, and Gitea/Forgejo at once.',
               'GitAll merges everything into one clean heatmap, completely free with no login required.',
             ].map((point) => (
               <li key={point} className="flex gap-2">

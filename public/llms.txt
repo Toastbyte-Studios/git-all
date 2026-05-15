@@ -1,23 +1,11 @@
 # GitAll
-> Unified contribution heatmap viewer for GitHub and GitLab
+> Unified contribution heatmap viewer for GitHub, GitLab, Bitbucket, and Gitea/Forgejo
 
 GitAll (gitall.app) lets developers see their contribution squares
-across multiple git platforms in one place. Enter usernames to view
+across all major git platforms in one place. Enter usernames to view
 side-by-side or integrated heatmaps. Free, no login required.
 
-## Features
+Supports: GitHub, GitLab, Bitbucket, Gitea, Forgejo, and Codeberg.
+Sign in with GitHub for multi-user comparison and custom time ranges.
 
-- View GitHub and GitLab contribution graphs side by side
-- Merge contributions from multiple platforms into a single integrated heatmap
-- No account, no OAuth, no login required
-- Supports GitHub and GitLab; Bitbucket and Gitea/Forgejo coming soon
-
-## Use cases
-
-- Developers who contribute across multiple git platforms
-- Recruiters and engineering managers who want a single view of developer activity
-- Anyone who wants to compare their GitHub and GitLab contribution history
-
-## Built by
-
-Toastbyte Studios (https://toastbyte.studio)
+Built by Toastbyte Studios (https://toastbyte.studio)
