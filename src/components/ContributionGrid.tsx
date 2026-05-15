@@ -29,17 +29,9 @@ const MONTH_LABELS = [
 
 const COLOR_KEY_PREFIX: Record<string, string> = {
   github: 'level',
-  'github-1': 'gh1-level',
-  'github-2': 'gh2-level',
   gitlab: 'gl-level',
-  'gitlab-1': 'gl1-level',
-  'gitlab-2': 'gl2-level',
   bitbucket: 'bb-level',
-  'bitbucket-1': 'bb1-level',
-  'bitbucket-2': 'bb2-level',
   gitea: 'gt-level',
-  'gitea-1': 'gt1-level',
-  'gitea-2': 'gt2-level',
   integrated: 'ga-level',
 };
 

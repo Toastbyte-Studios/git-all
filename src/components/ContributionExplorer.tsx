@@ -25,15 +25,9 @@ import type {
   ViewMode,
 } from '@/lib/types';
 
-/** Map a user's (platform, same-platform index) to a CSS color key. */
-function getColorKey(
-  platform: UserEntry['platform'],
-  samePlatformIndex: number,
-): string {
-  if (samePlatformIndex === 0) return platform;
-  // Cycle through variant suffixes 1 and 2 for any additional same-platform users.
-  const variant = ((samePlatformIndex - 1) % 2) + 1;
-  return `${platform}-${variant}`;
+/** Map a user's platform to its CSS color key. */
+function getColorKey(platform: UserEntry['platform']): string {
+  return platform;
 }
 
 export function ContributionExplorer() {
@@ -403,14 +397,11 @@ export function ContributionExplorer() {
 
   const hasEntries = results.length > 0;
 
-  // Assign each user a color key based on how many same-platform users appear before it.
-  const platformCounts: Record<string, number> = {};
-  const resultsWithColorKey = results.map((result) => {
-    const platform = result.entry.platform;
-    const index = platformCounts[platform] ?? 0;
-    platformCounts[platform] = index + 1;
-    return { ...result, colorKey: getColorKey(platform, index) };
-  });
+  // Assign each user a color key based on their platform.
+  const resultsWithColorKey = results.map((result) => ({
+    ...result,
+    colorKey: getColorKey(result.entry.platform),
+  }));
 
   const showMultiUser = authenticated === true;
   const showGitlabLimitNote =
