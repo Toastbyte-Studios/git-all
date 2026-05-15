@@ -15,9 +15,12 @@ export function SignInBanner() {
   useEffect(() => {
     // Only show the banner if OAuth is enabled, user is not signed in, and
     // they haven't already dismissed it.
-    const dismissed =
-      typeof window !== 'undefined' &&
-      localStorage.getItem(BANNER_DISMISSED_KEY) === 'true';
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(BANNER_DISMISSED_KEY) === 'true';
+    } catch {
+      // localStorage unavailable — treat as not dismissed
+    }
 
     if (dismissed) return;
 
@@ -36,7 +39,11 @@ export function SignInBanner() {
   if (!visible) return null;
 
   function handleDismiss() {
-    localStorage.setItem(BANNER_DISMISSED_KEY, 'true');
+    try {
+      localStorage.setItem(BANNER_DISMISSED_KEY, 'true');
+    } catch {
+      // localStorage unavailable — skip persistence
+    }
     setVisible(false);
   }
 
