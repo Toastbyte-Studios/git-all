@@ -15,12 +15,15 @@ export interface ContributionData {
   calendar: CalendarDay[];
 }
 
+export type Platform = 'github' | 'gitlab' | 'bitbucket' | 'gitea';
+
 export type ViewMode = 'side-by-side' | 'integrated';
 
 export interface UserEntry {
   id: string;
-  platform: 'github' | 'gitlab' | 'bitbucket';
+  platform: Platform;
   username: string;
+  instanceUrl?: string;
 }
 
 export interface UserResult {

@@ -1,6 +1,6 @@
 # GitAll
 
-Unified contribution heatmap viewer for GitHub, GitLab, and more. Enter usernames from any supported platform and see their contribution squares side-by-side or merged into a single integrated view.
+Unified contribution heatmap viewer for GitHub, GitLab, Bitbucket, and Gitea/Forgejo. Enter usernames from any supported platform and see their contribution squares side-by-side or merged into a single integrated view.
 
 **Live at [gitall.app](https://gitall.app)**
 
@@ -49,7 +49,8 @@ Open [http://localhost:3000](http://localhost:3000).
 - **GitHub contributions** via GraphQL API (server-side requests; OAuth token is encrypted in `httpOnly` session cookie)
 - **GitLab contributions** via public REST API (no auth needed)
 - **Bitbucket contributions** via public REST API aggregation (no auth needed)
-- **Side-by-side view** with platform-specific colors (green for GitHub, orange for GitLab, blue for Bitbucket)
+- **Gitea / Forgejo contributions** via public REST API (`/api/v1/users/{username}/heatmap`) with selectable instance URL (Codeberg by default)
+- **Side-by-side view** with platform-specific colors (green for GitHub, orange for GitLab, blue for Bitbucket, violet for Gitea/Forgejo)
 - **Integrated view** that merges all calendars into a single heatmap
 - **Stats bar** showing per-platform and combined totals
 - **Tooltips** on hover showing exact counts per day

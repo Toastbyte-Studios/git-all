@@ -67,6 +67,13 @@
   --bb-level-3: #2684ff;
   --bb-level-4: #4c9aff;
 
+  /* Gitea / Forgejo violets */
+  --gt-level-0: #161b22;
+  --gt-level-1: #2d1450;
+  --gt-level-2: #5b2d8e;
+  --gt-level-3: #8b5cf6;
+  --gt-level-4: #c084fc;
+
   /* git-all integrated view — cyans */
   --ga-level-0: #21262d;
   --ga-level-1: #064e3b;
@@ -115,6 +122,18 @@
   --bb2-level-2: #3730a3;
   --bb2-level-3: #4f46e5;
   --bb2-level-4: #818cf8;
+
+  --gt1-level-0: #161b22;
+  --gt1-level-1: #1f1d5a;
+  --gt1-level-2: #4338ca;
+  --gt1-level-3: #6366f1;
+  --gt1-level-4: #a5b4fc;
+
+  --gt2-level-0: #161b22;
+  --gt2-level-1: #3f1252;
+  --gt2-level-2: #7e22ce;
+  --gt2-level-3: #d946ef;
+  --gt2-level-4: #f0abfc;
 }
 
 /* Manual light override */
@@ -159,6 +178,12 @@
   --bb-level-2: #74a7ff;
   --bb-level-3: #2684ff;
   --bb-level-4: #0550ae;
+
+  --gt-level-0: #ebedf0;
+  --gt-level-1: #f3e8ff;
+  --gt-level-2: #c4b5fd;
+  --gt-level-3: #8b5cf6;
+  --gt-level-4: #7c3aed;
 
   --ga-level-0: #ebedf0;
   --ga-level-1: #b2f0e8;
@@ -205,6 +230,18 @@
   --bb2-level-2: #a5b4fc;
   --bb2-level-3: #6366f1;
   --bb2-level-4: #3730a3;
+
+  --gt1-level-0: #ebedf0;
+  --gt1-level-1: #ede9fe;
+  --gt1-level-2: #c4b5fd;
+  --gt1-level-3: #7c3aed;
+  --gt1-level-4: #5b21b6;
+
+  --gt2-level-0: #ebedf0;
+  --gt2-level-1: #fce7f3;
+  --gt2-level-2: #f9a8d4;
+  --gt2-level-3: #db2777;
+  --gt2-level-4: #9d174d;
 }
 
 /* Manual dark override */
@@ -249,6 +286,12 @@
   --bb-level-2: #0747a6;
   --bb-level-3: #2684ff;
   --bb-level-4: #4c9aff;
+
+  --gt-level-0: #161b22;
+  --gt-level-1: #2d1450;
+  --gt-level-2: #5b2d8e;
+  --gt-level-3: #8b5cf6;
+  --gt-level-4: #c084fc;
 
   --ga-level-0: #21262d;
   --ga-level-1: #064e3b;
@@ -295,6 +338,18 @@
   --bb2-level-2: #3730a3;
   --bb2-level-3: #4f46e5;
   --bb2-level-4: #818cf8;
+
+  --gt1-level-0: #161b22;
+  --gt1-level-1: #1f1d5a;
+  --gt1-level-2: #4338ca;
+  --gt1-level-3: #6366f1;
+  --gt1-level-4: #a5b4fc;
+
+  --gt2-level-0: #161b22;
+  --gt2-level-1: #3f1252;
+  --gt2-level-2: #7e22ce;
+  --gt2-level-3: #d946ef;
+  --gt2-level-4: #f0abfc;
 }
 
 /* System preference: light (when no manual choice has been set) */
@@ -341,6 +396,12 @@
     --bb-level-3: #2684ff;
     --bb-level-4: #0550ae;
 
+    --gt-level-0: #ebedf0;
+    --gt-level-1: #f3e8ff;
+    --gt-level-2: #c4b5fd;
+    --gt-level-3: #8b5cf6;
+    --gt-level-4: #7c3aed;
+
     --ga-level-0: #ebedf0;
     --ga-level-1: #b2f0e8;
     --ga-level-2: #2dd4bf;
@@ -386,6 +447,18 @@
     --bb2-level-2: #a5b4fc;
     --bb2-level-3: #6366f1;
     --bb2-level-4: #3730a3;
+
+    --gt1-level-0: #ebedf0;
+    --gt1-level-1: #ede9fe;
+    --gt1-level-2: #c4b5fd;
+    --gt1-level-3: #7c3aed;
+    --gt1-level-4: #5b21b6;
+
+    --gt2-level-0: #ebedf0;
+    --gt2-level-1: #fce7f3;
+    --gt2-level-2: #f9a8d4;
+    --gt2-level-3: #db2777;
+    --gt2-level-4: #9d174d;
   }
 }
 

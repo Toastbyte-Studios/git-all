@@ -37,6 +37,9 @@ const COLOR_KEY_PREFIX: Record<string, string> = {
   bitbucket: 'bb-level',
   'bitbucket-1': 'bb1-level',
   'bitbucket-2': 'bb2-level',
+  gitea: 'gt-level',
+  'gitea-1': 'gt1-level',
+  'gitea-2': 'gt2-level',
   integrated: 'ga-level',
 };
 

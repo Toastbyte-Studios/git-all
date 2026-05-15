@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getInstanceName } from '@/lib/gitea';
 import type { UserResult } from '@/lib/types';
 
 interface StatsBarProps {
@@ -13,13 +14,23 @@ const PLATFORM_COLOR: Record<string, string> = {
   github: 'var(--level-4)',
   gitlab: 'var(--gl-level-4)',
   bitbucket: 'var(--bb-level-4)',
+  gitea: 'var(--gt-level-4)',
 };
 
 const PLATFORM_SHORT_LABEL: Record<string, string> = {
   github: 'GH',
   gitlab: 'GL',
   bitbucket: 'BB',
+  gitea: 'GT',
 };
+
+function formatEntryLabel(result: UserResult) {
+  if (result.entry.platform !== 'gitea') {
+    return `@${result.entry.username}`;
+  }
+
+  return `${getInstanceName(result.entry.instanceUrl)} — @${result.entry.username}`;
+}
 
 export function StatsBar({ results }: StatsBarProps) {
   const [expanded, setExpanded] = useState(false);
@@ -47,7 +58,7 @@ export function StatsBar({ results }: StatsBarProps) {
         >
           {PLATFORM_SHORT_LABEL[r.entry.platform] ?? 'PL'}:{' '}
           <span style={{ color: 'var(--text-secondary)' }}>
-            @{r.entry.username}
+            {formatEntryLabel(r)}
           </span>{' '}
           <strong>{r.data!.totalContributions.toLocaleString()}</strong>
         </span>
