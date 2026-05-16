@@ -278,7 +278,13 @@ body {
 /* ── GitHub sign-in button ──────────────────────────────────────────
    Dark mode:  solid dark button, white text & mark (standard GitHub style)
    Light mode: soft outlined button, dark text & mark (less heavy on white)
+
+   The default (.gh-sign-in-btn) is dark since :root defaults to dark.
+   Light styles only apply via explicit [data-theme='light'] or via the
+   prefers-color-scheme media query when no manual theme is set.
    ──────────────────────────────────────────────────────────────────── */
+
+/* Base / dark (matches :root default) */
 .gh-sign-in-btn {
   background-color: #24292f;
   color: #ffffff;
@@ -286,13 +292,21 @@ body {
   text-decoration: none;
 }
 
-[data-theme='light'] .gh-sign-in-btn,
-:root:not([data-theme]) .gh-sign-in-btn {
+/* Explicit dark override (redundant but defensive) */
+[data-theme='dark'] .gh-sign-in-btn {
+  background-color: #24292f;
+  color: #ffffff;
+  border: 1px solid #30363d;
+}
+
+/* Explicit light override */
+[data-theme='light'] .gh-sign-in-btn {
   background-color: #f6f8fa;
   color: #24292f;
   border: 1px solid #d0d7de;
 }
 
+/* System preference light (only when no manual theme is set) */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) .gh-sign-in-btn {
     background-color: #f6f8fa;
