@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { AuthStatus } from '@/components/AuthStatus';
 import { ContributionExplorer } from '@/components/ContributionExplorer';
 import { GitAllLogo } from '@/components/GitAllLogo';
+import { SignInBanner } from '@/components/SignInBanner';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FAQ_ITEMS } from '@/lib/faq';
 
@@ -29,6 +30,7 @@ export default function Home() {
           <Suspense fallback={<ContributionExplorerFallback />}>
             <ContributionExplorer />
           </Suspense>
+          <SignInBanner />
         </section>
 
         {/* ── About ─────────────────────────────────────────────── */}
