@@ -3,7 +3,7 @@
 Unified contribution heatmap viewer for GitHub, GitLab, Bitbucket, and Gitea/Forgejo. Enter usernames from any supported platform and see their contribution squares side-by-side or merged into a single integrated view.
 
 **Live at [gitall.app](https://gitall.app)**
-<img src="https://github.com/Toastbyte-Studios/git-all/actions/workflows/deploy.yml/badge.svg">
+[![Deploy to Cloudflare](https://github.com/Toastbyte-Studios/git-all/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/Toastbyte-Studios/git-all/actions/workflows/deploy.yml)
 
 ## Getting Started
 
