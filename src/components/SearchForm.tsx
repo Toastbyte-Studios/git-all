@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DEFAULT_GITEA_INSTANCE_URL,
   GITEA_CUSTOM_INSTANCE_VALUE,
   GITEA_KNOWN_INSTANCES,
 } from '@/lib/gitea';
+import { generatePlaceholderNames } from '@/lib/placeholder-names';
 
 interface SearchFormProps {
   onSearch: (
@@ -19,6 +20,7 @@ interface SearchFormProps {
 }
 
 export function SearchForm({ onSearch, loading }: SearchFormProps) {
+  const placeholders = useMemo(() => generatePlaceholderNames(4), []);
   const [github, setGithub] = useState('');
   const [gitlab, setGitlab] = useState('');
   const [bitbucket, setBitbucket] = useState('');
@@ -54,7 +56,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
             type="text"
             value={github}
             onChange={(e) => setGithub(e.target.value)}
-            placeholder="octocat"
+            placeholder={placeholders[0]}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
             style={{
               backgroundColor: 'var(--bg-surface)',
@@ -76,7 +78,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
             type="text"
             value={gitlab}
             onChange={(e) => setGitlab(e.target.value)}
-            placeholder="johndoe"
+            placeholder={placeholders[1]}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
             style={{
               backgroundColor: 'var(--bg-surface)',
@@ -98,7 +100,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
             type="text"
             value={bitbucket}
             onChange={(e) => setBitbucket(e.target.value)}
-            placeholder="atlassian"
+            placeholder={placeholders[2]}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
             style={{
               backgroundColor: 'var(--bg-surface)',
@@ -120,7 +122,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
             type="text"
             value={gitea}
             onChange={(e) => setGitea(e.target.value)}
-            placeholder="johndoe"
+            placeholder={placeholders[3]}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
             style={{
               backgroundColor: 'var(--bg-surface)',

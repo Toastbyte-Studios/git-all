@@ -1,0 +1,176 @@
+export const ADJECTIVES: readonly string[] = [
+  'bouncy',
+  'sleepy',
+  'majestic',
+  'crinkly',
+  'soggy',
+  'sparkly',
+  'thunderous',
+  'grumpy',
+  'wiggly',
+  'fluffy',
+  'zesty',
+  'wobbly',
+  'sneaky',
+  'breezy',
+  'crunchy',
+  'squishy',
+  'jolly',
+  'fuzzy',
+  'snappy',
+  'clumsy',
+  'peppy',
+  'lanky',
+  'plucky',
+  'prickly',
+  'bubbly',
+  'scruffy',
+  'perky',
+  'wacky',
+  'drippy',
+  'gloomy',
+  'lumpy',
+  'flimsy',
+  'grouchy',
+  'chirpy',
+  'whimsical',
+  'clunky',
+  'frothy',
+  'snarky',
+  'dinky',
+  'quirky',
+  'stubby',
+  'zingy',
+  'mushy',
+  'creaky',
+  'giddy',
+  'lofty',
+  'rusty',
+  'silky',
+  'tangy',
+  'twitchy',
+  'velvety',
+  'wooly',
+  'zippy',
+  'dazzling',
+  'frosty',
+  'glittery',
+  'honking',
+  'jazzy',
+  'knobbly',
+  'loopy',
+  'munchy',
+  'noodly',
+  'oozy',
+  'puffy',
+  'rambling',
+  'sloppy',
+  'toasty',
+  'uppity',
+  'vivid',
+  'wobbly',
+  'yawning',
+];
+
+export const NOUNS: readonly string[] = [
+  'walrus',
+  'noodle',
+  'pickle',
+  'wizard',
+  'kazoo',
+  'toaster',
+  'biscuit',
+  'penguin',
+  'muffin',
+  'cactus',
+  'goblin',
+  'waffle',
+  'llama',
+  'turnip',
+  'snorkel',
+  'pebble',
+  'hamster',
+  'spatula',
+  'radish',
+  'wombat',
+  'donut',
+  'teapot',
+  'noodle',
+  'raccoon',
+  'pretzel',
+  'marmot',
+  'blobfish',
+  'cabbage',
+  'igloo',
+  'jellybean',
+  'koala',
+  'lantern',
+  'mittens',
+  'narwhal',
+  'origami',
+  'parsnip',
+  'quokka',
+  'rhubarb',
+  'scone',
+  'toadstool',
+  'umbrella',
+  'vessel',
+  'weasel',
+  'yak',
+  'zeppelin',
+  'anchovy',
+  'bagpipe',
+  'catfish',
+  'dumbbell',
+  'eggplant',
+  'flamingo',
+  'gerbil',
+  'harmonica',
+  'icicle',
+  'jawbreaker',
+  'kettle',
+  'lollipop',
+  'macaroon',
+  'nectarine',
+  'opossum',
+  'platypus',
+  'quicksand',
+  'rutabaga',
+  'salamander',
+  'trombone',
+  'ukulele',
+  'varmint',
+  'woodpecker',
+  'xylophone',
+  'yodel',
+  'zucchini',
+];
+
+export function generatePlaceholderName(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  return `${adj}-${noun}`;
+}
+
+export function generatePlaceholderNames(count: number): string[] {
+  const results: string[] = [];
+  const seen = new Set<string>();
+  const maxAttempts = (ADJECTIVES.length * NOUNS.length) / 2;
+  let attempts = 0;
+
+  while (results.length < count && attempts < maxAttempts) {
+    const name = generatePlaceholderName();
+    if (!seen.has(name)) {
+      seen.add(name);
+      results.push(name);
+    }
+    attempts++;
+  }
+
+  // Fallback: if we somehow exhausted unique combinations, fill with indexed names
+  while (results.length < count) {
+    results.push(`user-${results.length + 1}`);
+  }
+
+  return results;
+}
