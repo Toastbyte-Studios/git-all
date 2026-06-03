@@ -1,11 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_GITEA_INSTANCE_URL,
   GITEA_CUSTOM_INSTANCE_VALUE,
   GITEA_KNOWN_INSTANCES,
 } from '@/lib/gitea';
+import { generatePlaceholderName } from '@/lib/placeholder-names';
 import type { UserEntry } from '@/lib/types';
 
 const MAX_USERS = 10;
@@ -15,6 +16,8 @@ interface MultiUserFormProps {
   loading: boolean;
 }
 
+type EntryWithPlaceholder = UserEntry & { placeholder: string };
+
 let _counter = 0;
 function nextId(): string {
   return `entry-${++_counter}`;
@@ -23,25 +26,37 @@ function nextId(): string {
 function createEntry(
   platform: UserEntry['platform'] = 'github',
   username = '',
-): UserEntry {
+  placeholder = '',
+): EntryWithPlaceholder {
   return {
     id: nextId(),
     platform,
     username,
     instanceUrl: platform === 'gitea' ? DEFAULT_GITEA_INSTANCE_URL : undefined,
+    placeholder,
   };
 }
 
 export function MultiUserForm({ onSearch, loading }: MultiUserFormProps) {
-  const initialId = useRef(nextId());
-  const [entries, setEntries] = useState<UserEntry[]>([
-    { id: initialId.current, platform: 'github', username: '' },
+  const initialEntry = useRef(createEntry());
+  const [entries, setEntries] = useState<EntryWithPlaceholder[]>([
+    initialEntry.current,
   ]);
+
+  useEffect(() => {
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.placeholder
+          ? entry
+          : { ...entry, placeholder: generatePlaceholderName() },
+      ),
+    );
+  }, []);
 
   const addEntry = () => {
     setEntries((prev) => {
       if (prev.length >= MAX_USERS) return prev;
-      return [...prev, createEntry()];
+      return [...prev, createEntry('github', '', generatePlaceholderName())];
     });
   };
 
@@ -106,15 +121,7 @@ export function MultiUserForm({ onSearch, loading }: MultiUserFormProps) {
                 onChange={(e) =>
                   updateEntry(entry.id, { username: e.target.value })
                 }
-                placeholder={
-                  entry.platform === 'github'
-                    ? 'octocat'
-                    : entry.platform === 'gitlab'
-                      ? 'johndoe'
-                      : entry.platform === 'bitbucket'
-                        ? 'atlassian'
-                        : 'johndoe'
-                }
+                placeholder={entry.placeholder}
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
                 style={{
                   backgroundColor: 'var(--bg-surface)',
