@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DEFAULT_GITEA_INSTANCE_URL,
   GITEA_CUSTOM_INSTANCE_VALUE,
   GITEA_KNOWN_INSTANCES,
 } from '@/lib/gitea';
 import { generatePlaceholderNames } from '@/lib/placeholder-names';
+
+const DEFAULT_PLACEHOLDERS = ['user-1', 'user-2', 'user-3', 'user-4'];
 
 interface SearchFormProps {
   onSearch: (
@@ -20,7 +22,7 @@ interface SearchFormProps {
 }
 
 export function SearchForm({ onSearch, loading }: SearchFormProps) {
-  const placeholders = useMemo(() => generatePlaceholderNames(4), []);
+  const [placeholders, setPlaceholders] = useState(DEFAULT_PLACEHOLDERS);
   const [github, setGithub] = useState('');
   const [gitlab, setGitlab] = useState('');
   const [bitbucket, setBitbucket] = useState('');
@@ -29,6 +31,10 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
     DEFAULT_GITEA_INSTANCE_URL,
   );
   const [customGiteaInstance, setCustomGiteaInstance] = useState('');
+
+  useEffect(() => {
+    setPlaceholders(generatePlaceholderNames(DEFAULT_PLACEHOLDERS.length));
+  }, []);
 
   const giteaInstanceUrl =
     giteaInstancePreset === GITEA_CUSTOM_INSTANCE_VALUE

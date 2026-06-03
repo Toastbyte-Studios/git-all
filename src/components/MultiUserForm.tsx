@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_GITEA_INSTANCE_URL,
   GITEA_CUSTOM_INSTANCE_VALUE,
@@ -26,13 +26,14 @@ function nextId(): string {
 function createEntry(
   platform: UserEntry['platform'] = 'github',
   username = '',
+  placeholder = '',
 ): EntryWithPlaceholder {
   return {
     id: nextId(),
     platform,
     username,
     instanceUrl: platform === 'gitea' ? DEFAULT_GITEA_INSTANCE_URL : undefined,
-    placeholder: generatePlaceholderName(),
+    placeholder,
   };
 }
 
@@ -42,10 +43,20 @@ export function MultiUserForm({ onSearch, loading }: MultiUserFormProps) {
     initialEntry.current,
   ]);
 
+  useEffect(() => {
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.placeholder
+          ? entry
+          : { ...entry, placeholder: generatePlaceholderName() },
+      ),
+    );
+  }, []);
+
   const addEntry = () => {
     setEntries((prev) => {
       if (prev.length >= MAX_USERS) return prev;
-      return [...prev, createEntry()];
+      return [...prev, createEntry('github', '', generatePlaceholderName())];
     });
   };
 
