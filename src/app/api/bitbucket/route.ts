@@ -7,7 +7,8 @@ import {
 } from '@/lib/contribution-period';
 
 const BITBUCKET_API_BASE = 'https://api.bitbucket.org/2.0';
-const BITBUCKET_USERNAME_PATTERN = /^[a-zA-Z0-9._-]{1,100}$/;
+const BITBUCKET_SLUG_PATTERN = /^[a-zA-Z0-9._-]{1,100}$/;
+const BITBUCKET_URL_PREFIX = /^(?:https?:\/\/)?bitbucket\.org\/([^/?#]+)/i;
 const BITBUCKET_PAGE_SIZE = 100;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE_TTL_SECONDS = Math.floor(CACHE_TTL_MS / 1000);
@@ -19,6 +20,10 @@ const MAX_COMMIT_PAGES_PER_REPOSITORY = 2;
 
 interface BitbucketRepository {
   slug: string;
+  owner?: {
+    account_id?: string;
+    nickname?: string;
+  };
 }
 
 interface BitbucketPaginatedResponse<T> {
@@ -26,10 +31,16 @@ interface BitbucketPaginatedResponse<T> {
   next?: string;
 }
 
+interface BitbucketUser {
+  account_id?: string;
+  nickname: string;
+}
+
 interface BitbucketCommit {
   date: string;
   author?: {
     user?: {
+      account_id?: string;
       nickname?: string;
       username?: string;
     };
@@ -138,22 +149,24 @@ function getOrCreateInFlightContributionRequest(
 }
 
 export async function GET(request: NextRequest) {
-  const requestedUsername = request.nextUrl.searchParams
-    .get('username')
-    ?.trim();
+  const rawInput = request.nextUrl.searchParams.get('username')?.trim();
 
-  if (!requestedUsername) {
+  if (!rawInput) {
     return NextResponse.json(
       { error: 'Missing username parameter' },
       { status: 400 },
     );
   }
 
-  if (!BITBUCKET_USERNAME_PATTERN.test(requestedUsername)) {
+  // Accept full profile URLs: https://bitbucket.org/jason-shprintz/...
+  const urlMatch = rawInput.match(BITBUCKET_URL_PREFIX);
+  const requestedUsername = urlMatch ? urlMatch[1] : rawInput;
+
+  if (!BITBUCKET_SLUG_PATTERN.test(requestedUsername)) {
     return NextResponse.json(
       {
         error:
-          'Invalid Bitbucket username. Usernames may include letters, numbers, periods, underscores, and hyphens.',
+          'Invalid Bitbucket workspace. Enter your workspace slug or paste your bitbucket.org profile URL.',
       },
       { status: 400 },
     );
@@ -192,10 +205,17 @@ export async function GET(request: NextRequest) {
       async () => {
         const repositories = await fetchAllRepositories(username);
 
+        // Extract account_id from repo owner — more reliable than a separate
+        // /users lookup since it works with nicknames and avoids a deprecated endpoint
+        const user: BitbucketUser = {
+          nickname: repositories[0]?.owner?.nickname ?? username,
+          account_id: repositories[0]?.owner?.account_id,
+        };
+
         const counts = new Map<string, number>();
         for (const repo of repositories) {
           await aggregateRepositoryCommits({
-            username,
+            user,
             repoSlug: repo.slug,
             fromMs,
             toExclusiveMs,
@@ -284,19 +304,19 @@ async function fetchAllRepositories(username: string) {
 }
 
 async function aggregateRepositoryCommits({
-  username,
+  user,
   repoSlug,
   fromMs,
   toExclusiveMs,
   counts,
 }: {
-  username: string;
+  user: BitbucketUser;
   repoSlug: string;
   fromMs: number;
   toExclusiveMs: number;
   counts: Map<string, number>;
 }) {
-  let nextUrl = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(username)}/${encodeURIComponent(repoSlug)}/commits?pagelen=${BITBUCKET_PAGE_SIZE}`;
+  let nextUrl = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(user.nickname)}/${encodeURIComponent(repoSlug)}/commits?pagelen=${BITBUCKET_PAGE_SIZE}`;
   let pageCount = 0;
 
   while (nextUrl && pageCount < MAX_COMMIT_PAGES_PER_REPOSITORY) {
@@ -334,7 +354,7 @@ async function aggregateRepositoryCommits({
         continue;
       }
 
-      if (!isCommitByUsername(commit, username)) {
+      if (!isCommitByUser(commit, user)) {
         continue;
       }
 
@@ -350,16 +370,24 @@ async function aggregateRepositoryCommits({
   }
 }
 
-function isCommitByUsername(commit: BitbucketCommit, username: string) {
-  const target = username.toLowerCase();
-  const user = commit.author?.user;
+function isCommitByUser(commit: BitbucketCommit, user: BitbucketUser) {
+  const commitUser = commit.author?.user;
+  if (!commitUser) return false;
 
-  const userFields = [user?.username, user?.nickname]
+  // Primary: stable account_id match (works for modern Atlassian accounts
+  // where username is deprecated)
+  if (commitUser.account_id && commitUser.account_id === user.account_id) {
+    return true;
+  }
+
+  // Fallback: nickname/username match for older accounts or unlinked commits
+  const nicknameLower = user.nickname.toLowerCase();
+  return [commitUser.username, commitUser.nickname]
     .filter((value): value is string => Boolean(value))
-    .map((value) => value.toLowerCase());
-
-  return userFields.includes(target);
+    .map((value) => value.toLowerCase())
+    .includes(nicknameLower);
 }
+
 
 function normalizeRequestedRange(
   request: NextRequest,

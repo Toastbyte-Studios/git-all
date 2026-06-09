@@ -99,7 +99,14 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
             className="block text-xs font-medium mb-1.5"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Bitbucket username
+            Bitbucket workspace
+            <span
+              className="ml-1 font-normal"
+              style={{ color: 'var(--text-tertiary, var(--text-secondary))' }}
+              title="Find it in your profile URL: bitbucket.org/{workspace}"
+            >
+              (bitbucket.org/<em>workspace</em>)
+            </span>
           </label>
           <input
             id="bitbucket"
