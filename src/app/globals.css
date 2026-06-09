@@ -83,7 +83,6 @@
   --ga-level-2: #0d9488;
   --ga-level-3: #2dd4bf;
   --ga-level-4: #5eead4;
-
 }
 
 /* Manual light override */
@@ -142,7 +141,6 @@
   --ga-level-2: #2dd4bf;
   --ga-level-3: #0d9488;
   --ga-level-4: #0f766e;
-
 }
 
 /* Manual dark override */
@@ -201,7 +199,6 @@
   --ga-level-2: #0d9488;
   --ga-level-3: #2dd4bf;
   --ga-level-4: #5eead4;
-
 }
 
 /* System preference: light (when no manual choice has been set) */

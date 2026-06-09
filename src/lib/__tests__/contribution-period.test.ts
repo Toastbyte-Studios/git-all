@@ -178,34 +178,32 @@ describe('normalizeCustomDateRange', () => {
 
 describe('isRangeWithinOneYear', () => {
   it('returns true for a range exactly under 1 year', () => {
-    expect(
-      isRangeWithinOneYear({ from: '2023-06-16', to: '2024-06-15' }),
-    ).toBe(true);
+    expect(isRangeWithinOneYear({ from: '2023-06-16', to: '2024-06-15' })).toBe(
+      true,
+    );
   });
 
   it('returns true for a short range', () => {
-    expect(
-      isRangeWithinOneYear({ from: '2024-01-01', to: '2024-01-31' }),
-    ).toBe(true);
+    expect(isRangeWithinOneYear({ from: '2024-01-01', to: '2024-01-31' })).toBe(
+      true,
+    );
   });
 
   it('returns false for a range spanning exactly 1 year (from not > toDate-1year)', () => {
     // from === toDate - 1 year → not strictly greater → false
-    expect(
-      isRangeWithinOneYear({ from: '2023-06-15', to: '2024-06-15' }),
-    ).toBe(false);
+    expect(isRangeWithinOneYear({ from: '2023-06-15', to: '2024-06-15' })).toBe(
+      false,
+    );
   });
 
   it('returns false for a range spanning more than 1 year', () => {
-    expect(
-      isRangeWithinOneYear({ from: '2022-01-01', to: '2024-06-15' }),
-    ).toBe(false);
+    expect(isRangeWithinOneYear({ from: '2022-01-01', to: '2024-06-15' })).toBe(
+      false,
+    );
   });
 
   it('returns false for invalid date strings', () => {
-    expect(isRangeWithinOneYear({ from: 'bad', to: '2024-06-15' })).toBe(
-      false,
-    );
+    expect(isRangeWithinOneYear({ from: 'bad', to: '2024-06-15' })).toBe(false);
   });
 });
 

@@ -48,7 +48,9 @@ describe('generatePlaceholderName', () => {
   });
 
   it('returns different values across multiple calls (probabilistic)', () => {
-    const names = new Set(Array.from({ length: 20 }, () => generatePlaceholderName()));
+    const names = new Set(
+      Array.from({ length: 20 }, () => generatePlaceholderName()),
+    );
     // With 4900 combinations, getting 20 unique out of 20 tries is overwhelmingly likely
     expect(names.size).toBeGreaterThan(1);
   });
