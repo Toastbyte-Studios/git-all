@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1781024090295" clover="3.2.0">
+  <project timestamp="1781024090295" name="All files">
+    <metrics statements="176" coveredstatements="169" conditionals="80" coveredconditionals="78" methods="29" coveredmethods="28" elements="285" coveredelements="275" complexity="0" loc="176" ncloc="176" packages="1" files="7" classes="7"/>
+    <file name="app-metadata.ts" path="/Volumes/ExternalSSD/Code/GitHub/git-all/src/lib/app-metadata.ts">
+      <metrics statements="3" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <line num="3" count="0" type="stmt"/>
+      <line num="4" count="0" type="stmt"/>
+      <line num="5" count="0" type="stmt"/>
+    </file>
+    <file name="auth-session.ts" path="/Volumes/ExternalSSD/Code/GitHub/git-all/src/lib/auth-session.ts">
+      <metrics statements="64" coveredstatements="61" conditionals="21" coveredconditionals="19" methods="8" coveredmethods="7"/>
+      <line num="3" count="1" type="stmt"/>
+      <line num="4" count="1" type="stmt"/>
+      <line num="5" count="1" type="stmt"/>
+      <line num="6" count="1" type="stmt"/>
+      <line num="7" count="1" type="stmt"/>
+      <line num="10" count="1" type="stmt"/>
+      <line num="35" count="20" type="stmt"/>
+      <line num="36" count="20" type="stmt"/>
+      <line num="37" count="1010" type="stmt"/>
+      <line num="39" count="20" type="stmt"/>
+      <line num="46" count="6" type="stmt"/>
+      <line num="47" count="6" type="stmt"/>
+      <line num="48" count="6" type="cond" truecount="1" falsecount="1"/>
+      <line num="49" count="0" type="stmt"/>
+      <line num="52" count="6" type="stmt"/>
+      <line num="53" count="6" type="stmt"/>
+      <line num="54" count="6" type="stmt"/>
+      <line num="55" count="6" type="stmt"/>
+      <line num="56" count="372" type="stmt"/>
+      <line num="58" count="6" type="stmt"/>
+      <line num="64" count="4" type="stmt"/>
+      <line num="70" count="5" type="stmt"/>
+      <line num="71" count="5" type="stmt"/>
+      <line num="72" count="5" type="stmt"/>
+      <line num="78" count="11" type="stmt"/>
+      <line num="79" count="11" type="cond" truecount="2" falsecount="0"/>
+      <line num="80" count="2" type="stmt"/>
+      <line num="83" count="9" type="stmt"/>
+      <line num="84" count="9" type="stmt"/>
+      <line num="86" count="9" type="stmt"/>
+      <line num="97" count="6" type="stmt"/>
+      <line num="98" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="99" count="1" type="stmt"/>
+      <line num="102" count="5" type="stmt"/>
+      <line num="103" count="5" type="stmt"/>
+      <line num="108" count="5" type="stmt"/>
+      <line num="115" count="5" type="stmt"/>
+      <line num="118" count="5" type="stmt"/>
+      <line num="122" count="5" type="stmt"/>
+      <line num="123" count="5" type="stmt"/>
+      <line num="125" count="5" type="stmt"/>
+      <line num="131" count="7" type="cond" truecount="2" falsecount="0"/>
+      <line num="132" count="2" type="stmt"/>
+      <line num="135" count="5" type="stmt"/>
+      <line num="136" count="5" type="cond" truecount="2" falsecount="0"/>
+      <line num="137" count="1" type="stmt"/>
+      <line num="140" count="4" type="stmt"/>
+      <line num="141" count="4" type="cond" truecount="2" falsecount="0"/>
+      <line num="142" count="2" type="stmt"/>
+      <line num="145" count="2" type="stmt"/>
+      <line num="147" count="2" type="stmt"/>
+      <line num="148" count="2" type="stmt"/>
+      <line num="149" count="2" type="stmt"/>
+      <line num="150" count="2" type="stmt"/>
+      <line num="153" count="2" type="stmt"/>
+      <line num="154" count="2" type="stmt"/>
+      <line num="155" count="2" type="stmt"/>
+      <line num="157" count="2" type="stmt"/>
+      <line num="163" count="1" type="stmt"/>
+      <line num="167" count="1" type="cond" truecount="1" falsecount="1"/>
+      <line num="174" count="0" type="stmt"/>
+      <line num="177" count="1" type="stmt"/>
+      <line num="179" count="1" type="stmt"/>
+      <line num="186" count="0" type="stmt"/>
+    </file>
+    <file name="contribution-period.ts" path="/Volumes/ExternalSSD/Code/GitHub/git-all/src/lib/contribution-period.ts">
+      <metrics statements="69" coveredstatements="69" conditionals="45" coveredconditionals="45" methods="16" coveredmethods="16"/>
+      <line num="22" count="1" type="stmt"/>
+      <line num="27" count="1" type="stmt"/>
+      <line num="44" count="79" type="stmt"/>
+      <line num="48" count="3" type="stmt"/>
+      <line num="49" count="3" type="stmt"/>
+      <line num="55" count="33" type="stmt"/>
+      <line num="59" count="61" type="cond" truecount="4" falsecount="0"/>
+      <line num="60" count="22" type="stmt"/>
+      <line num="63" count="39" type="stmt"/>
+      <line num="64" count="39" type="stmt"/>
+      <line num="66" count="39" type="cond" truecount="2" falsecount="0"/>
+      <line num="71" count="4" type="stmt"/>
+      <line num="74" count="35" type="stmt"/>
+      <line num="78" count="3" type="stmt"/>
+      <line num="79" count="3" type="stmt"/>
+      <line num="80" count="3" type="stmt"/>
+      <line num="84" count="13" type="stmt"/>
+      <line num="88" count="4" type="stmt"/>
+      <line num="89" count="4" type="stmt"/>
+      <line num="90" count="4" type="stmt"/>
+      <line num="91" count="4" type="stmt"/>
+      <line num="92" count="4" type="stmt"/>
+      <line num="93" count="4" type="stmt"/>
+      <line num="94" count="4" type="stmt"/>
+      <line num="98" count="9" type="stmt"/>
+      <line num="99" count="9" type="stmt"/>
+      <line num="100" count="9" type="stmt"/>
+      <line num="101" count="9" type="stmt"/>
+      <line num="102" count="9" type="stmt"/>
+      <line num="103" count="9" type="stmt"/>
+      <line num="104" count="9" type="stmt"/>
+      <line num="113" count="10" type="cond" truecount="8" falsecount="0"/>
+      <line num="115" count="1" type="stmt"/>
+      <line num="120" count="2" type="stmt"/>
+      <line num="125" count="2" type="stmt"/>
+      <line num="130" count="1" type="stmt"/>
+      <line num="136" count="1" type="stmt"/>
+      <line num="137" count="1" type="stmt"/>
+      <line num="143" count="1" type="stmt"/>
+      <line num="146" count="2" type="stmt"/>
+      <line num="157" count="17" type="stmt"/>
+      <line num="158" count="17" type="stmt"/>
+      <line num="160" count="17" type="cond" truecount="5" falsecount="0"/>
+      <line num="161" count="11" type="stmt"/>
+      <line num="164" count="6" type="stmt"/>
+      <line num="179" count="6" type="cond" truecount="4" falsecount="0"/>
+      <line num="180" count="1" type="stmt"/>
+      <line num="183" count="5" type="stmt"/>
+      <line num="184" count="5" type="cond" truecount="2" falsecount="0"/>
+      <line num="185" count="2" type="stmt"/>
+      <line num="188" count="3" type="cond" truecount="2" falsecount="0"/>
+      <line num="189" count="2" type="stmt"/>
+      <line num="192" count="1" type="stmt"/>
+      <line num="196" count="8" type="stmt"/>
+      <line num="197" count="8" type="stmt"/>
+      <line num="199" count="8" type="cond" truecount="5" falsecount="0"/>
+      <line num="200" count="1" type="stmt"/>
+      <line num="203" count="7" type="stmt"/>
+      <line num="209" count="5" type="stmt"/>
+      <line num="214" count="5" type="cond" truecount="2" falsecount="0"/>
+      <line num="215" count="1" type="stmt"/>
+      <line num="222" count="4" type="stmt"/>
+      <line num="223" count="4" type="cond" truecount="4" falsecount="0"/>
+      <line num="224" count="1" type="stmt"/>
+      <line num="231" count="3" type="stmt"/>
+      <line num="239" count="1" type="stmt"/>
+      <line num="250" count="4" type="stmt"/>
+      <line num="251" count="4" type="stmt"/>
+      <line num="252" count="4" type="stmt"/>
+    </file>
+    <file name="faq.ts" path="/Volumes/ExternalSSD/Code/GitHub/git-all/src/lib/faq.ts">
+      <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <line num="1" count="0" type="stmt"/>
+    </file>
+    <file name="gitea.ts" path="/Volumes/ExternalSSD/Code/GitHub/git-all/src/lib/gitea.ts">
+      <metrics statements="21" coveredstatements="21" conditionals="10" coveredconditionals="10" methods="3" coveredmethods="3"/>
+      <line num="1" count="1" type="stmt"/>
+      <line num="3" count="1" type="stmt"/>
+      <line num="8" count="1" type="stmt"/>
+      <line num="11" count="13" type="stmt"/>
+      <line num="12" count="13" type="cond" truecount="2" falsecount="0"/>
+      <line num="14" count="11" type="stmt"/>
+      <line num="15" count="11" type="stmt"/>
+      <line num="16" count="11" type="cond" truecount="4" falsecount="0"/>
+      <line num="17" count="2" type="stmt"/>
+      <line num="19" count="7" type="stmt"/>
+      <line num="20" count="7" type="stmt"/>
+      <line num="21" count="7" type="stmt"/>
+      <line num="22" count="7" type="stmt"/>
+      <line num="24" count="2" type="stmt"/>
+      <line num="29" count="9" type="cond" truecount="2" falsecount="0"/>
+      <line num="31" count="7" type="stmt"/>
+      <line num="32" count="12" type="stmt"/>
+      <line num="34" count="7" type="cond" truecount="2" falsecount="0"/>
+      <line num="36" count="3" type="stmt"/>
+      <line num="37" count="3" type="stmt"/>
+      <line num="39" count="1" type="stmt"/>
+    </file>
+    <file name="placeholder-names.ts" path="/Volumes/ExternalSSD/Code/GitHub/git-all/src/lib/placeholder-names.ts">
+      <metrics statements="18" coveredstatements="18" conditionals="4" coveredconditionals="4" methods="2" coveredmethods="2"/>
+      <line num="1" count="1" type="stmt"/>
+      <line num="74" count="1" type="stmt"/>
+      <line num="148" count="2602" type="stmt"/>
+      <line num="149" count="2602" type="stmt"/>
+      <line num="150" count="2602" type="stmt"/>
+      <line num="154" count="8" type="stmt"/>
+      <line num="155" count="8" type="stmt"/>
+      <line num="156" count="8" type="stmt"/>
+      <line num="157" count="8" type="stmt"/>
+      <line num="159" count="8" type="cond" truecount="2" falsecount="0"/>
+      <line num="160" count="2581" type="stmt"/>
+      <line num="161" count="2581" type="cond" truecount="2" falsecount="0"/>
+      <line num="162" count="2028" type="stmt"/>
+      <line num="163" count="2028" type="stmt"/>
+      <line num="165" count="2581" type="stmt"/>
+      <line num="169" count="8" type="stmt"/>
+      <line num="170" count="3007" type="stmt"/>
+      <line num="173" count="8" type="stmt"/>
+    </file>
+    <file name="types.ts" path="/Volumes/ExternalSSD/Code/GitHub/git-all/src/lib/types.ts">
+      <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+    </file>
+  </project>
+</coverage>

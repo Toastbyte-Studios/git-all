@@ -1,20 +1,22 @@
 {
   "name": "git-all",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "clean:appledouble": "find . -type f -name '._*' -delete",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
-    "cleanup": "npm run clean:appledouble && npm run format && npm run lint",
+    "cleanup": "npm run format && npm run lint && npm run test",
     "cf:build": "npx @opennextjs/cloudflare build",
     "cf:preview": "npm run cf:build && wrangler dev",
-    "cf:deploy": "npm run cf:build && wrangler deploy"
+    "cf:deploy": "npm run cf:build && wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "next": "^15.3.0",
@@ -29,6 +31,7 @@
     "@types/react-dom": "^19.1.0",
     "@typescript-eslint/eslint-plugin": "^8.59.2",
     "@typescript-eslint/parser": "^8.59.2",
+    "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^9.39.4",
     "eslint-config-next": "15.5.15",
     "eslint-config-prettier": "^10.1.8",
@@ -38,6 +41,7 @@
     "prettier": "^3.8.3",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.0",
+    "vitest": "^4.1.8",
     "wrangler": "^4.0.0"
   }
 }
