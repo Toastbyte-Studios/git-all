@@ -10,7 +10,7 @@
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
-    "cleanup": "npm run format && npm run lint && npm run test && npm run test:coverage",
+    "cleanup": "npm run format && npm run lint && npm run test",
     "cf:build": "npx @opennextjs/cloudflare build",
     "cf:preview": "npm run cf:build && wrangler dev",
     "cf:deploy": "npm run cf:build && wrangler deploy",
