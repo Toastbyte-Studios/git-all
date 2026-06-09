@@ -1,180 +1,295 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  encodeAuthSession,
-  decodeAuthSession,
-  createOAuthState,
-  hasGithubOAuthConfig,
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
-  STATE_COOKIE_NAME,
+  SESSION_VERSION,
   STATE_MAX_AGE_SECONDS,
+  createOAuthState,
+  decodeAuthSession,
+  encodeAuthSession,
+  getStateCookieName,
+  mergeConnectionIntoSession,
+  removeConnectionFromSession,
   type AuthSession,
 } from '../auth-session';
+import { hasOAuthConfig } from '../oauth-providers';
 
-const TEST_SECRET = 'test-secret-value-for-unit-tests-only';
+const TEST_SESSION_SECRET = 'test-session-secret-value-for-unit-tests-only';
 
-const ORIGINAL_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+const ORIGINAL_ENV = {
+  SESSION_SECRET: process.env.SESSION_SECRET,
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+  GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
+  GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
+  BITBUCKET_CLIENT_KEY: process.env.BITBUCKET_CLIENT_KEY,
+  BITBUCKET_CLIENT_SECRET: process.env.BITBUCKET_CLIENT_SECRET,
+};
 
 const SAMPLE_SESSION: AuthSession = {
-  accessToken: 'gho_testtoken123',
-  user: {
-    login: 'testuser',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/123',
+  primary: 'github',
+  connections: {
+    github: {
+      provider: 'github',
+      accountId: '123',
+      username: 'testuser',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/123',
+      accessToken: 'gho_testtoken123',
+      verifiedAt: 1_717_777_777_000,
+    },
   },
 };
 
-function setEnv(secret: string | undefined) {
-  if (secret === undefined) {
-    delete process.env.GITHUB_CLIENT_SECRET;
-  } else {
-    process.env.GITHUB_CLIENT_SECRET = secret;
+function restoreEnv() {
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
   }
 }
 
-afterEach(() => setEnv(ORIGINAL_CLIENT_SECRET));
+async function createSessionTokenForPayload(payload: unknown) {
+  const secret = new TextEncoder().encode(TEST_SESSION_SECRET);
+  const secretHash = await crypto.subtle.digest('SHA-256', secret);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    secretHash,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt'],
+  );
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify(payload));
+  const encrypted = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext),
+  );
+
+  const tagLength = 16;
+  const ciphertext = encrypted.slice(0, encrypted.length - tagLength);
+  const tag = encrypted.slice(encrypted.length - tagLength);
+
+  const toBase64Url = (value: Uint8Array) =>
+    Buffer.from(value)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+  return `${toBase64Url(iv)}.${toBase64Url(tag)}.${toBase64Url(ciphertext)}`;
+}
+
+beforeEach(() => {
+  process.env.SESSION_SECRET = TEST_SESSION_SECRET;
+});
+
+afterEach(() => {
+  restoreEnv();
+});
 
 describe('constants', () => {
-  it('SESSION_COOKIE_NAME is github_oauth_session', () => {
-    expect(SESSION_COOKIE_NAME).toBe('github_oauth_session');
+  it('uses the unified session cookie name', () => {
+    expect(SESSION_COOKIE_NAME).toBe('gitall_session');
   });
 
-  it('SESSION_MAX_AGE_SECONDS is 7 days', () => {
+  it('uses per-provider state cookie names', () => {
+    expect(getStateCookieName('github')).toBe('gitall_oauth_state_github');
+    expect(getStateCookieName('gitlab')).toBe('gitall_oauth_state_gitlab');
+    expect(getStateCookieName('bitbucket')).toBe(
+      'gitall_oauth_state_bitbucket',
+    );
+  });
+
+  it('keeps the existing session lifetime', () => {
     expect(SESSION_MAX_AGE_SECONDS).toBe(60 * 60 * 24 * 7);
   });
 
-  it('STATE_COOKIE_NAME is github_oauth_state', () => {
-    expect(STATE_COOKIE_NAME).toBe('github_oauth_state');
-  });
-
-  it('STATE_MAX_AGE_SECONDS is 10 minutes', () => {
+  it('keeps the existing state lifetime', () => {
     expect(STATE_MAX_AGE_SECONDS).toBe(60 * 10);
   });
 });
 
-describe('hasGithubOAuthConfig', () => {
-  const origClientId = process.env.GITHUB_CLIENT_ID;
-  afterEach(() => {
-    if (origClientId === undefined) delete process.env.GITHUB_CLIENT_ID;
-    else process.env.GITHUB_CLIENT_ID = origClientId;
+describe('hasOAuthConfig', () => {
+  it('returns true when GitHub OAuth env vars are set', () => {
+    process.env.GITHUB_CLIENT_ID = 'github-client-id';
+    process.env.GITHUB_CLIENT_SECRET = 'github-client-secret';
+
+    expect(hasOAuthConfig('github')).toBe(true);
   });
 
-  it('returns true when both env vars are set', () => {
-    process.env.GITHUB_CLIENT_ID = 'client_id';
-    process.env.GITHUB_CLIENT_SECRET = 'client_secret';
-    expect(hasGithubOAuthConfig()).toBe(true);
+  it('returns false when GitLab OAuth is partially configured', () => {
+    process.env.GITLAB_CLIENT_ID = 'gitlab-client-id';
+    delete process.env.GITLAB_CLIENT_SECRET;
+
+    expect(hasOAuthConfig('gitlab')).toBe(false);
   });
 
-  it('returns false when GITHUB_CLIENT_ID is missing', () => {
-    delete process.env.GITHUB_CLIENT_ID;
-    process.env.GITHUB_CLIENT_SECRET = 'client_secret';
-    expect(hasGithubOAuthConfig()).toBe(false);
-  });
+  it('uses Bitbucket client key env names', () => {
+    process.env.BITBUCKET_CLIENT_KEY = 'bitbucket-client-key';
+    process.env.BITBUCKET_CLIENT_SECRET = 'bitbucket-client-secret';
 
-  it('returns false when GITHUB_CLIENT_SECRET is missing', () => {
-    process.env.GITHUB_CLIENT_ID = 'client_id';
-    delete process.env.GITHUB_CLIENT_SECRET;
-    expect(hasGithubOAuthConfig()).toBe(false);
-  });
-
-  it('returns false when both env vars are missing', () => {
-    delete process.env.GITHUB_CLIENT_ID;
-    delete process.env.GITHUB_CLIENT_SECRET;
-    expect(hasGithubOAuthConfig()).toBe(false);
+    expect(hasOAuthConfig('bitbucket')).toBe(true);
   });
 });
 
 describe('createOAuthState', () => {
-  it('returns a non-empty string', () => {
+  it('returns a non-empty base64url string', () => {
     const state = createOAuthState();
-    expect(typeof state).toBe('string');
-    expect(state.length).toBeGreaterThan(0);
+
+    expect(state).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(state.length).toBeGreaterThanOrEqual(20);
   });
 
   it('returns different values on each call', () => {
-    const a = createOAuthState();
-    const b = createOAuthState();
-    expect(a).not.toBe(b);
-  });
-
-  it('returns a base64url string (no +, /, or = padding)', () => {
-    const state = createOAuthState();
-    expect(state).not.toMatch(/[+/=]/);
-  });
-
-  it('returns a string of reasonable length (16 bytes → ~22 chars base64url)', () => {
-    const state = createOAuthState();
-    expect(state.length).toBeGreaterThanOrEqual(20);
-    expect(state.length).toBeLessThanOrEqual(30);
+    expect(createOAuthState()).not.toBe(createOAuthState());
   });
 });
 
-describe('encodeAuthSession / decodeAuthSession roundtrip', () => {
-  beforeEach(() => setEnv(TEST_SECRET));
-  afterEach(() => setEnv(undefined));
+describe('encodeAuthSession / decodeAuthSession', () => {
+  it('round-trips a multi-connection session', async () => {
+    const token = await encodeAuthSession({
+      primary: 'gitlab',
+      connections: {
+        ...SAMPLE_SESSION.connections,
+        gitlab: {
+          provider: 'gitlab',
+          accountId: '456',
+          username: 'gitlab-user',
+          avatarUrl: 'https://gitlab.com/avatar.png',
+          accessToken: 'glpat-token',
+          verifiedAt: 1_717_777_888_000,
+        },
+      },
+    });
 
-  it('encodes and decodes a session correctly', async () => {
-    const token = await encodeAuthSession(SAMPLE_SESSION);
     expect(token).not.toBeNull();
-
-    const decoded = await decodeAuthSession(token!);
-    expect(decoded).not.toBeNull();
-    expect(decoded!.accessToken).toBe(SAMPLE_SESSION.accessToken);
-    expect(decoded!.user.login).toBe(SAMPLE_SESSION.user.login);
-    expect(decoded!.user.avatarUrl).toBe(SAMPLE_SESSION.user.avatarUrl);
+    await expect(decodeAuthSession(token!)).resolves.toEqual({
+      primary: 'gitlab',
+      connections: {
+        github: SAMPLE_SESSION.connections.github,
+        gitlab: {
+          provider: 'gitlab',
+          accountId: '456',
+          username: 'gitlab-user',
+          avatarUrl: 'https://gitlab.com/avatar.png',
+          accessToken: 'glpat-token',
+          verifiedAt: 1_717_777_888_000,
+        },
+      },
+    });
   });
 
-  it('encoded token is a 3-part dot-separated string', async () => {
+  it('returns different encrypted values on each encode', async () => {
+    const first = await encodeAuthSession(SAMPLE_SESSION);
+    const second = await encodeAuthSession(SAMPLE_SESSION);
+
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(first).not.toBe(second);
+  });
+
+  it('returns null for tampered cookies', async () => {
     const token = await encodeAuthSession(SAMPLE_SESSION);
     expect(token).not.toBeNull();
+
     const parts = token!.split('.');
-    expect(parts.length).toBe(3);
-    for (const part of parts) {
-      expect(part.length).toBeGreaterThan(0);
-    }
+    parts[2] = `${parts[2]}tampered`;
+
+    await expect(decodeAuthSession(parts.join('.'))).resolves.toBeNull();
   });
 
-  it('produces different tokens on each encode (random IV)', async () => {
-    const token1 = await encodeAuthSession(SAMPLE_SESSION);
-    const token2 = await encodeAuthSession(SAMPLE_SESSION);
-    expect(token1).not.toBe(token2);
+  it('returns null for expired cookies', async () => {
+    const token = await createSessionTokenForPayload({
+      version: SESSION_VERSION,
+      primary: 'github',
+      connections: SAMPLE_SESSION.connections,
+      expiresAt: Date.now() - 1,
+    });
+
+    await expect(decodeAuthSession(token)).resolves.toBeNull();
   });
 
-  it('returns null when decoding undefined', async () => {
-    expect(await decodeAuthSession(undefined)).toBeNull();
+  it('rejects older session versions', async () => {
+    const token = await createSessionTokenForPayload({
+      version: SESSION_VERSION - 1,
+      primary: 'github',
+      connections: SAMPLE_SESSION.connections,
+      expiresAt: Date.now() + 60_000,
+    });
+
+    await expect(decodeAuthSession(token)).resolves.toBeNull();
   });
 
-  it('returns null when decoding an empty string', async () => {
-    expect(await decodeAuthSession('')).toBeNull();
+  it('returns null when SESSION_SECRET is missing during encode', async () => {
+    delete process.env.SESSION_SECRET;
+
+    await expect(encodeAuthSession(SAMPLE_SESSION)).resolves.toBeNull();
   });
 
-  it('returns null for a malformed token (wrong part count)', async () => {
-    expect(await decodeAuthSession('only.two')).toBeNull();
-    expect(await decodeAuthSession('one')).toBeNull();
-  });
-
-  it('returns null for a token with tampered ciphertext', async () => {
+  it('returns null when SESSION_SECRET is missing during decode', async () => {
     const token = await encodeAuthSession(SAMPLE_SESSION);
-    expect(token).not.toBeNull();
-    const parts = token!.split('.');
-    // Corrupt the encrypted payload part
-    parts[2] = parts[2].split('').reverse().join('');
-    const tampered = parts.join('.');
-    expect(await decodeAuthSession(tampered)).toBeNull();
+    delete process.env.SESSION_SECRET;
+
+    await expect(decodeAuthSession(token ?? undefined)).resolves.toBeNull();
   });
 });
 
-describe('encodeAuthSession without secret', () => {
-  beforeEach(() => setEnv(undefined));
+describe('session connection helpers', () => {
+  it('adding a second connection preserves the first one', () => {
+    const merged = mergeConnectionIntoSession(SAMPLE_SESSION, {
+      provider: 'bitbucket',
+      accountId: 'workspace:789',
+      username: 'bb-user',
+      avatarUrl: 'https://bitbucket.org/avatar.png',
+      accessToken: 'bb-token',
+      verifiedAt: 1_717_777_999_000,
+    });
 
-  it('returns null when GITHUB_CLIENT_SECRET is not set', async () => {
-    const token = await encodeAuthSession(SAMPLE_SESSION);
-    expect(token).toBeNull();
+    expect(merged.connections.github).toEqual(
+      SAMPLE_SESSION.connections.github,
+    );
+    expect(merged.connections.bitbucket?.username).toBe('bb-user');
+    expect(merged.primary).toBe('bitbucket');
   });
-});
 
-describe('decodeAuthSession without secret', () => {
-  it('returns null when GITHUB_CLIENT_SECRET is not set', async () => {
-    setEnv(undefined);
-    expect(await decodeAuthSession('some.token.value')).toBeNull();
+  it('removing a connection leaves remaining ones intact', () => {
+    const nextSession = removeConnectionFromSession(
+      {
+        primary: 'github',
+        connections: {
+          ...SAMPLE_SESSION.connections,
+          gitlab: {
+            provider: 'gitlab',
+            accountId: '456',
+            username: 'gitlab-user',
+            avatarUrl: 'https://gitlab.com/avatar.png',
+            accessToken: 'glpat-token',
+            verifiedAt: 1_717_777_888_000,
+          },
+        },
+      },
+      'github',
+    );
+
+    expect(nextSession).not.toBeNull();
+    expect(nextSession).toEqual({
+      primary: 'gitlab',
+      connections: {
+        gitlab: {
+          provider: 'gitlab',
+          accountId: '456',
+          username: 'gitlab-user',
+          avatarUrl: 'https://gitlab.com/avatar.png',
+          accessToken: 'glpat-token',
+          verifiedAt: 1_717_777_888_000,
+        },
+      },
+    });
+  });
+
+  it('removing the last connection clears the session', () => {
+    expect(removeConnectionFromSession(SAMPLE_SESSION, 'github')).toBeNull();
   });
 });

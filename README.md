@@ -22,21 +22,38 @@ cp .env.example .env.local
 
 A GitHub personal access token is needed to call the GraphQL API (even for public data). No special scopes required — a classic token with zero permissions works.
 
-### Optional: Sign in with GitHub OAuth
+### Optional: Sign in with GitHub, GitLab, and Bitbucket OAuth
 
-OAuth is optional. Anonymous users can still use the app normally, but signed-in users can use their own GitHub API rate limit and unlock private contribution data on their own profile.
+OAuth is optional. Anonymous users can still use the app normally, but signed-in users can verify ownership of their GitHub, GitLab, and Bitbucket identities in one shared session. If a GitHub connection is present, GitAll can also use that user's GitHub API rate limit and include their private GitHub contributions on self-lookups.
 
 OAuth session data is stored in an encrypted, authenticated `httpOnly` cookie so it is not available to client-side JavaScript. If your deployment requires stronger resistance to cookie theft, use an opaque session id with server-side token storage instead.
 
-1. Create a GitHub OAuth App: **GitHub Settings → Developer settings → OAuth Apps → New OAuth App**
-2. Set **Authorization callback URL** to:
-   - `http://localhost:3000/api/auth/callback` for local dev
-   - `https://your-domain/api/auth/callback` in production
-3. Add these values to `.env.local`:
+1. Generate a random `SESSION_SECRET` (32+ bytes recommended) and add it to `.env.local`.
+2. Create a GitHub OAuth App: **GitHub Settings → Developer settings → OAuth Apps → New OAuth App**
+3. Set **Authorization callback URL** to:
+   - `http://localhost:3000/api/auth/callback/github` for local dev
+   - `https://your-domain/api/auth/callback/github` in production
+4. Create a GitLab application: **GitLab → User Settings → Applications**
+   - Redirect URI: `http://localhost:3000/api/auth/callback/gitlab` for local dev
+   - Redirect URI: `https://your-domain/api/auth/callback/gitlab` in production
+   - Scope: `read_user`
+5. Create a Bitbucket OAuth consumer: **Bitbucket Workspace → Settings → OAuth consumers**
+   - Callback URL: `http://localhost:3000/api/auth/callback/bitbucket` for local dev
+   - Callback URL: `https://your-domain/api/auth/callback/bitbucket` in production
+   - Scope: `account`
+6. Add any configured provider values to `.env.local`:
 
 ```bash
-GITHUB_CLIENT_ID=your_oauth_app_client_id
-GITHUB_CLIENT_SECRET=your_oauth_app_client_secret
+SESSION_SECRET=long_random_string_here
+
+GITHUB_CLIENT_ID=your_github_oauth_app_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_app_client_secret
+
+GITLAB_CLIENT_ID=your_gitlab_application_client_id
+GITLAB_CLIENT_SECRET=your_gitlab_application_client_secret
+
+BITBUCKET_CLIENT_KEY=your_bitbucket_oauth_consumer_key
+BITBUCKET_CLIENT_SECRET=your_bitbucket_oauth_consumer_secret
 ```
 
 ```bash
@@ -44,6 +61,16 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### Production deployment checklist
+
+Before merging auth changes to `main`:
+
+1. Set `SESSION_SECRET` as a production Worker secret (`wrangler secret put SESSION_SECRET`).
+2. Update the GitHub OAuth App callback URL to `https://gitall.app/api/auth/callback/github`.
+3. If launching GitLab on day one, create the GitLab app with redirect URI `https://gitall.app/api/auth/callback/gitlab`, then set `GITLAB_CLIENT_ID` and `GITLAB_CLIENT_SECRET` as Worker secrets.
+4. If launching Bitbucket on day one, create the Bitbucket OAuth consumer with callback URL `https://gitall.app/api/auth/callback/bitbucket`, then set `BITBUCKET_CLIENT_KEY` and `BITBUCKET_CLIENT_SECRET` as Worker secrets.
+5. On the preview deployment, verify GitHub sign-in end-to-end, confirm `/api/auth/session` returns the redacted multi-connection shape, and confirm deleting a lone connection clears the session cookie.
 
 ## Features
 
