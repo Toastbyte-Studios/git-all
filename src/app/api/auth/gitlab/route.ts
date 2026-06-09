@@ -7,7 +7,7 @@ import {
 import { getOAuthClientId, hasOAuthConfig } from '@/lib/oauth-providers';
 
 export async function GET(request: NextRequest) {
-  if (!hasOAuthConfig('github')) {
+  if (!hasOAuthConfig('gitlab')) {
     const url = new URL('/', request.nextUrl.origin);
     url.searchParams.set('auth_error', 'oauth_not_configured');
     return NextResponse.redirect(url);
@@ -15,20 +15,20 @@ export async function GET(request: NextRequest) {
 
   const state = createOAuthState();
   const redirectUri = new URL(
-    '/api/auth/callback/github',
+    '/api/auth/callback/gitlab',
     request.nextUrl.origin,
   );
-  const authUrl = new URL('https://github.com/login/oauth/authorize');
+  const authUrl = new URL('https://gitlab.com/oauth/authorize');
 
-  authUrl.searchParams.set('client_id', getOAuthClientId('github')!);
+  authUrl.searchParams.set('client_id', getOAuthClientId('gitlab')!);
   authUrl.searchParams.set('redirect_uri', redirectUri.toString());
   authUrl.searchParams.set('state', state);
-  authUrl.searchParams.set('scope', 'read:user');
+  authUrl.searchParams.set('scope', 'read_user');
   authUrl.searchParams.set('response_type', 'code');
 
   const response = NextResponse.redirect(authUrl);
   response.cookies.set({
-    name: getStateCookieName('github'),
+    name: getStateCookieName('gitlab'),
     value: state,
     httpOnly: true,
     sameSite: 'lax',

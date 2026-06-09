@@ -1,0 +1,202 @@
+import { NextRequest } from 'next/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GET as callbackGet } from '@/app/api/auth/callback/[provider]/route';
+import { DELETE as deleteConnection } from '@/app/api/auth/connections/[provider]/route';
+import {
+  SESSION_COOKIE_NAME,
+  decodeAuthSession,
+  encodeAuthSession,
+  getStateCookieName,
+  type AuthSession,
+} from '../auth-session';
+
+const ORIGINAL_ENV = {
+  SESSION_SECRET: process.env.SESSION_SECRET,
+  GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
+  GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
+};
+
+function restoreEnv() {
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+function createRequest(url: string, cookies: Record<string, string> = {}) {
+  const cookieHeader = Object.entries(cookies)
+    .map(([name, value]) => `${name}=${value}`)
+    .join('; ');
+
+  return new NextRequest(url, {
+    headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+  });
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+beforeEach(() => {
+  process.env.SESSION_SECRET = 'test-session-secret-value-for-route-tests';
+  process.env.GITLAB_CLIENT_ID = 'gitlab-client-id';
+  process.env.GITLAB_CLIENT_SECRET = 'gitlab-client-secret';
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  restoreEnv();
+});
+
+describe('OAuth callback route', () => {
+  it('merges a new provider connection into the existing session', async () => {
+    const existingSession: AuthSession = {
+      primary: 'github',
+      connections: {
+        github: {
+          provider: 'github',
+          accountId: '123',
+          username: 'octocat',
+          avatarUrl: 'https://avatars.githubusercontent.com/u/123',
+          accessToken: 'gho-existing',
+          verifiedAt: 1_717_777_777_000,
+        },
+      },
+    };
+
+    const existingCookie = await encodeAuthSession(existingSession);
+    expect(existingCookie).not.toBeNull();
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'glpat-new-token' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 456,
+          username: 'gitlab-user',
+          avatar_url: 'https://gitlab.com/avatar.png',
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/gitlab?code=abc&state=state-123',
+        {
+          [SESSION_COOKIE_NAME]: existingCookie!,
+          [getStateCookieName('gitlab')]: 'state-123',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'gitlab' }) },
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://gitall.app/');
+
+    const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
+    expect(nextCookie).toBeTruthy();
+
+    const decodedSession = await decodeAuthSession(nextCookie);
+    expect(decodedSession).toEqual({
+      primary: 'gitlab',
+      connections: {
+        github: existingSession.connections.github,
+        gitlab: {
+          provider: 'gitlab',
+          accountId: '456',
+          username: 'gitlab-user',
+          avatarUrl: 'https://gitlab.com/avatar.png',
+          accessToken: 'glpat-new-token',
+          verifiedAt: expect.any(Number),
+        },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://gitlab.com/oauth/token');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://gitlab.com/api/v4/user');
+  });
+});
+
+describe('disconnect route', () => {
+  it('removes one connection and keeps the remaining session', async () => {
+    const existingSession: AuthSession = {
+      primary: 'github',
+      connections: {
+        github: {
+          provider: 'github',
+          accountId: '123',
+          username: 'octocat',
+          avatarUrl: 'https://avatars.githubusercontent.com/u/123',
+          accessToken: 'gho-existing',
+          verifiedAt: 1_717_777_777_000,
+        },
+        gitlab: {
+          provider: 'gitlab',
+          accountId: '456',
+          username: 'gitlab-user',
+          avatarUrl: 'https://gitlab.com/avatar.png',
+          accessToken: 'glpat-existing',
+          verifiedAt: 1_717_777_888_000,
+        },
+      },
+    };
+
+    const existingCookie = await encodeAuthSession(existingSession);
+    expect(existingCookie).not.toBeNull();
+
+    const response = await deleteConnection(
+      createRequest('https://gitall.app/api/auth/connections/github', {
+        [SESSION_COOKIE_NAME]: existingCookie!,
+      }),
+      { params: Promise.resolve({ provider: 'github' }) },
+    );
+
+    expect(response.status).toBe(200);
+
+    const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const decodedSession = await decodeAuthSession(nextCookie);
+    expect(decodedSession).toEqual({
+      primary: 'gitlab',
+      connections: {
+        gitlab: existingSession.connections.gitlab,
+      },
+    });
+  });
+
+  it('clears the cookie when removing the last connection', async () => {
+    const existingCookie = await encodeAuthSession({
+      primary: 'github',
+      connections: {
+        github: {
+          provider: 'github',
+          accountId: '123',
+          username: 'octocat',
+          avatarUrl: 'https://avatars.githubusercontent.com/u/123',
+          accessToken: 'gho-existing',
+          verifiedAt: 1_717_777_777_000,
+        },
+      },
+    });
+    expect(existingCookie).not.toBeNull();
+
+    const response = await deleteConnection(
+      createRequest('https://gitall.app/api/auth/connections/github', {
+        [SESSION_COOKIE_NAME]: existingCookie!,
+      }),
+      { params: Promise.resolve({ provider: 'github' }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toContain(
+      `${SESSION_COOKIE_NAME}=;`,
+    );
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+  });
+});

@@ -182,9 +182,10 @@ export async function GET(request: NextRequest) {
   }
 
   const authSession = await getAuthSessionFromRequest(request);
-  const authSessionLogin = authSession?.user.login.toLowerCase() ?? null;
-  const token = authSession?.accessToken ?? process.env.GITHUB_TOKEN;
-  const shouldBypassCache = Boolean(authSession);
+  const githubConnection = authSession?.connections.github;
+  const authSessionLogin = githubConnection?.username.toLowerCase() ?? null;
+  const token = githubConnection?.accessToken ?? process.env.GITHUB_TOKEN;
+  const shouldBypassCache = Boolean(githubConnection);
   const isSelfLookup = authSessionLogin === username;
 
   if (!token) {

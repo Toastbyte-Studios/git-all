@@ -2,24 +2,42 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import type { ConnectionProvider } from '@/lib/types';
 
 interface AuthSessionResponse {
   authenticated: boolean;
-  user?: {
-    login: string;
-    avatarUrl: string;
-  };
+  availableProviders?: ConnectionProvider[];
+  primary?: ConnectionProvider;
+  connections?: Partial<
+    Record<
+      ConnectionProvider,
+      {
+        provider: ConnectionProvider;
+        accountId: string;
+        username: string;
+        avatarUrl: string;
+        verifiedAt: number;
+      }
+    >
+  >;
 }
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
-  oauth_not_configured: 'GitHub sign-in is not configured for this deployment.',
+  oauth_not_configured:
+    'That sign-in provider is not configured for this deployment.',
   invalid_state: 'Sign-in failed: session state mismatch. Please try again.',
   token_exchange_failed:
-    'Sign-in failed: could not exchange token with GitHub.',
-  user_fetch_failed: 'Sign-in failed: could not retrieve your GitHub profile.',
-  invalid_user_data: 'Sign-in failed: invalid user data from GitHub.',
+    'Sign-in failed: could not complete the OAuth exchange.',
+  user_fetch_failed: 'Sign-in failed: could not retrieve your profile.',
+  invalid_user_data: 'Sign-in failed: invalid profile data from the provider.',
   session_create_failed: 'Sign-in failed: could not create your session.',
   oauth_callback_failed: 'Sign-in failed: unexpected error. Please try again.',
+};
+
+const PROVIDER_LABELS: Record<ConnectionProvider, string> = {
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  bitbucket: 'Bitbucket',
 };
 
 /** The official GitHub Invertocat mark SVG. Used white on dark backgrounds,
@@ -94,18 +112,23 @@ export function AuthStatus() {
     ) : null;
   }
 
-  if (session.authenticated && session.user) {
+  const primaryConnection = session.primary
+    ? session.connections?.[session.primary]
+    : undefined;
+
+  if (session.authenticated && primaryConnection) {
     return (
       <div className="flex items-center gap-2 text-xs">
         <Image
-          src={session.user.avatarUrl}
-          alt={`Avatar for @${session.user.login}`}
+          src={primaryConnection.avatarUrl}
+          alt={`Avatar for @${primaryConnection.username}`}
           width={24}
           height={24}
           className="rounded-full"
         />
         <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-          @{session.user.login}
+          {PROVIDER_LABELS[primaryConnection.provider]} @
+          {primaryConnection.username}
         </span>
         <form method="post" action="/api/auth/logout">
           <button
@@ -128,16 +151,19 @@ export function AuthStatus() {
           onDismiss={() => setAuthError(null)}
         />
       )}
-      {/* Dark mode: solid dark button with white text/mark (GitHub standard)
-          Light mode: soft outlined button with dark text/mark (less heavy) */}
-      <a
-        href="/api/auth/github"
-        className="gh-sign-in-btn inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90"
-        aria-label="Sign in with GitHub"
-      >
-        <GitHubMark />
-        Sign in with GitHub
-      </a>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {(session.availableProviders ?? []).map((provider) => (
+          <a
+            key={provider}
+            href={`/api/auth/${provider}`}
+            className="gh-sign-in-btn inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90"
+            aria-label={`Sign in with ${PROVIDER_LABELS[provider]}`}
+          >
+            {provider === 'github' ? <GitHubMark /> : null}
+            Sign in with {PROVIDER_LABELS[provider]}
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
