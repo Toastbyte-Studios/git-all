@@ -34,6 +34,7 @@ interface BitbucketPaginatedResponse<T> {
 interface BitbucketUser {
   account_id?: string;
   nickname: string;
+  workspace: string;
 }
 
 interface BitbucketCommit {
@@ -153,7 +154,7 @@ export async function GET(request: NextRequest) {
 
   if (!rawInput) {
     return NextResponse.json(
-      { error: 'Missing username parameter' },
+      { error: 'Missing Bitbucket workspace parameter' },
       { status: 400 },
     );
   }
@@ -210,6 +211,7 @@ export async function GET(request: NextRequest) {
         const user: BitbucketUser = {
           nickname: repositories[0]?.owner?.nickname ?? username,
           account_id: repositories[0]?.owner?.account_id,
+          workspace: username,
         };
 
         const counts = new Map<string, number>();
@@ -316,7 +318,7 @@ async function aggregateRepositoryCommits({
   toExclusiveMs: number;
   counts: Map<string, number>;
 }) {
-  let nextUrl = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(user.nickname)}/${encodeURIComponent(repoSlug)}/commits?pagelen=${BITBUCKET_PAGE_SIZE}`;
+  let nextUrl = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(user.workspace)}/${encodeURIComponent(repoSlug)}/commits?pagelen=${BITBUCKET_PAGE_SIZE}`;
   let pageCount = 0;
 
   while (nextUrl && pageCount < MAX_COMMIT_PAGES_PER_REPOSITORY) {
@@ -387,7 +389,6 @@ function isCommitByUser(commit: BitbucketCommit, user: BitbucketUser) {
     .map((value) => value.toLowerCase())
     .includes(nicknameLower);
 }
-
 
 function normalizeRequestedRange(
   request: NextRequest,
