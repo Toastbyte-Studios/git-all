@@ -13,6 +13,8 @@ import {
 
 const TEST_SECRET = 'test-secret-value-for-unit-tests-only';
 
+const ORIGINAL_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+
 const SAMPLE_SESSION: AuthSession = {
   accessToken: 'gho_testtoken123',
   user: {
@@ -28,6 +30,8 @@ function setEnv(secret: string | undefined) {
     process.env.GITHUB_CLIENT_SECRET = secret;
   }
 }
+
+afterEach(() => setEnv(ORIGINAL_CLIENT_SECRET));
 
 describe('constants', () => {
   it('SESSION_COOKIE_NAME is github_oauth_session', () => {
@@ -49,14 +53,9 @@ describe('constants', () => {
 
 describe('hasGithubOAuthConfig', () => {
   const origClientId = process.env.GITHUB_CLIENT_ID;
-  const origClientSecret = process.env.GITHUB_CLIENT_SECRET;
-
   afterEach(() => {
     if (origClientId === undefined) delete process.env.GITHUB_CLIENT_ID;
     else process.env.GITHUB_CLIENT_ID = origClientId;
-
-    if (origClientSecret === undefined) delete process.env.GITHUB_CLIENT_SECRET;
-    else process.env.GITHUB_CLIENT_SECRET = origClientSecret;
   });
 
   it('returns true when both env vars are set', () => {

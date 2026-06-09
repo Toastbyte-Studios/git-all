@@ -49,7 +49,7 @@ describe('generatePlaceholderName', () => {
 
   it('returns different values across multiple calls (probabilistic)', () => {
     const names = new Set(Array.from({ length: 20 }, () => generatePlaceholderName()));
-    // With 5184 combinations, getting 20 unique out of 20 tries is overwhelmingly likely
+    // With 4900 combinations, getting 20 unique out of 20 tries is overwhelmingly likely
     expect(names.size).toBeGreaterThan(1);
   });
 });
@@ -81,7 +81,6 @@ describe('generatePlaceholderNames', () => {
 
   it('returns valid names when requesting many unique combinations', () => {
     // 70 * 70 = 4900 possible combinations
-    const maxCombinations = ADJECTIVES.length * NOUNS.length;
     // Requesting close to max should still work (uses fallback if needed)
     const names = generatePlaceholderNames(100);
     expect(names.length).toBe(100);
