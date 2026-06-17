@@ -52,7 +52,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
         <div className="flex-1">
           <label
             htmlFor="github"
-            className="block text-xs font-medium mb-1.5"
+            className="block text-xs font-medium mb-1.5 md:min-h-8"
             style={{ color: 'var(--text-secondary)' }}
           >
             GitHub username
@@ -74,7 +74,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
         <div className="flex-1">
           <label
             htmlFor="gitlab"
-            className="block text-xs font-medium mb-1.5"
+            className="block text-xs font-medium mb-1.5 md:min-h-8"
             style={{ color: 'var(--text-secondary)' }}
           >
             GitLab username
@@ -96,7 +96,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
         <div className="flex-1">
           <label
             htmlFor="bitbucket"
-            className="block text-xs font-medium mb-1.5"
+            className="block text-xs font-medium mb-1.5 md:min-h-8"
             style={{ color: 'var(--text-secondary)' }}
           >
             Bitbucket workspace
@@ -125,7 +125,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
         <div className="flex-1">
           <label
             htmlFor="gitea"
-            className="block text-xs font-medium mb-1.5"
+            className="block text-xs font-medium mb-1.5 md:min-h-8"
             style={{ color: 'var(--text-secondary)' }}
           >
             Gitea / Forgejo username
