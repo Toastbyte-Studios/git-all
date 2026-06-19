@@ -262,6 +262,14 @@ export default function Home() {
             Toastbyte Studios
           </a>
         </p>
+        {process.env.NEXT_PUBLIC_APP_VERSION && (
+          <p
+            className="text-[10px] mt-1"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </p>
+        )}
       </footer>
     </>
   );
