@@ -101,7 +101,7 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
           >
             Bitbucket workspace
             <span
-              className="ml-1 font-normal"
+              className="ml-1 md:ml-0 md:block font-normal"
               style={{ color: 'var(--text-tertiary, var(--text-secondary))' }}
               title="Find it in your profile URL: bitbucket.org/{workspace}"
             >
