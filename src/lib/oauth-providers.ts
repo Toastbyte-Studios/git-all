@@ -159,3 +159,11 @@ export function getOAuthClientSecret(provider: ConnectionProvider) {
 export function getAvailableOAuthProviders() {
   return CONNECTION_PROVIDERS.filter((provider) => hasOAuthConfig(provider));
 }
+
+export function getVisibleOAuthProviders(
+  availableProviders?: ConnectionProvider[],
+) {
+  return availableProviders && availableProviders.length > 0
+    ? availableProviders
+    : (['github'] as ConnectionProvider[]);
+}

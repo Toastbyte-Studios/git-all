@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { getVisibleOAuthProviders } from '@/lib/oauth-providers';
 import type { ConnectionProvider } from '@/lib/types';
 
 interface AuthSessionResponse {
@@ -115,6 +116,7 @@ export function AuthStatus() {
   const primaryConnection = session.primary
     ? session.connections?.[session.primary]
     : undefined;
+  const visibleProviders = getVisibleOAuthProviders(session.availableProviders);
 
   if (session.authenticated && primaryConnection) {
     return (
@@ -152,7 +154,7 @@ export function AuthStatus() {
         />
       )}
       <div className="flex flex-wrap items-center justify-center gap-2">
-        {(session.availableProviders ?? []).map((provider) => (
+        {visibleProviders.map((provider) => (
           <a
             key={provider}
             href={`/api/auth/${provider}`}
