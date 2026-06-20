@@ -15,6 +15,17 @@ export interface ContributionData {
   calendar: CalendarDay[];
 }
 
+export type ConnectionProvider = 'github' | 'gitlab' | 'bitbucket';
+
+export interface Connection {
+  provider: ConnectionProvider;
+  accountId: string;
+  username: string;
+  avatarUrl: string;
+  accessToken: string;
+  verifiedAt: number;
+}
+
 export type Platform = 'github' | 'gitlab' | 'bitbucket' | 'gitea';
 
 export type ViewMode = 'side-by-side' | 'integrated';

@@ -11,21 +11,21 @@ import {
 } from '@/lib/oauth-providers';
 
 export async function GET(request: NextRequest) {
-  if (!hasOAuthConfig('github')) {
+  if (!hasOAuthConfig('gitlab')) {
     const url = new URL('/', request.nextUrl.origin);
     url.searchParams.set('auth_error', 'oauth_not_configured');
     return NextResponse.redirect(url);
   }
 
   const state = createOAuthState();
-  const config = OAUTH_PROVIDERS.github;
+  const config = OAUTH_PROVIDERS.gitlab;
   const redirectUri = new URL(
-    '/api/auth/callback/github',
+    '/api/auth/callback/gitlab',
     request.nextUrl.origin,
   );
   const authUrl = new URL(config.authorizeUrl);
 
-  authUrl.searchParams.set('client_id', getOAuthClientId('github')!);
+  authUrl.searchParams.set('client_id', getOAuthClientId('gitlab')!);
   authUrl.searchParams.set('redirect_uri', redirectUri.toString());
   authUrl.searchParams.set('state', state);
   authUrl.searchParams.set('scope', config.scope);
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   const response = NextResponse.redirect(authUrl);
   response.cookies.set({
-    name: getStateCookieName('github'),
+    name: getStateCookieName('gitlab'),
     value: state,
     httpOnly: true,
     sameSite: 'lax',
