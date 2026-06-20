@@ -64,7 +64,7 @@ export function SignInBanner() {
           className="font-medium mb-1"
           style={{ color: 'var(--text-primary)' }}
         >
-          Sign in with GitHub to unlock:
+          Sign in to unlock:
         </p>
         <ul className="space-y-0.5">
           <li className="flex gap-2">

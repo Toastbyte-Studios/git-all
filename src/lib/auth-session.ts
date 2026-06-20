@@ -1,33 +1,29 @@
+import type { Connection, ConnectionProvider } from '@/lib/types';
 import type { NextRequest } from 'next/server';
 
-const SESSION_VERSION = 1;
-const SESSION_COOKIE_NAME = 'github_oauth_session';
-const STATE_COOKIE_NAME = 'github_oauth_state';
+const SESSION_VERSION = 2;
+const SESSION_COOKIE_NAME = 'gitall_session';
+const STATE_COOKIE_PREFIX = 'gitall_oauth_state_';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const STATE_MAX_AGE_SECONDS = 60 * 10;
 
 // AES-GCM auth tag length in bytes
 const TAG_LENGTH = 16;
 
-interface SessionUser {
-  login: string;
-  avatarUrl: string;
-}
-
 interface StoredAuthSession {
   version: number;
-  accessToken: string;
-  user: SessionUser;
+  primary: ConnectionProvider;
+  connections: Partial<Record<ConnectionProvider, Connection>>;
   expiresAt: number;
 }
 
 export interface AuthSession {
-  accessToken: string;
-  user: SessionUser;
+  primary: ConnectionProvider;
+  connections: Partial<Record<ConnectionProvider, Connection>>;
 }
 
 export { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS };
-export { STATE_COOKIE_NAME, STATE_MAX_AGE_SECONDS };
+export { SESSION_VERSION, STATE_MAX_AGE_SECONDS };
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -60,22 +56,83 @@ function fromBase64Url(str: string): Uint8Array<ArrayBuffer> {
 
 // ── Public utilities ─────────────────────────────────────────────────
 
-export function hasGithubOAuthConfig() {
-  return Boolean(
-    process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET,
-  );
-}
-
 export function createOAuthState() {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return toBase64Url(bytes);
 }
 
+export function getStateCookieName(provider: ConnectionProvider) {
+  return `${STATE_COOKIE_PREFIX}${provider}`;
+}
+
+export function mergeConnectionIntoSession(
+  session: AuthSession | null,
+  connection: Connection,
+): AuthSession {
+  return {
+    primary: connection.provider,
+    connections: {
+      ...(session?.connections ?? {}),
+      [connection.provider]: connection,
+    },
+  };
+}
+
+export function removeConnectionFromSession(
+  session: AuthSession,
+  provider: ConnectionProvider,
+): AuthSession | null {
+  const connections = { ...session.connections };
+  delete connections[provider];
+
+  const remainingProviders = Object.entries(connections)
+    .filter((entry): entry is [string, Connection] => entry[1] !== undefined)
+    .map(([connectionProvider]) => connectionProvider as ConnectionProvider);
+
+  if (remainingProviders.length === 0) {
+    return null;
+  }
+
+  return {
+    primary:
+      session.primary === provider ? remainingProviders[0] : session.primary,
+    connections,
+  };
+}
+
+function isConnectionProvider(value: unknown): value is ConnectionProvider {
+  return value === 'github' || value === 'gitlab' || value === 'bitbucket';
+}
+
+function isValidConnection(
+  provider: ConnectionProvider,
+  connection: unknown,
+): connection is Connection {
+  if (!connection || typeof connection !== 'object') {
+    return false;
+  }
+
+  const candidate = connection as Partial<Connection>;
+  return (
+    candidate.provider === provider &&
+    typeof candidate.accountId === 'string' &&
+    candidate.accountId.length > 0 &&
+    typeof candidate.username === 'string' &&
+    candidate.username.length > 0 &&
+    typeof candidate.avatarUrl === 'string' &&
+    candidate.avatarUrl.length > 0 &&
+    typeof candidate.accessToken === 'string' &&
+    candidate.accessToken.length > 0 &&
+    typeof candidate.verifiedAt === 'number' &&
+    Number.isFinite(candidate.verifiedAt)
+  );
+}
+
 // ── Session key ──────────────────────────────────────────────────────
 
 async function getSessionKey(): Promise<CryptoKey | null> {
-  const secret = process.env.GITHUB_CLIENT_SECRET;
+  const secret = process.env.SESSION_SECRET;
   if (!secret) {
     return null;
   }
@@ -107,8 +164,8 @@ export async function encodeAuthSession(
   // opaque session ID backed by server-side token storage.
   const payload: StoredAuthSession = {
     version: SESSION_VERSION,
-    accessToken: session.accessToken,
-    user: session.user,
+    primary: session.primary,
+    connections: session.connections,
     expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
   };
 
@@ -166,15 +223,34 @@ export async function decodeAuthSession(
 
     if (
       session.version !== SESSION_VERSION ||
-      !session.accessToken ||
-      !session.user?.login ||
-      !session.user?.avatarUrl ||
-      session.expiresAt <= Date.now()
+      !isConnectionProvider(session.primary) ||
+      typeof session.expiresAt !== 'number' ||
+      session.expiresAt <= Date.now() ||
+      !session.connections ||
+      typeof session.connections !== 'object'
     ) {
       return null;
     }
 
-    return { accessToken: session.accessToken, user: session.user };
+    const connections: Partial<Record<ConnectionProvider, Connection>> = {};
+    for (const [provider, connection] of Object.entries(session.connections)) {
+      if (
+        !isConnectionProvider(provider) ||
+        !isValidConnection(provider, connection)
+      ) {
+        return null;
+      }
+      connections[provider] = connection;
+    }
+
+    if (
+      Object.keys(connections).length === 0 ||
+      !connections[session.primary]
+    ) {
+      return null;
+    }
+
+    return { primary: session.primary, connections };
   } catch {
     return null;
   }

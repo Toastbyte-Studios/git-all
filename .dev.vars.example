@@ -3,3 +3,16 @@
 
 # Required for GitHub contributions API (GraphQL API needs a token even for public data)
 GITHUB_TOKEN=ghp_your_token_here
+
+# Session encryption secret (32+ random bytes recommended)
+SESSION_SECRET=long_random_string_here
+
+# Optional OAuth providers for verified account connections
+GITHUB_CLIENT_ID=your_github_oauth_app_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_app_client_secret
+
+GITLAB_CLIENT_ID=your_gitlab_application_client_id
+GITLAB_CLIENT_SECRET=your_gitlab_application_client_secret
+
+BITBUCKET_CLIENT_KEY=your_bitbucket_oauth_consumer_key
+BITBUCKET_CLIENT_SECRET=your_bitbucket_oauth_consumer_secret
