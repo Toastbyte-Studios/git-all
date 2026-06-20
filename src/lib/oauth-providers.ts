@@ -144,7 +144,9 @@ export const CONNECTION_PROVIDERS = Object.keys(
 export function hasOAuthConfig(provider: ConnectionProvider) {
   const config = OAUTH_PROVIDERS[provider];
   return Boolean(
-    process.env[config.clientIdEnv] && process.env[config.clientSecretEnv],
+    process.env.SESSION_SECRET &&
+    process.env[config.clientIdEnv] &&
+    process.env[config.clientSecretEnv],
   );
 }
 

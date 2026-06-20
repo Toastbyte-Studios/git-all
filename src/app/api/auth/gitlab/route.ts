@@ -4,7 +4,11 @@ import {
   createOAuthState,
   getStateCookieName,
 } from '@/lib/auth-session';
-import { getOAuthClientId, hasOAuthConfig } from '@/lib/oauth-providers';
+import {
+  getOAuthClientId,
+  hasOAuthConfig,
+  OAUTH_PROVIDERS,
+} from '@/lib/oauth-providers';
 
 export async function GET(request: NextRequest) {
   if (!hasOAuthConfig('gitlab')) {
@@ -14,16 +18,17 @@ export async function GET(request: NextRequest) {
   }
 
   const state = createOAuthState();
+  const config = OAUTH_PROVIDERS.gitlab;
   const redirectUri = new URL(
     '/api/auth/callback/gitlab',
     request.nextUrl.origin,
   );
-  const authUrl = new URL('https://gitlab.com/oauth/authorize');
+  const authUrl = new URL(config.authorizeUrl);
 
   authUrl.searchParams.set('client_id', getOAuthClientId('gitlab')!);
   authUrl.searchParams.set('redirect_uri', redirectUri.toString());
   authUrl.searchParams.set('state', state);
-  authUrl.searchParams.set('scope', 'read_user');
+  authUrl.searchParams.set('scope', config.scope);
   authUrl.searchParams.set('response_type', 'code');
 
   const response = NextResponse.redirect(authUrl);

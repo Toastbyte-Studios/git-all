@@ -4,7 +4,11 @@ import {
   createOAuthState,
   getStateCookieName,
 } from '@/lib/auth-session';
-import { getOAuthClientId, hasOAuthConfig } from '@/lib/oauth-providers';
+import {
+  getOAuthClientId,
+  hasOAuthConfig,
+  OAUTH_PROVIDERS,
+} from '@/lib/oauth-providers';
 
 export async function GET(request: NextRequest) {
   if (!hasOAuthConfig('bitbucket')) {
@@ -14,16 +18,17 @@ export async function GET(request: NextRequest) {
   }
 
   const state = createOAuthState();
+  const config = OAUTH_PROVIDERS.bitbucket;
   const redirectUri = new URL(
     '/api/auth/callback/bitbucket',
     request.nextUrl.origin,
   );
-  const authUrl = new URL('https://bitbucket.org/site/oauth2/authorize');
+  const authUrl = new URL(config.authorizeUrl);
 
   authUrl.searchParams.set('client_id', getOAuthClientId('bitbucket')!);
   authUrl.searchParams.set('redirect_uri', redirectUri.toString());
   authUrl.searchParams.set('state', state);
-  authUrl.searchParams.set('scope', 'account');
+  authUrl.searchParams.set('scope', config.scope);
   authUrl.searchParams.set('response_type', 'code');
 
   const response = NextResponse.redirect(authUrl);

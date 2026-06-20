@@ -1,7 +1,10 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GET as bitbucketAuthGet } from '@/app/api/auth/bitbucket/route';
 import { GET as callbackGet } from '@/app/api/auth/callback/[provider]/route';
 import { DELETE as deleteConnection } from '@/app/api/auth/connections/[provider]/route';
+import { GET as githubAuthGet } from '@/app/api/auth/github/route';
+import { GET as gitlabAuthGet } from '@/app/api/auth/gitlab/route';
 import {
   SESSION_COOKIE_NAME,
   decodeAuthSession,
@@ -9,11 +12,16 @@ import {
   getStateCookieName,
   type AuthSession,
 } from '../auth-session';
+import { OAUTH_PROVIDERS } from '../oauth-providers';
 
 const ORIGINAL_ENV = {
   SESSION_SECRET: process.env.SESSION_SECRET,
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
   GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
+  BITBUCKET_CLIENT_KEY: process.env.BITBUCKET_CLIENT_KEY,
+  BITBUCKET_CLIENT_SECRET: process.env.BITBUCKET_CLIENT_SECRET,
 };
 
 function restoreEnv() {
@@ -45,8 +53,12 @@ function jsonResponse(body: unknown, status = 200) {
 
 beforeEach(() => {
   process.env.SESSION_SECRET = 'test-session-secret-value-for-route-tests';
+  process.env.GITHUB_CLIENT_ID = 'github-client-id';
+  process.env.GITHUB_CLIENT_SECRET = 'github-client-secret';
   process.env.GITLAB_CLIENT_ID = 'gitlab-client-id';
   process.env.GITLAB_CLIENT_SECRET = 'gitlab-client-secret';
+  process.env.BITBUCKET_CLIENT_KEY = 'bitbucket-client-key';
+  process.env.BITBUCKET_CLIENT_SECRET = 'bitbucket-client-secret';
 });
 
 afterEach(() => {
@@ -121,6 +133,64 @@ describe('OAuth callback route', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://gitlab.com/oauth/token');
     expect(fetchMock.mock.calls[1]?.[0]).toBe('https://gitlab.com/api/v4/user');
+  });
+});
+
+describe('OAuth init routes', () => {
+  it.each([
+    {
+      provider: 'github',
+      routeGet: githubAuthGet,
+      clientIdValue: 'github-client-id',
+    },
+    {
+      provider: 'gitlab',
+      routeGet: gitlabAuthGet,
+      clientIdValue: 'gitlab-client-id',
+    },
+    {
+      provider: 'bitbucket',
+      routeGet: bitbucketAuthGet,
+      clientIdValue: 'bitbucket-client-key',
+    },
+  ] as const)(
+    'builds the $provider authorize URL from shared provider config',
+    async ({ provider, routeGet, clientIdValue }) => {
+      const response = await routeGet(
+        createRequest(`https://gitall.app/api/auth/${provider}`),
+      );
+
+      expect(response.status).toBe(307);
+
+      const location = response.headers.get('location');
+      expect(location).toBeTruthy();
+
+      const redirectUrl = new URL(location!);
+      const config = OAUTH_PROVIDERS[provider];
+      expect(redirectUrl.origin + redirectUrl.pathname).toBe(
+        config.authorizeUrl,
+      );
+      expect(redirectUrl.searchParams.get('client_id')).toBe(clientIdValue);
+      expect(redirectUrl.searchParams.get('scope')).toBe(config.scope);
+      expect(redirectUrl.searchParams.get('response_type')).toBe('code');
+      expect(redirectUrl.searchParams.get('redirect_uri')).toBe(
+        `https://gitall.app/api/auth/callback/${provider}`,
+      );
+      expect(redirectUrl.searchParams.get('state')).toBeTruthy();
+    },
+  );
+
+  it('treats OAuth as unavailable when SESSION_SECRET is missing', async () => {
+    delete process.env.SESSION_SECRET;
+
+    const response = await githubAuthGet(
+      createRequest('https://gitall.app/api/auth/github'),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'https://gitall.app/?auth_error=oauth_not_configured',
+    );
   });
 });
 

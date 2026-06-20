@@ -126,6 +126,14 @@ describe('hasOAuthConfig', () => {
     expect(hasOAuthConfig('gitlab')).toBe(false);
   });
 
+  it('returns false when SESSION_SECRET is missing', () => {
+    process.env.GITHUB_CLIENT_ID = 'github-client-id';
+    process.env.GITHUB_CLIENT_SECRET = 'github-client-secret';
+    delete process.env.SESSION_SECRET;
+
+    expect(hasOAuthConfig('github')).toBe(false);
+  });
+
   it('uses Bitbucket client key env names', () => {
     process.env.BITBUCKET_CLIENT_KEY = 'bitbucket-client-key';
     process.env.BITBUCKET_CLIENT_SECRET = 'bitbucket-client-secret';

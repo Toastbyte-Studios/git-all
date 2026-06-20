@@ -4,7 +4,11 @@ import {
   createOAuthState,
   getStateCookieName,
 } from '@/lib/auth-session';
-import { getOAuthClientId, hasOAuthConfig } from '@/lib/oauth-providers';
+import {
+  getOAuthClientId,
+  hasOAuthConfig,
+  OAUTH_PROVIDERS,
+} from '@/lib/oauth-providers';
 
 export async function GET(request: NextRequest) {
   if (!hasOAuthConfig('github')) {
@@ -14,16 +18,17 @@ export async function GET(request: NextRequest) {
   }
 
   const state = createOAuthState();
+  const config = OAUTH_PROVIDERS.github;
   const redirectUri = new URL(
     '/api/auth/callback/github',
     request.nextUrl.origin,
   );
-  const authUrl = new URL('https://github.com/login/oauth/authorize');
+  const authUrl = new URL(config.authorizeUrl);
 
   authUrl.searchParams.set('client_id', getOAuthClientId('github')!);
   authUrl.searchParams.set('redirect_uri', redirectUri.toString());
   authUrl.searchParams.set('state', state);
-  authUrl.searchParams.set('scope', 'read:user');
+  authUrl.searchParams.set('scope', config.scope);
   authUrl.searchParams.set('response_type', 'code');
 
   const response = NextResponse.redirect(authUrl);
