@@ -10,9 +10,20 @@ interface AuthSessionResponse {
 
 export function SignInBanner() {
   const [visible, setVisible] = useState(false);
+  const [isProfileRedirect, setIsProfileRedirect] = useState(false);
 
   useEffect(() => {
-    // Show the banner for unauthenticated users who haven't dismissed it.
+    // Check whether we were redirected here because a sign-in was required.
+    const params = new URLSearchParams(window.location.search);
+    const signinRequired = params.get('signin') === 'required';
+    if (signinRequired) {
+      setIsProfileRedirect(true);
+      setVisible(true);
+      return;
+    }
+
+    // Otherwise, show the generic benefits banner for unauthenticated users
+    // who haven't dismissed it.
     let dismissed = false;
     try {
       dismissed = localStorage.getItem(BANNER_DISMISSED_KEY) === 'true';
@@ -37,12 +48,55 @@ export function SignInBanner() {
   if (!visible) return null;
 
   function handleDismiss() {
-    try {
-      localStorage.setItem(BANNER_DISMISSED_KEY, 'true');
-    } catch {
-      // localStorage unavailable — skip persistence
+    if (!isProfileRedirect) {
+      try {
+        localStorage.setItem(BANNER_DISMISSED_KEY, 'true');
+      } catch {
+        // localStorage unavailable — skip persistence
+      }
     }
     setVisible(false);
+  }
+
+  if (isProfileRedirect) {
+    return (
+      <div
+        role="region"
+        aria-label="Sign in required"
+        className="max-w-2xl mx-auto mt-4 rounded-lg px-4 py-3 text-sm flex gap-3 items-start"
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        <span aria-hidden="true" className="text-base leading-snug shrink-0">
+          🔒
+        </span>
+        <div className="flex-1 min-w-0">
+          <p
+            className="font-medium mb-1"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Sign in to view your profile
+          </p>
+          <p>
+            Connect a GitHub, GitLab, or Bitbucket account to access your
+            verified contribution profile at{' '}
+            <span className="font-mono">/me</span>.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleDismiss}
+          aria-label="Dismiss sign-in required banner"
+          className="shrink-0 cursor-pointer bg-transparent border-0 p-0 leading-none hover:opacity-70 transition-opacity"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          ✕
+        </button>
+      </div>
+    );
   }
 
   return (
