@@ -261,3 +261,9 @@ export async function getAuthSessionFromRequest(
 ): Promise<AuthSession | null> {
   return decodeAuthSession(request.cookies.get(SESSION_COOKIE_NAME)?.value);
 }
+
+export async function getAuthSession(): Promise<AuthSession | null> {
+  const { cookies } = await import('next/headers');
+  const cookieStore = await cookies();
+  return decodeAuthSession(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+}
