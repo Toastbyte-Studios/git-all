@@ -1,6 +1,6 @@
 {
   "name": "git-all",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -26,11 +26,13 @@
   "devDependencies": {
     "@opennextjs/cloudflare": "latest",
     "@tailwindcss/postcss": "^4.1.0",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@typescript-eslint/eslint-plugin": "^8.59.2",
     "@typescript-eslint/parser": "^8.59.2",
+    "@vitejs/plugin-react": "^6.0.2",
     "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^9.39.4",
     "eslint-config-next": "15.5.15",
@@ -38,6 +40,7 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.5",
+    "happy-dom": "^20.10.6",
     "prettier": "^3.8.3",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.0",
