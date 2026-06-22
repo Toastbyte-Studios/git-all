@@ -203,7 +203,7 @@ export function ContributionExplorer() {
     setGlobalError(null);
     const seen = new Set<string>();
     const deduped = newEntries.filter((entry) => {
-      const key = `${entry.platform}:${entry.username}:${entry.instanceUrl ?? ''}`;
+      const key = `${entry.platform}:${entry.username.trim().toLowerCase()}:${(entry.instanceUrl ?? '').trim().toLowerCase()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
