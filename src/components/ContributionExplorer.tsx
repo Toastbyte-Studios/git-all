@@ -201,7 +201,14 @@ export function ContributionExplorer() {
     }
 
     setGlobalError(null);
-    setEntries(newEntries);
+    const seen = new Set<string>();
+    const deduped = newEntries.filter((entry) => {
+      const key = `${entry.platform}:${entry.username}:${entry.instanceUrl ?? ''}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    setEntries(deduped);
   };
 
   const handlePeriodChange = (nextPeriod: ContributionPeriod) => {

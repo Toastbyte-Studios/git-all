@@ -48,6 +48,8 @@ export function ContributionsView({
   const fetchContributions = useCallback(async () => {
     if (entries.length === 0) {
       setResults([]);
+      setLoading(false);
+      setGlobalError(null);
       return;
     }
 
@@ -98,15 +100,6 @@ export function ContributionsView({
     } finally {
       if (requestId === requestSequence.current) {
         setLoading(false);
-
-        setResults((current) => {
-          if (current.length > 0 && current.every((r) => r.error !== null)) {
-            setGlobalError(
-              'All lookups failed. Check the usernames and try again.',
-            );
-          }
-          return current;
-        });
       }
     }
   }, [entries, from, to]);
@@ -114,6 +107,16 @@ export function ContributionsView({
   useEffect(() => {
     void fetchContributions();
   }, [fetchContributions]);
+
+  useEffect(() => {
+    if (
+      !loading &&
+      results.length > 0 &&
+      results.every((r) => r.error !== null)
+    ) {
+      setGlobalError('All lookups failed. Check the usernames and try again.');
+    }
+  }, [results, loading]);
 
   if (results.length === 0 && !loading) {
     return null;

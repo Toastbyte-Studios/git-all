@@ -16,6 +16,7 @@ export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
       {(['side-by-side', 'integrated'] as ViewMode[]).map((mode) => (
         <button
           key={mode}
+          type="button"
           onClick={() => onChange(mode)}
           aria-pressed={viewMode === mode}
           className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer"
