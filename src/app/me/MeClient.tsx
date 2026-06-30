@@ -193,7 +193,7 @@ export function MeClient({ session }: { session: ClientSession }) {
             {primaryConnection && (
               <ProfileHeader
                 primary={session.primary}
-                connection={primaryConnection}
+                connections={session.connections}
               />
             )}
 
