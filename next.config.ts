@@ -10,9 +10,27 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
+      // GitHub avatars
       {
         protocol: 'https',
         hostname: 'avatars.githubusercontent.com',
+      },
+      // GitLab uploaded avatars
+      {
+        protocol: 'https',
+        hostname: 'gitlab.com',
+      },
+      // Gravatar fallback — GitLab and Bitbucket serve Gravatar URLs when a
+      // user has no custom avatar (Bitbucket avatar hrefs are frequently these).
+      {
+        protocol: 'https',
+        hostname: 'secure.gravatar.com',
+      },
+      // Bitbucket / Atlassian avatar CDN. Region varies (e.g. us-west-2), so
+      // match any subdomain of the Atlassian avatar host.
+      {
+        protocol: 'https',
+        hostname: '**.atl-paas.net',
       },
     ],
   },
