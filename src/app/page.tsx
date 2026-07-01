@@ -8,7 +8,10 @@ import { FAQ_ITEMS } from '@/lib/faq';
 export default function Home() {
   return (
     <>
-      <header className="max-w-6xl mx-auto px-4 pt-8 pb-0 text-center">
+      <section
+        aria-label="Hero"
+        className="max-w-6xl mx-auto px-4 pt-8 pb-0 text-center"
+      >
         <h1 className="flex justify-center mb-3">
           <GitAllLogo />
         </h1>
@@ -19,7 +22,7 @@ export default function Home() {
         <div className="mt-3 flex justify-center">
           <AuthStatus />
         </div>
-      </header>
+      </section>
 
       <main className="max-w-6xl mx-auto px-4 pb-12">
         <section aria-label="Contribution lookup tool" className="mt-10">

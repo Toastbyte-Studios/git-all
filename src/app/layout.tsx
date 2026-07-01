@@ -1,8 +1,8 @@
+import { Header } from '@/components/Header';
 import { FAQ_ITEMS } from '@/lib/faq';
 import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { Header } from '@/components/Header';
 
 export const metadata: Metadata = {
   title:

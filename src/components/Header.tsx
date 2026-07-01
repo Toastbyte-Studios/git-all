@@ -8,10 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
  */
 export function Header() {
   return (
-    <header
-      className="border-b"
-      style={{ borderColor: 'var(--border)' }}
-    >
+    <header className="border-b" style={{ borderColor: 'var(--border)' }}>
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         <Link
           href="/"
