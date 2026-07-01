@@ -2,6 +2,7 @@ import { FAQ_ITEMS } from '@/lib/faq';
 import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { Header } from '@/components/Header';
 
 export const metadata: Metadata = {
   title:
@@ -109,7 +110,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="preconnect" href="https://api.github.com" />
         <link rel="preconnect" href="https://gitlab.com" />
       </head>
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <Header />
+        {children}
+      </body>
     </html>
   );
 }
