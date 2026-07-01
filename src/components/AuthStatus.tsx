@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getVisibleOAuthProviders } from '@/lib/oauth-providers';
 import type { ConnectionProvider } from '@/lib/types';
@@ -121,16 +122,26 @@ export function AuthStatus() {
   if (session.authenticated && primaryConnection) {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <Image
-          src={primaryConnection.avatarUrl}
-          alt={`Avatar for @${primaryConnection.username}`}
-          width={24}
-          height={24}
-          className="rounded-full"
-        />
-        <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-          {PROVIDER_LABELS[primaryConnection.provider]} @
-          {primaryConnection.username}
+        <Link
+          href="/whoami"
+          aria-label="View your profile"
+          className="flex items-center gap-2 hover:underline"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          <Image
+            src={primaryConnection.avatarUrl}
+            alt=""
+            width={24}
+            height={24}
+            className="rounded-full"
+          />
+          <span className="font-medium">
+            {PROVIDER_LABELS[primaryConnection.provider]} @
+            {primaryConnection.username}
+          </span>
+        </Link>
+        <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>
+          ·
         </span>
         <form method="post" action="/api/auth/logout">
           <button

@@ -83,7 +83,7 @@ export function SignInBanner() {
           <p>
             Connect a GitHub, GitLab, or Bitbucket account to access your
             verified contribution profile at{' '}
-            <span className="font-mono">/me</span>.
+            <span className="font-mono">/whoami</span>.
           </p>
         </div>
         <button
