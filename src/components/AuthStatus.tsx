@@ -124,7 +124,6 @@ export function AuthStatus() {
       <div className="flex items-center gap-2 text-xs">
         <Link
           href="/whoami"
-          aria-label="View your profile"
           className="flex items-center gap-2 hover:underline"
           style={{ color: 'var(--text-primary)' }}
         >
