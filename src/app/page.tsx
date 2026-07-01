@@ -3,16 +3,12 @@ import { AuthStatus } from '@/components/AuthStatus';
 import { ContributionExplorer } from '@/components/ContributionExplorer';
 import { GitAllLogo } from '@/components/GitAllLogo';
 import { SignInBanner } from '@/components/SignInBanner';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { FAQ_ITEMS } from '@/lib/faq';
 
 export default function Home() {
   return (
     <>
-      <header className="max-w-6xl mx-auto px-4 pt-12 pb-0 text-center">
-        <div className="flex justify-end mb-4">
-          <ThemeToggle />
-        </div>
+      <header className="max-w-6xl mx-auto px-4 pt-8 pb-0 text-center">
         <h1 className="flex justify-center mb-3">
           <GitAllLogo />
         </h1>
