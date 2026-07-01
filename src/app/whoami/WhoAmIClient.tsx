@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConnectionsPanel } from '@/components/ConnectionsPanel';
 import { ContributionsView } from '@/components/ContributionsView';
 import { ProfileHeader } from '@/components/ProfileHeader';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { TimePeriodSelector } from '@/components/TimePeriodSelector';
 import {
   DEFAULT_CONTRIBUTION_PERIOD,
@@ -180,13 +179,7 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
 
   return (
     <>
-      <header className="max-w-6xl mx-auto px-4 pt-8 pb-0">
-        <div className="flex justify-end mb-4">
-          <ThemeToggle />
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 pb-12">
+      <main className="max-w-6xl mx-auto px-4 pt-8 pb-12">
         <div className="flex flex-col md:flex-row gap-8">
           {/* ── Left column: identity + connections ─────────────── */}
           <aside className="md:w-72 shrink-0 space-y-6">
