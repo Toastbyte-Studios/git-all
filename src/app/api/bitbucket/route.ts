@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Accept full profile URLs: https://bitbucket.org/jason-shprintz/...
+  // Accept full profile URLs: https://bitbucket.org/workspace-slug/...
   const urlMatch = rawInput.match(BITBUCKET_URL_PREFIX);
   const requestedUsername = urlMatch ? urlMatch[1] : rawInput;
 

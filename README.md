@@ -8,7 +8,7 @@ Unified contribution heatmap viewer for GitHub, GitLab, Bitbucket, and Gitea/For
 ## Getting Started
 
 ```bash
-git clone https://github.com/jason-shprintz/git-all.git
+git clone https://github.com/Toastbyte-Studios/git-all.git
 cd git-all
 npm install
 ```
@@ -95,7 +95,7 @@ Before merging auth changes to `main`:
 
 ## Related
 
-- [git-contributions MCP service](https://github.com/jason-shprintz/mcp-services) — the MCP server counterpart for AI agents
+- git-contributions MCP service — the MCP server counterpart for AI agents
 
 ## Built by
 

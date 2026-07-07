@@ -131,6 +131,11 @@ async function fetchProviderIdentity(
   accessToken: string,
 ) {
   const config = OAUTH_PROVIDERS[provider];
+
+  if (config.fetchIdentity) {
+    return config.fetchIdentity(accessToken, APP_USER_AGENT);
+  }
+
   const acceptHeader =
     provider === 'github' ? 'application/vnd.github+json' : 'application/json';
 
