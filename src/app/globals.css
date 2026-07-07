@@ -33,6 +33,7 @@
 
   /* Brand accent — cyan */
   --accent: #2dd4bf;
+  --on-accent: #0d1117;
   --accent-hover: #5eead4;
 
   /* Semantic / platform tokens */
@@ -97,6 +98,7 @@
 
   /* Brand accent — cyan (slightly deeper for contrast on white) */
   --accent: #0d9488;
+  --on-accent: #ffffff;
   --accent-hover: #0f766e;
 
   /* Semantic / platform tokens */
@@ -155,6 +157,7 @@
 
   /* Brand accent — cyan */
   --accent: #2dd4bf;
+  --on-accent: #0d1117;
   --accent-hover: #5eead4;
 
   /* Semantic / platform tokens */
@@ -214,6 +217,7 @@
 
     /* Brand accent — cyan (slightly deeper for contrast on white) */
     --accent: #0d9488;
+    --on-accent: #ffffff;
     --accent-hover: #0f766e;
 
     /* Semantic / platform tokens */
@@ -290,4 +294,17 @@ body {
   color: var(--gh-btn-color);
   border: 1px solid var(--gh-btn-border);
   text-decoration: none;
+}
+
+/* Primary brand call-to-action (e.g. the signed-in "whoami" button). */
+.whoami-btn {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border: 1px solid var(--accent);
+  text-decoration: none;
+}
+
+.whoami-btn:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
