@@ -152,6 +152,11 @@ async function fetchBitbucketIdentity(
     return null;
   }
 
+  const legacyUsername = (() => {
+    const candidate = userPayload as { username?: unknown };
+    return isNonEmptyString(candidate.username) ? candidate.username : null;
+  })();
+
   // If the workspaces call succeeds, prefer the workspace slug over nickname
   // because nickname may be a display name rather than the URL-safe slug.
   if (workspacesResponse.ok) {
@@ -162,6 +167,12 @@ async function fetchBitbucketIdentity(
     if (isNonEmptyString(slug)) {
       return { ...userIdentity, username: slug };
     }
+  }
+
+  // If the workspaces call fails, prefer the deprecated `username` field when present,
+  // as it is more likely to be the URL-safe workspace identifier than `nickname`.
+  if (legacyUsername) {
+    return { ...userIdentity, username: legacyUsername };
   }
 
   return userIdentity;
