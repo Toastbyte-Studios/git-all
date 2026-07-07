@@ -15,6 +15,15 @@ interface OAuthProviderConfig {
   scope: string;
   tokenAuth: 'body' | 'basic';
   parseIdentity: (payload: unknown) => OAuthIdentity | null;
+  /**
+   * Optional override for identity fetching. When present, replaces the
+   * default single-request fetch + parseIdentity flow. Useful for providers
+   * that need multiple API calls (e.g. Bitbucket workspace slug lookup).
+   */
+  fetchIdentity?: (
+    accessToken: string,
+    userAgent: string,
+  ) => Promise<OAuthIdentity | null>;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -73,6 +82,8 @@ function parseGitlabIdentity(payload: unknown): OAuthIdentity | null {
   };
 }
 
+const BITBUCKET_API_BASE = 'https://api.bitbucket.org/2.0';
+
 function parseBitbucketIdentity(payload: unknown): OAuthIdentity | null {
   if (!payload || typeof payload !== 'object') {
     return null;
@@ -101,6 +112,59 @@ function parseBitbucketIdentity(payload: unknown): OAuthIdentity | null {
     username: candidate.nickname,
     avatarUrl: candidate.links.avatar.href,
   };
+}
+
+/**
+ * Fetch Bitbucket identity via two API calls:
+ *   1. /2.0/user — account_id and avatar
+ *   2. /2.0/user/permissions/workspaces?role=owner — workspace slug
+ *
+ * The workspace slug is the value that appears in Bitbucket URLs
+ * (e.g. bitbucket.org/{slug}/...) and is the correct identifier
+ * to use for repository lookups. The `nickname` field on /2.0/user
+ * may hold the user's display name rather than their workspace slug.
+ */
+async function fetchBitbucketIdentity(
+  accessToken: string,
+  userAgent: string,
+): Promise<OAuthIdentity | null> {
+  const headers = {
+    Authorization: 'Bearer ' + accessToken,
+    Accept: 'application/json',
+    'User-Agent': userAgent,
+  };
+
+  const [userResponse, workspacesResponse] = await Promise.all([
+    fetch(`${BITBUCKET_API_BASE}/user`, { headers }),
+    fetch(
+      `${BITBUCKET_API_BASE}/user/permissions/workspaces?role=owner&pagelen=1`,
+      { headers },
+    ),
+  ]);
+
+  if (!userResponse.ok) {
+    return null;
+  }
+
+  const userPayload = await userResponse.json();
+  const userIdentity = parseBitbucketIdentity(userPayload);
+  if (!userIdentity) {
+    return null;
+  }
+
+  // If the workspaces call succeeds, prefer the workspace slug over nickname
+  // because nickname may be a display name rather than the URL-safe slug.
+  if (workspacesResponse.ok) {
+    const workspacesPayload = (await workspacesResponse.json()) as {
+      values?: Array<{ workspace?: { slug?: string } }>;
+    };
+    const slug = workspacesPayload.values?.[0]?.workspace?.slug;
+    if (isNonEmptyString(slug)) {
+      return { ...userIdentity, username: slug };
+    }
+  }
+
+  return userIdentity;
 }
 
 export const OAUTH_PROVIDERS: Record<ConnectionProvider, OAuthProviderConfig> =
@@ -134,6 +198,7 @@ export const OAUTH_PROVIDERS: Record<ConnectionProvider, OAuthProviderConfig> =
       scope: 'account',
       tokenAuth: 'basic',
       parseIdentity: parseBitbucketIdentity,
+      fetchIdentity: fetchBitbucketIdentity,
     },
   };
 

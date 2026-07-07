@@ -135,7 +135,56 @@ describe('OAuth callback route', () => {
     expect(fetchMock.mock.calls[1]?.[0]).toBe('https://gitlab.com/api/v4/user');
   });
 
-  it('stores the Bitbucket nickname (workspace slug), not the deprecated username', async () => {
+  it('stores the Bitbucket workspace slug, not the nickname or deprecated username', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ access_token: 'bbtoken', token_type: 'bearer' }),
+      )
+      // /2.0/user — nickname may be a display name, not the workspace slug
+      .mockResolvedValueOnce(
+        jsonResponse({
+          account_id: '{bb-account-uuid}',
+          nickname: 'Jason Shprintz',
+          links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
+        }),
+      )
+      // /2.0/user/permissions/workspaces?role=owner — the authoritative slug
+      .mockResolvedValueOnce(
+        jsonResponse({
+          values: [{ workspace: { slug: 'jason-shprintz' } }],
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/bitbucket?code=abc&state=state-bb',
+        {
+          [getStateCookieName('bitbucket')]: 'state-bb',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'bitbucket' }) },
+    );
+
+    expect(response.status).toBe(307);
+
+    const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const decodedSession = await decodeAuthSession(nextCookie);
+    expect(decodedSession?.connections.bitbucket?.username).toBe(
+      'jason-shprintz',
+    );
+    // Verify all three calls were made
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'https://api.bitbucket.org/2.0/user',
+    );
+    expect(String(fetchMock.mock.calls[2]?.[0])).toContain(
+      '/user/permissions/workspaces',
+    );
+  });
+
+  it('falls back to Bitbucket nickname when workspaces API fails', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -144,12 +193,12 @@ describe('OAuth callback route', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           account_id: '{bb-account-uuid}',
-          // nickname is the workspace slug; username is the deprecated field
           nickname: 'jason-shprintz',
-          username: 'jason-shprintz-admin',
           links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
         }),
-      );
+      )
+      // workspaces API returns an error
+      .mockResolvedValueOnce(new Response('', { status: 403 }));
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await callbackGet(
