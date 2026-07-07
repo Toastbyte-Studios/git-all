@@ -80,7 +80,7 @@ function parseBitbucketIdentity(payload: unknown): OAuthIdentity | null {
 
   const candidate = payload as {
     account_id?: string;
-    username?: string;
+    nickname?: string;
     links?: {
       avatar?: {
         href?: string;
@@ -90,7 +90,7 @@ function parseBitbucketIdentity(payload: unknown): OAuthIdentity | null {
 
   if (
     !isNonEmptyString(candidate.account_id) ||
-    !isNonEmptyString(candidate.username) ||
+    !isNonEmptyString(candidate.nickname) ||
     !isNonEmptyString(candidate.links?.avatar?.href)
   ) {
     return null;
@@ -98,7 +98,7 @@ function parseBitbucketIdentity(payload: unknown): OAuthIdentity | null {
 
   return {
     accountId: candidate.account_id,
-    username: candidate.username,
+    username: candidate.nickname,
     avatarUrl: candidate.links.avatar.href,
   };
 }

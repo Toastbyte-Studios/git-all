@@ -134,6 +134,42 @@ describe('OAuth callback route', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://gitlab.com/oauth/token');
     expect(fetchMock.mock.calls[1]?.[0]).toBe('https://gitlab.com/api/v4/user');
   });
+
+  it('stores the Bitbucket nickname (workspace slug), not the deprecated username', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ access_token: 'bbtoken', token_type: 'bearer' }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          account_id: '{bb-account-uuid}',
+          // nickname is the workspace slug; username is the deprecated field
+          nickname: 'jason-shprintz',
+          username: 'jason-shprintz-admin',
+          links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/bitbucket?code=abc&state=state-bb',
+        {
+          [getStateCookieName('bitbucket')]: 'state-bb',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'bitbucket' }) },
+    );
+
+    expect(response.status).toBe(307);
+
+    const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const decodedSession = await decodeAuthSession(nextCookie);
+    expect(decodedSession?.connections.bitbucket?.username).toBe(
+      'jason-shprintz',
+    );
+  });
 });
 
 describe('OAuth init routes', () => {
