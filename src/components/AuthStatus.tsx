@@ -121,27 +121,21 @@ export function AuthStatus() {
 
   if (session.authenticated && primaryConnection) {
     return (
-      <div className="flex items-center gap-2 text-xs">
+      <div className="flex flex-col items-center gap-2">
         <Link
           href="/whoami"
-          className="flex items-center gap-2 hover:underline"
-          style={{ color: 'var(--text-primary)' }}
+          aria-label={`Open your profile — signed in as ${PROVIDER_LABELS[primaryConnection.provider]} @${primaryConnection.username}`}
+          className="whoami-btn inline-flex items-center gap-2.5 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors"
         >
           <Image
             src={primaryConnection.avatarUrl}
             alt=""
-            width={24}
-            height={24}
+            width={22}
+            height={22}
             className="rounded-full"
           />
-          <span className="font-medium">
-            {PROVIDER_LABELS[primaryConnection.provider]} @
-            {primaryConnection.username}
-          </span>
+          whoami
         </Link>
-        <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>
-          ·
-        </span>
         <form method="post" action="/api/auth/logout">
           <button
             type="submit"
