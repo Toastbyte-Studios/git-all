@@ -42,6 +42,14 @@ const PROVIDER_LABELS: Record<ConnectionProvider, string> = {
   bitbucket: 'Bitbucket',
 };
 
+const PROVIDER_ORDER: ConnectionProvider[] = ['github', 'gitlab', 'bitbucket'];
+
+const PROVIDER_RING: Record<ConnectionProvider, string> = {
+  github: 'var(--gh-accent)',
+  gitlab: 'var(--gl-accent)',
+  bitbucket: 'var(--bb-accent)',
+};
+
 /** The official GitHub Invertocat mark SVG. Used white on dark backgrounds,
  *  dark (#24292f) on light backgrounds per GitHub logo guidelines. */
 function GitHubMark({ color = 'currentColor' }: { color?: string }) {
@@ -120,38 +128,60 @@ export function AuthStatus() {
   const visibleProviders = getVisibleOAuthProviders(session.availableProviders);
 
   if (session.authenticated && primaryConnection) {
+    // All verified accounts, in stable order, with the primary rendered last
+    // so it sits on top of the overlapping stack (mirrors the /whoami header).
+    const connected = PROVIDER_ORDER.filter((p) => session.connections?.[p]);
+    const stackOrder = [
+      ...connected.filter((p) => p !== session.primary),
+      ...connected.filter((p) => p === session.primary),
+    ];
+    const accountsLabel = connected
+      .map((p) => `${PROVIDER_LABELS[p]} @${session.connections![p]!.username}`)
+      .join(', ');
+
     return (
-      <div className="flex items-center gap-2 text-xs">
-        <Link
-          href="/whoami"
-          className="flex items-center gap-2 hover:underline"
-          style={{ color: 'var(--text-primary)' }}
-        >
-          <Image
-            src={primaryConnection.avatarUrl}
-            alt=""
-            width={24}
-            height={24}
-            className="rounded-full"
-          />
-          <span className="font-medium">
-            {PROVIDER_LABELS[primaryConnection.provider]} @
-            {primaryConnection.username}
-          </span>
-        </Link>
-        <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>
-          ·
+      <Link
+        href="/whoami"
+        aria-label={`Open your profile — signed in as ${accountsLabel}`}
+        className="whoami-btn inline-flex items-center gap-3 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors"
+      >
+        <span className="flex shrink-0">
+          {stackOrder.map((provider, index) => {
+            const conn = session.connections![provider]!;
+            return (
+              <span
+                key={provider}
+                className="relative rounded-full"
+                style={{
+                  marginLeft: index === 0 ? 0 : '-9px',
+                  padding: '2px',
+                  // Gap between overlapping avatars matches the button fill.
+                  background: 'var(--accent)',
+                  zIndex:
+                    provider === session.primary
+                      ? stackOrder.length + 1
+                      : index + 1,
+                }}
+              >
+                <Image
+                  src={conn.avatarUrl}
+                  alt=""
+                  width={22}
+                  height={22}
+                  className="block rounded-full"
+                  style={{ border: `2px solid ${PROVIDER_RING[provider]}` }}
+                />
+              </span>
+            );
+          })}
         </span>
-        <form method="post" action="/api/auth/logout">
-          <button
-            type="submit"
-            style={{ color: 'var(--text-secondary)' }}
-            className="hover:underline cursor-pointer bg-transparent border-0 p-0 text-xs"
-          >
-            Sign out
-          </button>
-        </form>
-      </div>
+        <span className="font-mono-data">
+          <span aria-hidden="true" style={{ opacity: 0.6 }}>
+            ${' '}
+          </span>
+          whoami
+        </span>
+      </Link>
     );
   }
 
