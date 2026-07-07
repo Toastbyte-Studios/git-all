@@ -145,14 +145,14 @@ describe('OAuth callback route', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           account_id: '{bb-account-uuid}',
-          nickname: 'Jason Shprintz',
+          nickname: 'Sample Display Name',
           links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
         }),
       )
       // /2.0/user/permissions/workspaces?role=owner — the authoritative slug
       .mockResolvedValueOnce(
         jsonResponse({
-          values: [{ workspace: { slug: 'jason-shprintz' } }],
+          values: [{ workspace: { slug: 'sample-workspace' } }],
         }),
       );
     vi.stubGlobal('fetch', fetchMock);
@@ -172,7 +172,7 @@ describe('OAuth callback route', () => {
     const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
     const decodedSession = await decodeAuthSession(nextCookie);
     expect(decodedSession?.connections.bitbucket?.username).toBe(
-      'jason-shprintz',
+      'sample-workspace',
     );
     // Verify all three calls were made
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -184,7 +184,7 @@ describe('OAuth callback route', () => {
     );
   });
 
-  it('falls back to Bitbucket nickname when workspaces API fails', async () => {
+  it('falls back to Bitbucket username when workspaces API fails', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -193,7 +193,8 @@ describe('OAuth callback route', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           account_id: '{bb-account-uuid}',
-          nickname: 'jason-shprintz',
+          nickname: 'Sample Display Name',
+          username: 'sample-workspace',
           links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
         }),
       )
@@ -216,7 +217,43 @@ describe('OAuth callback route', () => {
     const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
     const decodedSession = await decodeAuthSession(nextCookie);
     expect(decodedSession?.connections.bitbucket?.username).toBe(
-      'jason-shprintz',
+      'sample-workspace',
+    );
+  });
+
+  it('falls back to Bitbucket username when the workspaces request throws', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ access_token: 'bbtoken', token_type: 'bearer' }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          account_id: '{bb-account-uuid}',
+          nickname: 'Sample Display Name',
+          username: 'sample-workspace',
+          links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
+        }),
+      )
+      .mockRejectedValueOnce(new Error('network error'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/bitbucket?code=abc&state=state-bb',
+        {
+          [getStateCookieName('bitbucket')]: 'state-bb',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'bitbucket' }) },
+    );
+
+    expect(response.status).toBe(307);
+
+    const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const decodedSession = await decodeAuthSession(nextCookie);
+    expect(decodedSession?.connections.bitbucket?.username).toBe(
+      'sample-workspace',
     );
   });
 });

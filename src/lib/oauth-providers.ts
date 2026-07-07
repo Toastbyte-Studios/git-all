@@ -134,13 +134,20 @@ async function fetchBitbucketIdentity(
     'User-Agent': userAgent,
   };
 
-  const [userResponse, workspacesResponse] = await Promise.all([
-    fetch(`${BITBUCKET_API_BASE}/user`, { headers }),
-    fetch(
-      `${BITBUCKET_API_BASE}/user/permissions/workspaces?role=owner&pagelen=1`,
-      { headers },
-    ),
-  ]);
+  const [userResponseResult, workspacesResponseResult] =
+    await Promise.allSettled([
+      fetch(`${BITBUCKET_API_BASE}/user`, { headers }),
+      fetch(
+        `${BITBUCKET_API_BASE}/user/permissions/workspaces?role=owner&pagelen=1`,
+        { headers },
+      ),
+    ]);
+
+  if (userResponseResult.status !== 'fulfilled') {
+    return null;
+  }
+
+  const userResponse = userResponseResult.value;
 
   if (!userResponse.ok) {
     return null;
@@ -159,8 +166,11 @@ async function fetchBitbucketIdentity(
 
   // If the workspaces call succeeds, prefer the workspace slug over nickname
   // because nickname may be a display name rather than the URL-safe slug.
-  if (workspacesResponse.ok) {
-    const workspacesPayload = (await workspacesResponse.json()) as {
+  if (
+    workspacesResponseResult.status === 'fulfilled' &&
+    workspacesResponseResult.value.ok
+  ) {
+    const workspacesPayload = (await workspacesResponseResult.value.json()) as {
       values?: Array<{ workspace?: { slug?: string } }>;
     };
     const slug = workspacesPayload.values?.[0]?.workspace?.slug;
