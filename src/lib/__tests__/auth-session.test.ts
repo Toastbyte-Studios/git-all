@@ -296,6 +296,7 @@ describe('encodeProviderToken / decodeProviderToken', () => {
 
   it('returns null when SESSION_SECRET is missing during decode', async () => {
     const encoded = await encodeProviderToken('token-value');
+    expect(encoded).not.toBeNull();
     delete process.env.SESSION_SECRET;
     await expect(decodeProviderToken(encoded!)).resolves.toBeNull();
   });

@@ -169,7 +169,7 @@ async function getSessionKey(): Promise<CryptoKey | null> {
 // base64url(iv).base64url(tag).base64url(ciphertext)
 async function encryptValue(
   key: CryptoKey,
-  plaintext: Uint8Array<ArrayBuffer>,
+  plaintext: BufferSource,
 ): Promise<string> {
   const iv = new Uint8Array(12);
   crypto.getRandomValues(iv);
