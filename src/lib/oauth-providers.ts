@@ -175,6 +175,9 @@ async function fetchBitbucketIdentity(
     };
     const slug = workspacesPayload.values?.[0]?.workspace?.slug;
     if (isNonEmptyString(slug)) {
+      if (legacyUsername && slug === `${legacyUsername}-admin`) {
+        return { ...userIdentity, username: legacyUsername };
+      }
       return { ...userIdentity, username: slug };
     }
   }

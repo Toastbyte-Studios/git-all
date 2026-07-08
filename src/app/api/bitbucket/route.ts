@@ -31,6 +31,11 @@ interface BitbucketPaginatedResponse<T> {
   next?: string;
 }
 
+interface BitbucketRepositoryLookupResult {
+  repositories: BitbucketRepository[];
+  workspace: string;
+}
+
 interface BitbucketUser {
   account_id?: string;
   nickname: string;
@@ -204,14 +209,15 @@ export async function GET(request: NextRequest) {
     const payload = await getOrCreateInFlightContributionRequest(
       cacheKey,
       async () => {
-        const repositories = await fetchAllRepositories(username);
+        const { repositories, workspace } =
+          await fetchAllRepositories(username);
 
         // Extract account_id from repo owner — more reliable than a separate
         // /users lookup since it works with nicknames and avoids a deprecated endpoint
         const user: BitbucketUser = {
           nickname: repositories[0]?.owner?.nickname ?? username,
           account_id: repositories[0]?.owner?.account_id,
-          workspace: username,
+          workspace,
         };
 
         const counts = new Map<string, number>();
@@ -247,7 +253,7 @@ export async function GET(request: NextRequest) {
 
         const responsePayload: BitbucketContributionResponse = {
           platform: 'bitbucket',
-          username,
+          username: workspace,
           totalContributions,
           dateRange: {
             from: calendar[0]?.date ?? null,
@@ -272,37 +278,70 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function fetchAllRepositories(username: string) {
-  const repositories: BitbucketRepository[] = [];
-  let nextUrl = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(username)}?pagelen=${BITBUCKET_PAGE_SIZE}`;
-  let pageCount = 0;
+async function fetchAllRepositories(
+  username: string,
+): Promise<BitbucketRepositoryLookupResult> {
+  for (const candidate of getWorkspaceCandidates(username)) {
+    const repositories: BitbucketRepository[] = [];
+    let nextUrl = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(candidate)}?pagelen=${BITBUCKET_PAGE_SIZE}`;
+    let pageCount = 0;
+    let notFound = false;
 
-  while (nextUrl && pageCount < MAX_REPOSITORY_LIST_PAGES) {
-    pageCount += 1;
-    const response = await fetch(nextUrl, {
-      headers: { 'User-Agent': APP_USER_AGENT },
-    });
+    while (nextUrl && pageCount < MAX_REPOSITORY_LIST_PAGES) {
+      pageCount += 1;
+      const response = await fetch(nextUrl, {
+        headers: { 'User-Agent': APP_USER_AGENT },
+      });
 
-    if (response.status === 404) {
-      throw new Error(`Bitbucket user '${username}' not found.`);
+      if (response.status === 404) {
+        notFound = true;
+        break;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Bitbucket API returned ${response.status}`);
+      }
+
+      const page: BitbucketPaginatedResponse<BitbucketRepository> =
+        await response.json();
+
+      repositories.push(...page.values);
+      if (repositories.length >= MAX_REPOSITORIES) {
+        return {
+          repositories: repositories.slice(0, MAX_REPOSITORIES),
+          workspace: candidate,
+        };
+      }
+
+      nextUrl = page.next ?? '';
     }
 
-    if (!response.ok) {
-      throw new Error(`Bitbucket API returned ${response.status}`);
+    if (notFound) {
+      continue;
     }
 
-    const page: BitbucketPaginatedResponse<BitbucketRepository> =
-      await response.json();
-
-    repositories.push(...page.values);
-    if (repositories.length >= MAX_REPOSITORIES) {
-      return repositories.slice(0, MAX_REPOSITORIES);
-    }
-
-    nextUrl = page.next ?? '';
+    return { repositories, workspace: candidate };
   }
 
-  return repositories;
+  throw new Error(`Bitbucket user '${username}' not found.`);
+}
+
+function getWorkspaceCandidates(username: string) {
+  const normalizedUsername = username.toLowerCase();
+  const candidates = [normalizedUsername];
+
+  if (normalizedUsername.endsWith('-admin')) {
+    const withoutAdminSuffix = normalizedUsername.slice(0, -'-admin'.length);
+    if (
+      withoutAdminSuffix &&
+      BITBUCKET_SLUG_PATTERN.test(withoutAdminSuffix) &&
+      withoutAdminSuffix !== normalizedUsername
+    ) {
+      candidates.push(withoutAdminSuffix);
+    }
+  }
+
+  return candidates;
 }
 
 async function aggregateRepositoryCommits({
