@@ -47,7 +47,7 @@ const PROVIDER_LABELS: Record<ConnectionProvider, string> = {
 
 const PROVIDER_ICONS: Record<ConnectionProvider, ReactElement> = {
   github: <GitHubIcon />,
-  gitlab: <GitLabIcon />,
+  gitlab: <GitLabIcon size={18} />,
   bitbucket: <BitbucketIcon />,
 };
 
