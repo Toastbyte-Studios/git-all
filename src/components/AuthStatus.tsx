@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
 import { GitHubIcon } from '@/components/icons/GitHubIcon';
 import { GitLabIcon } from '@/components/icons/GitLabIcon';
@@ -53,11 +53,11 @@ const PROVIDER_RING: Record<ConnectionProvider, string> = {
   bitbucket: 'var(--bb-accent)',
 };
 
-const PROVIDER_ICONS: Record<ConnectionProvider, React.ReactNode> = {
-  github: <GitHubIcon />,
-  gitlab: <GitLabIcon />,
-  bitbucket: <BitbucketIcon />,
-};
+function ProviderIcon({ provider }: { provider: ConnectionProvider }) {
+  if (provider === 'github') return <GitHubIcon />;
+  if (provider === 'gitlab') return <GitLabIcon />;
+  return <BitbucketIcon />;
+}
 
 export function AuthStatus() {
   const [session, setSession] = useState<AuthSessionResponse | null>(null);
@@ -193,7 +193,7 @@ export function AuthStatus() {
             className="gh-sign-in-btn inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90"
             aria-label={`Sign in with ${PROVIDER_LABELS[provider]}`}
           >
-            {PROVIDER_ICONS[provider]}
+            <ProviderIcon provider={provider} />
             {PROVIDER_LABELS[provider]}
           </a>
         ))}
