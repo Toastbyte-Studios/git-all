@@ -184,6 +184,44 @@ describe('OAuth callback route', () => {
     );
   });
 
+  it('prefers the non-admin Bitbucket username when the workspace slug only adds the admin suffix', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ access_token: 'bbtoken', token_type: 'bearer' }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          account_id: '{bb-account-uuid}',
+          nickname: 'Sample Display Name',
+          username: 'sample-user',
+          links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          values: [{ workspace: { slug: 'sample-user-admin' } }],
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/bitbucket?code=abc&state=state-bb',
+        {
+          [getStateCookieName('bitbucket')]: 'state-bb',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'bitbucket' }) },
+    );
+
+    expect(response.status).toBe(307);
+
+    const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const decodedSession = await decodeAuthSession(nextCookie);
+    expect(decodedSession?.connections.bitbucket?.username).toBe('sample-user');
+  });
+
   it('falls back to Bitbucket username when workspaces API fails', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
