@@ -1,67 +1,24 @@
-'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import type { ConnectionProvider } from '@/lib/types';
-
-interface AuthSessionResponse {
-  authenticated: boolean;
-  primary?: ConnectionProvider;
-  connections?: Partial<
-    Record<
-      ConnectionProvider,
-      {
-        provider: ConnectionProvider;
-        username: string;
-        avatarUrl: string;
-      }
-    >
-  >;
-}
-
-const PROVIDER_ORDER: ConnectionProvider[] = ['github', 'gitlab', 'bitbucket'];
-
-const PROVIDER_LABELS: Record<ConnectionProvider, string> = {
-  github: 'GitHub',
-  gitlab: 'GitLab',
-  bitbucket: 'Bitbucket',
-};
-
-const PROVIDER_RING: Record<ConnectionProvider, string> = {
-  github: 'var(--gh-accent)',
-  gitlab: 'var(--gl-accent)',
-  bitbucket: 'var(--bb-accent)',
-};
+import { getAuthSession } from '@/lib/auth-session';
+import {
+  PROVIDER_LABELS,
+  PROVIDER_ORDER,
+  PROVIDER_RING,
+} from '@/lib/provider-ui';
 
 /**
  * Renders the connected-account avatar stack in the site header.
- * Fetches the auth session client-side and shows nothing while loading
- * or when the user is unauthenticated.
+ * Reads the auth session server-side to avoid a client-side round-trip.
  */
-export function HeaderAvatars() {
-  const [session, setSession] = useState<AuthSessionResponse | null>(null);
+export async function HeaderAvatars() {
+  const session = await getAuthSession();
 
-  useEffect(() => {
-    let isMounted = true;
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: AuthSessionResponse | null) => {
-        if (isMounted) setSession(data);
-      })
-      .catch(() => {
-        if (isMounted) setSession({ authenticated: false });
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  if (!session?.authenticated || !session.primary || !session.connections) {
+  if (!session?.primary || !session.connections) {
     return null;
   }
 
-  const connected = PROVIDER_ORDER.filter((p) => session.connections![p]);
+  const connected = PROVIDER_ORDER.filter((p) => session.connections[p]);
   if (connected.length === 0) return null;
 
   const stackOrder = [
@@ -70,7 +27,7 @@ export function HeaderAvatars() {
   ];
 
   const accountsLabel = connected
-    .map((p) => `${PROVIDER_LABELS[p]} @${session.connections![p]!.username}`)
+    .map((p) => `${PROVIDER_LABELS[p]} @${session.connections[p]!.username}`)
     .join(', ');
 
   return (
@@ -80,7 +37,7 @@ export function HeaderAvatars() {
       className="flex shrink-0 items-center rounded-full transition-opacity hover:opacity-80"
     >
       {stackOrder.map((provider, index) => {
-        const conn = session.connections![provider]!;
+        const conn = session.connections[provider]!;
         return (
           <span
             key={provider}
@@ -97,7 +54,8 @@ export function HeaderAvatars() {
           >
             <Image
               src={conn.avatarUrl}
-              alt={`Avatar for @${conn.username} on ${PROVIDER_LABELS[provider]}`}
+              alt=""
+              aria-hidden="true"
               width={28}
               height={28}
               className="block rounded-full"

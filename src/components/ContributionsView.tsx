@@ -240,9 +240,9 @@ function VerifiedChip() {
     <span
       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
       style={{
-        backgroundColor: 'rgba(45, 212, 191, 0.15)',
+        backgroundColor: 'rgb(var(--accent-rgb) / 0.15)',
         color: 'var(--accent)',
-        border: '1px solid rgba(45, 212, 191, 0.3)',
+        border: '1px solid rgb(var(--accent-rgb) / 0.3)',
       }}
       aria-label="Verified connection"
     >
