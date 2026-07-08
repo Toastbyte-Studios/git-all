@@ -155,8 +155,9 @@ export default function Home() {
                 name: 'Gitea / Forgejo',
                 desc: 'Lightweight self-hosted git servers',
                 color: 'var(--gt-accent)',
+                comingSoon: true,
               },
-            ].map(({ name, desc, color }) => (
+            ].map(({ name, desc, color, comingSoon }) => (
               <li
                 key={name}
                 className="p-3 rounded-lg text-sm"
@@ -165,8 +166,25 @@ export default function Home() {
                   border: '1px solid var(--border)',
                 }}
               >
-                <span className="font-medium block mb-0.5" style={{ color }}>
+                <span
+                  className="font-medium flex items-center gap-1.5 mb-0.5"
+                  style={{ color }}
+                >
                   {name}
+                  {comingSoon && (
+                    <span
+                      className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium leading-none"
+                      style={{
+                        backgroundColor:
+                          'rgba(var(--accent-rgb, 99 102 241) / 0.15)',
+                        color: 'var(--accent)',
+                        border:
+                          '1px solid rgba(var(--accent-rgb, 99 102 241) / 0.3)',
+                      }}
+                    >
+                      Coming soon
+                    </span>
+                  )}
                 </span>
                 <span style={{ color: 'var(--text-secondary)' }}>{desc}</span>
               </li>
