@@ -49,6 +49,12 @@
   --gh-btn-bg: #24292f;
   --gh-btn-color: #ffffff;
   --gh-btn-border: var(--border);
+  --gl-btn-bg: #292961;
+  --gl-btn-color: #ffffff;
+  --gl-btn-border: var(--border);
+  --bb-btn-bg: #091e42;
+  --bb-btn-color: #ffffff;
+  --bb-btn-border: var(--border);
 
   /* Contribution levels — GitHub-style greens */
   --level-0: #21262d;
@@ -113,6 +119,10 @@
   --success: #1a7f37;
   --gh-btn-bg: #f6f8fa;
   --gh-btn-color: #24292f;
+  --gl-btn-bg: #f6f8fa;
+  --gl-btn-color: #292961;
+  --bb-btn-bg: #f6f8fa;
+  --bb-btn-color: #091e42;
 
   --level-0: #ebedf0;
   --level-1: #9be9a8;
@@ -172,6 +182,10 @@
   --success: #3fb950;
   --gh-btn-bg: #24292f;
   --gh-btn-color: #ffffff;
+  --gl-btn-bg: #292961;
+  --gl-btn-color: #ffffff;
+  --bb-btn-bg: #091e42;
+  --bb-btn-color: #ffffff;
 
   --level-0: #21262d;
   --level-1: #0e4429;
@@ -232,6 +246,10 @@
     --success: #1a7f37;
     --gh-btn-bg: #f6f8fa;
     --gh-btn-color: #24292f;
+    --gl-btn-bg: #f6f8fa;
+    --gl-btn-color: #292961;
+    --bb-btn-bg: #f6f8fa;
+    --bb-btn-color: #091e42;
 
     --level-0: #ebedf0;
     --level-1: #9be9a8;
@@ -285,14 +303,29 @@ body {
     'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
 }
 
-/* ── GitHub sign-in button ──────────────────────────────────────────
-   Theme comes from CSS variables so it follows the same cascade as the
-   rest of the app tokens and updates immediately on theme changes.
+/* ── Provider sign-in buttons ───────────────────────────────────────
+   Each provider gets its own CSS class wired to provider-specific
+   CSS variables so the buttons are styled consistently per brand and
+   update immediately on theme changes.
    ──────────────────────────────────────────────────────────────────── */
 .gh-sign-in-btn {
   background-color: var(--gh-btn-bg);
   color: var(--gh-btn-color);
   border: 1px solid var(--gh-btn-border);
+  text-decoration: none;
+}
+
+.gl-sign-in-btn {
+  background-color: var(--gl-btn-bg);
+  color: var(--gl-btn-color);
+  border: 1px solid var(--border);
+  text-decoration: none;
+}
+
+.bb-sign-in-btn {
+  background-color: var(--bb-btn-bg);
+  color: var(--bb-btn-color);
+  border: 1px solid var(--border);
   text-decoration: none;
 }
 

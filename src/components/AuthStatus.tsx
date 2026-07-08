@@ -2,7 +2,10 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
+import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
+import { GitHubIcon } from '@/components/icons/GitHubIcon';
+import { GitLabIcon } from '@/components/icons/GitLabIcon';
 import { getVisibleOAuthProviders } from '@/lib/oauth-providers';
 import type { ConnectionProvider } from '@/lib/types';
 
@@ -42,6 +45,18 @@ const PROVIDER_LABELS: Record<ConnectionProvider, string> = {
   bitbucket: 'Bitbucket',
 };
 
+const PROVIDER_ICONS: Record<ConnectionProvider, ReactElement> = {
+  github: <GitHubIcon />,
+  gitlab: <GitLabIcon />,
+  bitbucket: <BitbucketIcon />,
+};
+
+const PROVIDER_SIGN_IN_CLASS: Record<ConnectionProvider, string> = {
+  github: 'gh-sign-in-btn',
+  gitlab: 'gl-sign-in-btn',
+  bitbucket: 'bb-sign-in-btn',
+};
+
 const PROVIDER_ORDER: ConnectionProvider[] = ['github', 'gitlab', 'bitbucket'];
 
 const PROVIDER_RING: Record<ConnectionProvider, string> = {
@@ -49,57 +64,6 @@ const PROVIDER_RING: Record<ConnectionProvider, string> = {
   gitlab: 'var(--gl-accent)',
   bitbucket: 'var(--bb-accent)',
 };
-
-function GitHubMark() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 98 96"
-      width="16"
-      height="16"
-      aria-hidden="true"
-      fill="currentColor"
-    >
-      <path d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z" />
-    </svg>
-  );
-}
-
-function GitLabMark() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 380 380"
-      width="16"
-      height="16"
-      aria-hidden="true"
-      fill="currentColor"
-    >
-      <path d="M282.83 170.73l-.27-.69-26.14-68.22a6.81 6.81 0 00-2.69-3.24 7 7 0 00-8 .43 7 7 0 00-2.32 3.52l-17.65 54H154.29l-17.65-54a6.86 6.86 0 00-2.32-3.52 7 7 0 00-8-.43 6.87 6.87 0 00-2.69 3.24L97.44 170l-.26.69a48.54 48.54 0 0016.1 56.1l.09.07.24.17 39.82 29.82 19.7 14.91 12 9.06a8.07 8.07 0 009.19 0l12-9.06 19.7-14.91 40.06-30 .1-.08a48.56 48.56 0 0016.07-56.04z" />
-    </svg>
-  );
-}
-
-function BitbucketMark() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 32 32"
-      width="16"
-      height="16"
-      aria-hidden="true"
-      fill="currentColor"
-    >
-      <path d="M2 4a2 2 0 00-2 2.3l4.31 21.09A2.78 2.78 0 006.88 30H25.5a2 2 0 002-1.7L31.94 6.32A2 2 0 0030 4zm17.75 17.75h-7.58L10.09 12h11.74z" />
-    </svg>
-  );
-}
-
-function ProviderIcon({ provider }: { provider: ConnectionProvider }) {
-  if (provider === 'github') return <GitHubMark />;
-  if (provider === 'gitlab') return <GitLabMark />;
-  return <BitbucketMark />;
-}
 
 export function AuthStatus() {
   const [session, setSession] = useState<AuthSessionResponse | null>(null);
@@ -232,10 +196,10 @@ export function AuthStatus() {
           <a
             key={provider}
             href={`/api/auth/${provider}`}
-            className="gh-sign-in-btn inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90"
+            className={`${PROVIDER_SIGN_IN_CLASS[provider]} inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90`}
             aria-label={`Sign in with ${PROVIDER_LABELS[provider]}`}
           >
-            <ProviderIcon provider={provider} />
+            {PROVIDER_ICONS[provider]}
             {PROVIDER_LABELS[provider]}
           </a>
         ))}
