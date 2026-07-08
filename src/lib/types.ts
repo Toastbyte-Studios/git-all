@@ -22,7 +22,8 @@ export interface Connection {
   accountId: string;
   username: string;
   avatarUrl: string;
-  accessToken: string;
+  /** Not persisted in the session cookie; loaded from a separate per-provider token cookie. */
+  accessToken?: string;
   verifiedAt: number;
 }
 

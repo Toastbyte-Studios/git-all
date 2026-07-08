@@ -8,7 +8,9 @@ import { GET as gitlabAuthGet } from '@/app/api/auth/gitlab/route';
 import {
   SESSION_COOKIE_NAME,
   decodeAuthSession,
+  decodeProviderToken,
   encodeAuthSession,
+  getProviderTokenCookieName,
   getStateCookieName,
   type AuthSession,
 } from '../auth-session';
@@ -76,7 +78,6 @@ describe('OAuth callback route', () => {
           accountId: '123',
           username: 'octocat',
           avatarUrl: 'https://avatars.githubusercontent.com/u/123',
-          accessToken: 'gho-existing',
           verifiedAt: 1_717_777_777_000,
         },
       },
@@ -114,6 +115,7 @@ describe('OAuth callback route', () => {
     const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
     expect(nextCookie).toBeTruthy();
 
+    // Session cookie should NOT contain access tokens (to stay under 4096 bytes).
     const decodedSession = await decodeAuthSession(nextCookie);
     expect(decodedSession).toEqual({
       primary: 'gitlab',
@@ -124,11 +126,19 @@ describe('OAuth callback route', () => {
           accountId: '456',
           username: 'gitlab-user',
           avatarUrl: 'https://gitlab.com/avatar.png',
-          accessToken: 'glpat-new-token',
           verifiedAt: expect.any(Number),
         },
       },
     });
+
+    // Token should be stored in a separate per-provider cookie.
+    const gitlabTokenCookie = response.cookies.get(
+      getProviderTokenCookieName('gitlab'),
+    )?.value;
+    expect(gitlabTokenCookie).toBeTruthy();
+    await expect(decodeProviderToken(gitlabTokenCookie)).resolves.toBe(
+      'glpat-new-token',
+    );
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://gitlab.com/oauth/token');
@@ -364,7 +374,6 @@ describe('disconnect route', () => {
           accountId: '123',
           username: 'octocat',
           avatarUrl: 'https://avatars.githubusercontent.com/u/123',
-          accessToken: 'gho-existing',
           verifiedAt: 1_717_777_777_000,
         },
         gitlab: {
@@ -372,7 +381,6 @@ describe('disconnect route', () => {
           accountId: '456',
           username: 'gitlab-user',
           avatarUrl: 'https://gitlab.com/avatar.png',
-          accessToken: 'glpat-existing',
           verifiedAt: 1_717_777_888_000,
         },
       },
@@ -398,6 +406,12 @@ describe('disconnect route', () => {
         gitlab: existingSession.connections.gitlab,
       },
     });
+
+    // Token cookie for the removed provider should be cleared.
+    const githubTokenCookie = response.cookies.get(
+      getProviderTokenCookieName('github'),
+    );
+    expect(githubTokenCookie?.value).toBe('');
   });
 
   it('clears the cookie when removing the last connection', async () => {
@@ -409,7 +423,6 @@ describe('disconnect route', () => {
           accountId: '123',
           username: 'octocat',
           avatarUrl: 'https://avatars.githubusercontent.com/u/123',
-          accessToken: 'gho-existing',
           verifiedAt: 1_717_777_777_000,
         },
       },

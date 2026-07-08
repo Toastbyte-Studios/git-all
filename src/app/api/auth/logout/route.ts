@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SESSION_COOKIE_NAME, getStateCookieName } from '@/lib/auth-session';
+import {
+  SESSION_COOKIE_NAME,
+  getProviderTokenCookieName,
+  getStateCookieName,
+} from '@/lib/auth-session';
 import { CONNECTION_PROVIDERS } from '@/lib/oauth-providers';
 
 function clearAuthCookies(response: NextResponse) {
@@ -15,6 +19,15 @@ function clearAuthCookies(response: NextResponse) {
   for (const provider of CONNECTION_PROVIDERS) {
     response.cookies.set({
       name: getStateCookieName(provider),
+      value: '',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 0,
+    });
+    response.cookies.set({
+      name: getProviderTokenCookieName(provider),
       value: '',
       httpOnly: true,
       sameSite: 'lax',

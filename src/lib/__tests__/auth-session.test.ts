@@ -6,7 +6,10 @@ import {
   STATE_MAX_AGE_SECONDS,
   createOAuthState,
   decodeAuthSession,
+  decodeProviderToken,
   encodeAuthSession,
+  encodeProviderToken,
+  getProviderTokenCookieName,
   getStateCookieName,
   mergeConnectionIntoSession,
   removeConnectionFromSession,
@@ -34,7 +37,6 @@ const SAMPLE_SESSION: AuthSession = {
       accountId: '123',
       username: 'testuser',
       avatarUrl: 'https://avatars.githubusercontent.com/u/123',
-      accessToken: 'gho_testtoken123',
       verifiedAt: 1_717_777_777_000,
     },
   },
@@ -102,6 +104,14 @@ describe('constants', () => {
     );
   });
 
+  it('uses per-provider token cookie names', () => {
+    expect(getProviderTokenCookieName('github')).toBe('gitall_token_github');
+    expect(getProviderTokenCookieName('gitlab')).toBe('gitall_token_gitlab');
+    expect(getProviderTokenCookieName('bitbucket')).toBe(
+      'gitall_token_bitbucket',
+    );
+  });
+
   it('keeps the existing session lifetime', () => {
     expect(SESSION_MAX_AGE_SECONDS).toBe(60 * 60 * 24 * 7);
   });
@@ -156,7 +166,7 @@ describe('createOAuthState', () => {
 });
 
 describe('encodeAuthSession / decodeAuthSession', () => {
-  it('round-trips a multi-connection session', async () => {
+  it('round-trips a multi-connection session (accessToken stripped from cookie)', async () => {
     const token = await encodeAuthSession({
       primary: 'gitlab',
       connections: {
@@ -173,16 +183,22 @@ describe('encodeAuthSession / decodeAuthSession', () => {
     });
 
     expect(token).not.toBeNull();
+    // accessToken is intentionally stripped from the session cookie to reduce size.
     await expect(decodeAuthSession(token!)).resolves.toEqual({
       primary: 'gitlab',
       connections: {
-        github: SAMPLE_SESSION.connections.github,
+        github: {
+          provider: 'github',
+          accountId: '123',
+          username: 'testuser',
+          avatarUrl: 'https://avatars.githubusercontent.com/u/123',
+          verifiedAt: 1_717_777_777_000,
+        },
         gitlab: {
           provider: 'gitlab',
           accountId: '456',
           username: 'gitlab-user',
           avatarUrl: 'https://gitlab.com/avatar.png',
-          accessToken: 'glpat-token',
           verifiedAt: 1_717_777_888_000,
         },
       },
@@ -244,6 +260,48 @@ describe('encodeAuthSession / decodeAuthSession', () => {
   });
 });
 
+describe('encodeProviderToken / decodeProviderToken', () => {
+  it('round-trips a provider token', async () => {
+    const encoded = await encodeProviderToken('gho_testtoken123');
+    expect(encoded).not.toBeNull();
+    await expect(decodeProviderToken(encoded!)).resolves.toBe(
+      'gho_testtoken123',
+    );
+  });
+
+  it('returns different encrypted values on each encode', async () => {
+    const first = await encodeProviderToken('some-token');
+    const second = await encodeProviderToken('some-token');
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(first).not.toBe(second);
+  });
+
+  it('returns null for tampered token cookies', async () => {
+    const encoded = await encodeProviderToken('token-value');
+    expect(encoded).not.toBeNull();
+    const parts = encoded!.split('.');
+    parts[2] = `${parts[2]}tampered`;
+    await expect(decodeProviderToken(parts.join('.'))).resolves.toBeNull();
+  });
+
+  it('returns null for undefined input', async () => {
+    await expect(decodeProviderToken(undefined)).resolves.toBeNull();
+  });
+
+  it('returns null when SESSION_SECRET is missing during encode', async () => {
+    delete process.env.SESSION_SECRET;
+    await expect(encodeProviderToken('token-value')).resolves.toBeNull();
+  });
+
+  it('returns null when SESSION_SECRET is missing during decode', async () => {
+    const encoded = await encodeProviderToken('token-value');
+    expect(encoded).not.toBeNull();
+    delete process.env.SESSION_SECRET;
+    await expect(decodeProviderToken(encoded!)).resolves.toBeNull();
+  });
+});
+
 describe('session connection helpers', () => {
   it('adding a second connection preserves the first one', () => {
     const merged = mergeConnectionIntoSession(SAMPLE_SESSION, {
@@ -251,7 +309,6 @@ describe('session connection helpers', () => {
       accountId: 'workspace:789',
       username: 'bb-user',
       avatarUrl: 'https://bitbucket.org/avatar.png',
-      accessToken: 'bb-token',
       verifiedAt: 1_717_777_999_000,
     });
 
@@ -273,7 +330,6 @@ describe('session connection helpers', () => {
             accountId: '456',
             username: 'gitlab-user',
             avatarUrl: 'https://gitlab.com/avatar.png',
-            accessToken: 'glpat-token',
             verifiedAt: 1_717_777_888_000,
           },
         },
@@ -290,7 +346,6 @@ describe('session connection helpers', () => {
           accountId: '456',
           username: 'gitlab-user',
           avatarUrl: 'https://gitlab.com/avatar.png',
-          accessToken: 'glpat-token',
           verifiedAt: 1_717_777_888_000,
         },
       },
