@@ -274,6 +274,11 @@ describe('OAuth callback route', () => {
     expect(decodedSession?.connections.bitbucket?.username).toBe(
       'jason-shprintz',
     );
+    // Verify all three calls were made and the third was the workspaces request
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2]?.[0])).toContain(
+      '/user/permissions/workspaces',
+    );
   });
 
   it('strips -admin suffix from deprecated username fallback when workspaces API fails', async () => {
@@ -311,6 +316,11 @@ describe('OAuth callback route', () => {
     const decodedSession = await decodeAuthSession(nextCookie);
     expect(decodedSession?.connections.bitbucket?.username).toBe(
       'jason-shprintz',
+    );
+    // Verify all three calls were made and the third was the workspaces request
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2]?.[0])).toContain(
+      '/user/permissions/workspaces',
     );
   });
 
