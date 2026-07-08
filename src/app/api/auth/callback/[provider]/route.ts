@@ -4,7 +4,9 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
   encodeAuthSession,
+  encodeProviderToken,
   getAuthSessionFromRequest,
+  getProviderTokenCookieName,
   getStateCookieName,
   mergeConnectionIntoSession,
 } from '@/lib/auth-session';
@@ -201,7 +203,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
         accountId: identity.accountId,
         username: identity.username,
         avatarUrl: identity.avatarUrl,
-        accessToken,
         verifiedAt: Date.now(),
       }),
     );
@@ -226,6 +227,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
       path: '/',
       maxAge: SESSION_MAX_AGE_SECONDS,
     });
+
+    // Store the access token in its own per-provider cookie to keep the main
+    // session cookie small (Bitbucket tokens are large enough to push a
+    // multi-account session past the 4096-byte browser limit).
+    const serializedToken = await encodeProviderToken(accessToken);
+    if (serializedToken) {
+      response.cookies.set({
+        name: getProviderTokenCookieName(providerParam),
+        value: serializedToken,
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: SESSION_MAX_AGE_SECONDS,
+      });
+    }
+
     clearStateCookie(response, providerParam);
 
     return response;

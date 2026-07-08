@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
-import { getAuthSessionFromRequest } from '@/lib/auth-session';
+import {
+  getAuthSessionFromRequest,
+  getProviderTokenFromRequest,
+} from '@/lib/auth-session';
 import {
   normalizeRequestedContributionRange,
   toExclusiveUpperBoundIso,
@@ -184,7 +187,9 @@ export async function GET(request: NextRequest) {
   const authSession = await getAuthSessionFromRequest(request);
   const githubConnection = authSession?.connections.github;
   const authSessionLogin = githubConnection?.username.toLowerCase() ?? null;
-  const token = githubConnection?.accessToken ?? process.env.GITHUB_TOKEN;
+  const token =
+    (await getProviderTokenFromRequest(request, 'github')) ??
+    process.env.GITHUB_TOKEN;
   const shouldBypassCache = Boolean(githubConnection);
   const isSelfLookup = authSessionLogin === username;
 

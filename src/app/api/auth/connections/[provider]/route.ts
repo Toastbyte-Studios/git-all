@@ -4,6 +4,7 @@ import {
   SESSION_MAX_AGE_SECONDS,
   encodeAuthSession,
   getAuthSessionFromRequest,
+  getProviderTokenCookieName,
   removeConnectionFromSession,
 } from '@/lib/auth-session';
 import type { ConnectionProvider } from '@/lib/types';
@@ -21,6 +22,21 @@ function isConnectionProvider(value: string): value is ConnectionProvider {
 function clearSessionCookie(response: NextResponse) {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
+    value: '',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 0,
+  });
+}
+
+function clearProviderTokenCookie(
+  response: NextResponse,
+  provider: ConnectionProvider,
+) {
+  response.cookies.set({
+    name: getProviderTokenCookieName(provider),
     value: '',
     httpOnly: true,
     sameSite: 'lax',
@@ -54,6 +70,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
     clearSessionCookie(response);
+    clearProviderTokenCookie(response, provider);
     return response;
   }
 
@@ -81,5 +98,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     path: '/',
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
+  clearProviderTokenCookie(response, provider);
   return response;
 }

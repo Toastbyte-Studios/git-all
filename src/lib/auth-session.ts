@@ -1,19 +1,30 @@
 import type { Connection, ConnectionProvider } from '@/lib/types';
 import type { NextRequest } from 'next/server';
 
-const SESSION_VERSION = 2;
+const SESSION_VERSION = 3;
 const SESSION_COOKIE_NAME = 'gitall_session';
 const STATE_COOKIE_PREFIX = 'gitall_oauth_state_';
+const PROVIDER_TOKEN_COOKIE_PREFIX = 'gitall_token_';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const STATE_MAX_AGE_SECONDS = 60 * 10;
 
 // AES-GCM auth tag length in bytes
 const TAG_LENGTH = 16;
 
+// Connection as stored in the session cookie — no access token to keep the
+// cookie small. Tokens are stored in separate per-provider cookies.
+interface StoredConnection {
+  provider: ConnectionProvider;
+  accountId: string;
+  username: string;
+  avatarUrl: string;
+  verifiedAt: number;
+}
+
 interface StoredAuthSession {
   version: number;
   primary: ConnectionProvider;
-  connections: Partial<Record<ConnectionProvider, Connection>>;
+  connections: Partial<Record<ConnectionProvider, StoredConnection>>;
   expiresAt: number;
 }
 
@@ -22,7 +33,11 @@ export interface AuthSession {
   connections: Partial<Record<ConnectionProvider, Connection>>;
 }
 
-export { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS };
+export {
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+  PROVIDER_TOKEN_COOKIE_PREFIX,
+};
 export { SESSION_VERSION, STATE_MAX_AGE_SECONDS };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -64,6 +79,10 @@ export function createOAuthState() {
 
 export function getStateCookieName(provider: ConnectionProvider) {
   return `${STATE_COOKIE_PREFIX}${provider}`;
+}
+
+export function getProviderTokenCookieName(provider: ConnectionProvider) {
+  return `${PROVIDER_TOKEN_COOKIE_PREFIX}${provider}`;
 }
 
 export function mergeConnectionIntoSession(
@@ -108,12 +127,12 @@ function isConnectionProvider(value: unknown): value is ConnectionProvider {
 function isValidConnection(
   provider: ConnectionProvider,
   connection: unknown,
-): connection is Connection {
+): connection is StoredConnection {
   if (!connection || typeof connection !== 'object') {
     return false;
   }
 
-  const candidate = connection as Partial<Connection>;
+  const candidate = connection as Partial<StoredConnection>;
   return (
     candidate.provider === provider &&
     typeof candidate.accountId === 'string' &&
@@ -122,8 +141,6 @@ function isValidConnection(
     candidate.username.length > 0 &&
     typeof candidate.avatarUrl === 'string' &&
     candidate.avatarUrl.length > 0 &&
-    typeof candidate.accessToken === 'string' &&
-    candidate.accessToken.length > 0 &&
     typeof candidate.verifiedAt === 'number' &&
     Number.isFinite(candidate.verifiedAt)
   );
@@ -148,28 +165,14 @@ async function getSessionKey(): Promise<CryptoKey | null> {
 
 // ── Encode / Decode ──────────────────────────────────────────────────
 
-export async function encodeAuthSession(
-  session: AuthSession,
-): Promise<string | null> {
-  const key = await getSessionKey();
-  if (!key) {
-    return null;
-  }
-
+// Shared helper: encrypt arbitrary plaintext bytes, returning
+// base64url(iv).base64url(tag).base64url(ciphertext)
+async function encryptValue(
+  key: CryptoKey,
+  plaintext: Uint8Array<ArrayBuffer>,
+): Promise<string> {
   const iv = new Uint8Array(12);
   crypto.getRandomValues(iv);
-
-  // Note: the OAuth access token is encrypted and authenticated in this
-  // HttpOnly cookie payload. For stricter theft resistance, migrate to an
-  // opaque session ID backed by server-side token storage.
-  const payload: StoredAuthSession = {
-    version: SESSION_VERSION,
-    primary: session.primary,
-    connections: session.connections,
-    expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
-  };
-
-  const plaintext = new TextEncoder().encode(JSON.stringify(payload));
 
   // Web Crypto AES-GCM returns ciphertext || authTag (tag is last 16 bytes)
   const combined = new Uint8Array(
@@ -182,18 +185,11 @@ export async function encodeAuthSession(
   return `${toBase64Url(iv)}.${toBase64Url(tag)}.${toBase64Url(encrypted)}`;
 }
 
-export async function decodeAuthSession(
-  value: string | undefined,
-): Promise<AuthSession | null> {
-  if (!value) {
-    return null;
-  }
-
-  const key = await getSessionKey();
-  if (!key) {
-    return null;
-  }
-
+// Shared helper: decrypt a value produced by encryptValue.
+async function decryptValue(
+  key: CryptoKey,
+  value: string,
+): Promise<Uint8Array | null> {
   const parts = value.split('.');
   if (parts.length !== 3) {
     return null;
@@ -211,12 +207,110 @@ export async function decodeAuthSession(
     combined.set(encrypted);
     combined.set(tag, encrypted.length);
 
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      combined,
+    return new Uint8Array(
+      await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, combined),
     );
+  } catch {
+    return null;
+  }
+}
 
+export async function encodeAuthSession(
+  session: AuthSession,
+): Promise<string | null> {
+  const key = await getSessionKey();
+  if (!key) {
+    return null;
+  }
+
+  // Strip accessToken from each connection before storing. Access tokens are
+  // kept in separate per-provider cookies to stay well under the 4096-byte
+  // per-cookie limit (Bitbucket tokens are especially large).
+  const storedConnections: Partial<
+    Record<ConnectionProvider, StoredConnection>
+  > = {};
+  for (const [provider, connection] of Object.entries(session.connections)) {
+    if (connection !== undefined) {
+      const p = provider as ConnectionProvider;
+      storedConnections[p] = {
+        provider: connection.provider,
+        accountId: connection.accountId,
+        username: connection.username,
+        avatarUrl: connection.avatarUrl,
+        verifiedAt: connection.verifiedAt,
+      };
+    }
+  }
+
+  const payload: StoredAuthSession = {
+    version: SESSION_VERSION,
+    primary: session.primary,
+    connections: storedConnections,
+    expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+  };
+
+  const plaintext = new TextEncoder().encode(JSON.stringify(payload));
+  return encryptValue(key, plaintext);
+}
+
+/**
+ * Encrypt a provider access token for storage in its own HttpOnly cookie.
+ * Use {@link getProviderTokenCookieName} for the cookie name.
+ */
+export async function encodeProviderToken(
+  token: string,
+): Promise<string | null> {
+  const key = await getSessionKey();
+  if (!key) {
+    return null;
+  }
+
+  const plaintext = new TextEncoder().encode(token);
+  return encryptValue(key, plaintext);
+}
+
+/**
+ * Decrypt a provider token that was stored with {@link encodeProviderToken}.
+ */
+export async function decodeProviderToken(
+  value: string | undefined,
+): Promise<string | null> {
+  if (!value) {
+    return null;
+  }
+
+  const key = await getSessionKey();
+  if (!key) {
+    return null;
+  }
+
+  const decrypted = await decryptValue(key, value);
+  if (!decrypted) {
+    return null;
+  }
+
+  const token = new TextDecoder().decode(decrypted);
+  return token.length > 0 ? token : null;
+}
+
+export async function decodeAuthSession(
+  value: string | undefined,
+): Promise<AuthSession | null> {
+  if (!value) {
+    return null;
+  }
+
+  const key = await getSessionKey();
+  if (!key) {
+    return null;
+  }
+
+  const decrypted = await decryptValue(key, value);
+  if (!decrypted) {
+    return null;
+  }
+
+  try {
     const session = JSON.parse(
       new TextDecoder().decode(decrypted),
     ) as StoredAuthSession;
@@ -260,6 +354,20 @@ export async function getAuthSessionFromRequest(
   request: NextRequest,
 ): Promise<AuthSession | null> {
   return decodeAuthSession(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+}
+
+/**
+ * Read and decrypt a provider's access token from its dedicated HttpOnly
+ * cookie (set by the OAuth callback). Returns null if the cookie is absent,
+ * tampered, or the session key is unavailable.
+ */
+export async function getProviderTokenFromRequest(
+  request: NextRequest,
+  provider: ConnectionProvider,
+): Promise<string | null> {
+  return decodeProviderToken(
+    request.cookies.get(getProviderTokenCookieName(provider))?.value,
+  );
 }
 
 export async function getAuthSession(): Promise<AuthSession | null> {
