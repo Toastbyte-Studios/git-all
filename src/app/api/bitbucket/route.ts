@@ -198,7 +198,8 @@ export async function GET(request: NextRequest) {
   const fromMs = fromDate.getTime();
   const toExclusiveMs = toDate.getTime() + 24 * 60 * 60 * 1000;
   const refresh = request.nextUrl.searchParams.get('refresh') === 'true';
-  const cacheKey = `bitbucket:${username}:${requestedRange.from}:${requestedRange.to}`;
+  const cacheWorkspace = getCacheWorkspace(username);
+  const cacheKey = `bitbucket:${cacheWorkspace}:${requestedRange.from}:${requestedRange.to}`;
 
   try {
     const cached = getCachedContribution(cacheKey);
@@ -215,7 +216,7 @@ export async function GET(request: NextRequest) {
         // Extract account_id from repo owner — more reliable than a separate
         // /users lookup since it works with nicknames and avoids a deprecated endpoint
         const user: BitbucketUser = {
-          nickname: repositories[0]?.owner?.nickname ?? username,
+          nickname: repositories[0]?.owner?.nickname ?? workspace,
           account_id: repositories[0]?.owner?.account_id,
           workspace,
         };
@@ -323,7 +324,7 @@ async function fetchAllRepositories(
     return { repositories, workspace: candidate };
   }
 
-  throw new Error(`Bitbucket user '${username}' not found.`);
+  throw new Error(`Bitbucket workspace '${username}' not found.`);
 }
 
 function getWorkspaceCandidates(username: string) {
@@ -342,6 +343,11 @@ function getWorkspaceCandidates(username: string) {
   }
 
   return candidates;
+}
+
+function getCacheWorkspace(username: string) {
+  const candidates = getWorkspaceCandidates(username);
+  return candidates[candidates.length - 1] ?? username;
 }
 
 async function aggregateRepositoryCommits({
