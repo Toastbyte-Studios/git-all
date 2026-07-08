@@ -46,15 +46,15 @@
   --ga-accent: #5eead4;
   --error: #f85149;
   --success: #3fb950;
-  --gh-btn-bg: #24292f;
+  --gh-btn-bg: rgba(57, 211, 83, 0.1);
   --gh-btn-color: #ffffff;
-  --gh-btn-border: var(--border);
-  --gl-btn-bg: #292961;
+  --gh-btn-border: rgba(57, 211, 83, 0.3);
+  --gl-btn-bg: rgba(253, 154, 40, 0.1);
   --gl-btn-color: #ffffff;
-  --gl-btn-border: var(--border);
-  --bb-btn-bg: #091e42;
+  --gl-btn-border: rgba(253, 154, 40, 0.3);
+  --bb-btn-bg: rgba(76, 154, 255, 0.1);
   --bb-btn-color: #ffffff;
-  --bb-btn-border: var(--border);
+  --bb-btn-border: rgba(76, 154, 255, 0.3);
 
   /* Contribution levels — GitHub-style greens */
   --level-0: #21262d;
@@ -117,12 +117,15 @@
   --ga-accent: #0d9488;
   --error: #cf222e;
   --success: #1a7f37;
-  --gh-btn-bg: #f6f8fa;
+  --gh-btn-bg: rgba(33, 110, 57, 0.08);
   --gh-btn-color: #24292f;
-  --gl-btn-bg: #f6f8fa;
+  --gh-btn-border: rgba(33, 110, 57, 0.3);
+  --gl-btn-bg: rgba(179, 89, 0, 0.08);
   --gl-btn-color: #292961;
-  --bb-btn-bg: #f6f8fa;
+  --gl-btn-border: rgba(179, 89, 0, 0.3);
+  --bb-btn-bg: rgba(5, 80, 174, 0.08);
   --bb-btn-color: #091e42;
+  --bb-btn-border: rgba(5, 80, 174, 0.3);
 
   --level-0: #ebedf0;
   --level-1: #9be9a8;
@@ -180,12 +183,15 @@
   --ga-accent: #5eead4;
   --error: #f85149;
   --success: #3fb950;
-  --gh-btn-bg: #24292f;
+  --gh-btn-bg: rgba(57, 211, 83, 0.1);
   --gh-btn-color: #ffffff;
-  --gl-btn-bg: #292961;
+  --gh-btn-border: rgba(57, 211, 83, 0.3);
+  --gl-btn-bg: rgba(253, 154, 40, 0.1);
   --gl-btn-color: #ffffff;
-  --bb-btn-bg: #091e42;
+  --gl-btn-border: rgba(253, 154, 40, 0.3);
+  --bb-btn-bg: rgba(76, 154, 255, 0.1);
   --bb-btn-color: #ffffff;
+  --bb-btn-border: rgba(76, 154, 255, 0.3);
 
   --level-0: #21262d;
   --level-1: #0e4429;
@@ -244,12 +250,15 @@
     --ga-accent: #0d9488;
     --error: #cf222e;
     --success: #1a7f37;
-    --gh-btn-bg: #f6f8fa;
+    --gh-btn-bg: rgba(33, 110, 57, 0.08);
     --gh-btn-color: #24292f;
-    --gl-btn-bg: #f6f8fa;
+    --gh-btn-border: rgba(33, 110, 57, 0.3);
+    --gl-btn-bg: rgba(179, 89, 0, 0.08);
     --gl-btn-color: #292961;
-    --bb-btn-bg: #f6f8fa;
+    --gl-btn-border: rgba(179, 89, 0, 0.3);
+    --bb-btn-bg: rgba(5, 80, 174, 0.08);
     --bb-btn-color: #091e42;
+    --bb-btn-border: rgba(5, 80, 174, 0.3);
 
     --level-0: #ebedf0;
     --level-1: #9be9a8;
@@ -318,14 +327,14 @@ body {
 .gl-sign-in-btn {
   background-color: var(--gl-btn-bg);
   color: var(--gl-btn-color);
-  border: 1px solid var(--border);
+  border: 1px solid var(--gl-btn-border);
   text-decoration: none;
 }
 
 .bb-sign-in-btn {
   background-color: var(--bb-btn-bg);
   color: var(--bb-btn-color);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bb-btn-border);
   text-decoration: none;
 }
 
