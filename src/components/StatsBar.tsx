@@ -76,7 +76,7 @@ export function StatsBar({ results }: StatsBarProps) {
         </button>
       )}
       {withData.length > 1 && (
-        <span style={{ color: 'var(--text-secondary)' }}>
+        <span style={{ color: 'var(--ga-level-4)' }}>
           Total: <strong>{total.toLocaleString()}</strong>
         </span>
       )}
