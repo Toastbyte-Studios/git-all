@@ -232,6 +232,98 @@ describe('OAuth callback route', () => {
     expect(decodedSession?.connections.bitbucket?.username).toBe('sample-user');
   });
 
+  it('strips -admin suffix when both deprecated username and workspace slug have it', async () => {
+    // Regression test: Bitbucket's deprecated username AND workspace slug both end in
+    // "-admin" (e.g. "jason-shprintz-admin"). The old check only normalised when
+    // slug === legacyUsername + "-admin", so it missed this case. The stored
+    // identifier should be the base slug ("jason-shprintz"), not the admin variant.
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ access_token: 'bbtoken', token_type: 'bearer' }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          account_id: '{bb-account-uuid}',
+          nickname: 'Jason Shprintz',
+          username: 'jason-shprintz-admin',
+          links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          values: [{ workspace: { slug: 'jason-shprintz-admin' } }],
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/bitbucket?code=abc&state=state-bb',
+        {
+          [getStateCookieName('bitbucket')]: 'state-bb',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'bitbucket' }) },
+    );
+
+    expect(response.status).toBe(307);
+
+    const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const decodedSession = await decodeAuthSession(nextCookie);
+    expect(decodedSession?.connections.bitbucket?.username).toBe(
+      'jason-shprintz',
+    );
+    // Verify all three calls were made and the third was the workspaces request
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2]?.[0])).toContain(
+      '/user/permissions/workspaces',
+    );
+  });
+
+  it('strips -admin suffix from deprecated username fallback when workspaces API fails', async () => {
+    // Regression test: the workspaces API fails and the only available identifier
+    // is the deprecated username field, which carries the synthetic "-admin" suffix.
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ access_token: 'bbtoken', token_type: 'bearer' }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          account_id: '{bb-account-uuid}',
+          nickname: 'Jason Shprintz',
+          username: 'jason-shprintz-admin',
+          links: { avatar: { href: 'https://bitbucket.org/avatar.png' } },
+        }),
+      )
+      .mockResolvedValueOnce(new Response('', { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/bitbucket?code=abc&state=state-bb',
+        {
+          [getStateCookieName('bitbucket')]: 'state-bb',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'bitbucket' }) },
+    );
+
+    expect(response.status).toBe(307);
+
+    const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const decodedSession = await decodeAuthSession(nextCookie);
+    expect(decodedSession?.connections.bitbucket?.username).toBe(
+      'jason-shprintz',
+    );
+    // Verify all three calls were made and the third was the workspaces request
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2]?.[0])).toContain(
+      '/user/permissions/workspaces',
+    );
+  });
+
   it('falls back to Bitbucket username when workspaces API fails', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

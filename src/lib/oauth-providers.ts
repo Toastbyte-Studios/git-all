@@ -175,8 +175,15 @@ async function fetchBitbucketIdentity(
     };
     const slug = workspacesPayload.values?.[0]?.workspace?.slug;
     if (isNonEmptyString(slug)) {
-      if (legacyUsername && slug === `${legacyUsername}-admin`) {
-        return { ...userIdentity, username: legacyUsername };
+      // Bitbucket creates a synthetic "-admin" workspace (slug = real-slug + "-admin")
+      // alongside every personal workspace. When the workspaces endpoint returns this
+      // admin slug, strip the suffix so the stored identifier resolves in public API
+      // lookups (e.g. GET /2.0/repositories/{workspace}).
+      if (slug.endsWith('-admin')) {
+        const baseSlug = slug.slice(0, -'-admin'.length);
+        if (isNonEmptyString(baseSlug)) {
+          return { ...userIdentity, username: baseSlug };
+        }
       }
       return { ...userIdentity, username: slug };
     }
@@ -185,6 +192,14 @@ async function fetchBitbucketIdentity(
   // If the workspaces call fails, prefer the deprecated `username` field when present,
   // as it is more likely to be the URL-safe workspace identifier than `nickname`.
   if (legacyUsername) {
+    // The deprecated `username` field may also carry the synthetic -admin suffix.
+    // Strip it for the same reason as above.
+    if (legacyUsername.endsWith('-admin')) {
+      const base = legacyUsername.slice(0, -'-admin'.length);
+      if (isNonEmptyString(base)) {
+        return { ...userIdentity, username: base };
+      }
+    }
     return { ...userIdentity, username: legacyUsername };
   }
 
