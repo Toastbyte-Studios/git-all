@@ -119,7 +119,7 @@ export function ConnectionsPanel({
 
               {connection ? (
                 <>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 flex flex-col items-start gap-1">
                     <span
                       className="font-medium"
                       style={{ color: 'var(--text-primary)' }}
@@ -127,7 +127,7 @@ export function ConnectionsPanel({
                       @{connection.username}
                     </span>
                     <span
-                      className="verified-badge ml-2"
+                      className="verified-badge"
                       aria-label={`${PROVIDER_LABELS[provider]} verified`}
                     >
                       ✓ Verified
