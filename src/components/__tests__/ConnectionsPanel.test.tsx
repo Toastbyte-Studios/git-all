@@ -58,12 +58,14 @@ describe('ConnectionsPanel', () => {
       const githubBadge = screen.getByLabelText('GitHub verified');
       const gitlabBadge = screen.getByLabelText('GitLab verified');
 
-      expect(githubBadge.parentElement?.className).toContain('flex-col');
-      expect(githubBadge.parentElement?.className).toContain('items-start');
+      expect(githubBadge.parentElement!.className).toContain('flex');
+      expect(githubBadge.parentElement!.className).toContain('flex-col');
+      expect(githubBadge.parentElement!.className).toContain('items-start');
       expect(githubBadge.className).not.toContain('ml-2');
 
-      expect(gitlabBadge.parentElement?.className).toContain('flex-col');
-      expect(gitlabBadge.parentElement?.className).toContain('items-start');
+      expect(gitlabBadge.parentElement!.className).toContain('flex');
+      expect(gitlabBadge.parentElement!.className).toContain('flex-col');
+      expect(gitlabBadge.parentElement!.className).toContain('items-start');
       expect(gitlabBadge.className).not.toContain('ml-2');
     });
 
