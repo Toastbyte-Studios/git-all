@@ -237,10 +237,7 @@ export function ContributionsView({
 
 function VerifiedChip() {
   return (
-    <span
-      className="verified-badge"
-      aria-label="Verified connection"
-    >
+    <span className="verified-badge" aria-label="Verified connection">
       ✓ Verified
     </span>
   );
