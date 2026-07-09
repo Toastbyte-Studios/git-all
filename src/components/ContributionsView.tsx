@@ -238,12 +238,7 @@ export function ContributionsView({
 function VerifiedChip() {
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
-      style={{
-        backgroundColor: 'rgb(var(--accent-rgb) / 0.15)',
-        color: 'var(--accent)',
-        border: '1px solid rgb(var(--accent-rgb) / 0.3)',
-      }}
+      className="verified-badge"
       aria-label="Verified connection"
     >
       ✓ Verified
