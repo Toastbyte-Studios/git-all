@@ -44,6 +44,31 @@ describe('ConnectionsPanel', () => {
       expect(screen.getAllByText(/✓ Verified/).length).toBeGreaterThan(0);
     });
 
+    it('stacks the verified chip below the username for connected providers', () => {
+      render(
+        <ConnectionsPanel
+          connections={{
+            github: GITHUB_CONNECTION,
+            gitlab: GITLAB_CONNECTION,
+          }}
+          availableProviders={['github', 'gitlab']}
+        />,
+      );
+
+      const githubBadge = screen.getByLabelText('GitHub verified');
+      const gitlabBadge = screen.getByLabelText('GitLab verified');
+
+      expect(githubBadge.parentElement!.className).toContain('flex');
+      expect(githubBadge.parentElement!.className).toContain('flex-col');
+      expect(githubBadge.parentElement!.className).toContain('items-start');
+      expect(githubBadge.className).not.toContain('ml-2');
+
+      expect(gitlabBadge.parentElement!.className).toContain('flex');
+      expect(gitlabBadge.parentElement!.className).toContain('flex-col');
+      expect(gitlabBadge.parentElement!.className).toContain('items-start');
+      expect(gitlabBadge.className).not.toContain('ml-2');
+    });
+
     it('renders a Disconnect button for a connected provider', () => {
       render(
         <ConnectionsPanel
