@@ -4,6 +4,11 @@ import Image from 'next/image';
 import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
 import { GitHubIcon } from '@/components/icons/GitHubIcon';
 import { GitLabIcon } from '@/components/icons/GitLabIcon';
+import {
+  PROVIDER_LABELS,
+  PROVIDER_ORDER,
+  PROVIDER_RING,
+} from '@/lib/provider-ui';
 import type { ConnectionProvider } from '@/lib/types';
 
 interface ProfileHeaderConnection {
@@ -16,20 +21,6 @@ interface ProfileHeaderProps {
   primary: ConnectionProvider;
   connections: Partial<Record<ConnectionProvider, ProfileHeaderConnection>>;
 }
-
-const PROVIDER_ORDER: ConnectionProvider[] = ['github', 'gitlab', 'bitbucket'];
-
-const PROVIDER_LABELS: Record<ConnectionProvider, string> = {
-  github: 'GitHub',
-  gitlab: 'GitLab',
-  bitbucket: 'Bitbucket',
-};
-
-const PROVIDER_RING: Record<ConnectionProvider, string> = {
-  github: 'var(--gh-accent)',
-  gitlab: 'var(--gl-accent)',
-  bitbucket: 'var(--bb-accent)',
-};
 
 function ProviderIcon({
   provider,

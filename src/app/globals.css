@@ -33,6 +33,7 @@
 
   /* Brand accent — cyan */
   --accent: #2dd4bf;
+  --accent-rgb: 45, 212, 191;
   --on-accent: #0d1117;
   --accent-hover: #5eead4;
 
@@ -104,6 +105,7 @@
 
   /* Brand accent — cyan (slightly deeper for contrast on white) */
   --accent: #0d9488;
+  --accent-rgb: 13, 148, 136;
   --on-accent: #ffffff;
   --accent-hover: #0f766e;
 
@@ -170,6 +172,7 @@
 
   /* Brand accent — cyan */
   --accent: #2dd4bf;
+  --accent-rgb: 45, 212, 191;
   --on-accent: #0d1117;
   --accent-hover: #5eead4;
 

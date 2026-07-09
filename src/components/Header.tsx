@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { GitAllLogo } from '@/components/GitAllLogo';
+import { HeaderAvatars } from '@/components/HeaderAvatars';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 /**
- * Site header — brand logo on the left (links home) and the theme toggle on
- * the right. Mounted once in the root layout so it appears on every page.
+ * Site header — brand logo on the left (links home), theme toggle and
+ * connected-account avatar stack on the right. Mounted once in the root
+ * layout so it appears on every page.
  */
 export function Header() {
   return (
@@ -17,7 +19,10 @@ export function Header() {
         >
           <GitAllLogo />
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <HeaderAvatars />
+        </div>
       </div>
     </header>
   );

@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, type ReactElement } from 'react';
 import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
@@ -20,7 +19,6 @@ interface AuthSessionResponse {
         provider: ConnectionProvider;
         accountId: string;
         username: string;
-        avatarUrl: string;
         verifiedAt: number;
       }
     >
@@ -58,12 +56,6 @@ const PROVIDER_SIGN_IN_CLASS: Record<ConnectionProvider, string> = {
 };
 
 const PROVIDER_ORDER: ConnectionProvider[] = ['github', 'gitlab', 'bitbucket'];
-
-const PROVIDER_RING: Record<ConnectionProvider, string> = {
-  github: 'var(--gh-accent)',
-  gitlab: 'var(--gl-accent)',
-  bitbucket: 'var(--bb-accent)',
-};
 
 export function AuthStatus() {
   const [session, setSession] = useState<AuthSessionResponse | null>(null);
@@ -126,13 +118,7 @@ export function AuthStatus() {
   const visibleProviders = getVisibleOAuthProviders(session.availableProviders);
 
   if (session.authenticated && primaryConnection) {
-    // All verified accounts, in stable order, with the primary rendered last
-    // so it sits on top of the overlapping stack (mirrors the /whoami header).
     const connected = PROVIDER_ORDER.filter((p) => session.connections?.[p]);
-    const stackOrder = [
-      ...connected.filter((p) => p !== session.primary),
-      ...connected.filter((p) => p === session.primary),
-    ];
     const accountsLabel = connected
       .map((p) => `${PROVIDER_LABELS[p]} @${session.connections![p]!.username}`)
       .join(', ');
@@ -141,38 +127,8 @@ export function AuthStatus() {
       <Link
         href="/whoami"
         aria-label={`Open your profile — signed in as ${accountsLabel}`}
-        className="whoami-btn inline-flex items-center gap-3 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors"
+        className="whoami-btn inline-flex items-center gap-2 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors"
       >
-        <span className="flex shrink-0">
-          {stackOrder.map((provider, index) => {
-            const conn = session.connections![provider]!;
-            return (
-              <span
-                key={provider}
-                className="relative rounded-full"
-                style={{
-                  marginLeft: index === 0 ? 0 : '-9px',
-                  padding: '2px',
-                  // Gap between overlapping avatars matches the button fill.
-                  background: 'var(--accent)',
-                  zIndex:
-                    provider === session.primary
-                      ? stackOrder.length + 1
-                      : index + 1,
-                }}
-              >
-                <Image
-                  src={conn.avatarUrl}
-                  alt=""
-                  width={22}
-                  height={22}
-                  className="block rounded-full"
-                  style={{ border: `2px solid ${PROVIDER_RING[provider]}` }}
-                />
-              </span>
-            );
-          })}
-        </span>
         <span className="font-mono-data">
           <span aria-hidden="true" style={{ opacity: 0.6 }}>
             ${' '}
