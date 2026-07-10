@@ -225,13 +225,15 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
         <div className="mb-6">
           <Link
             href="/"
-            className="text-xs font-mono-data hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--text-secondary)' }}
+            className="whoami-btn inline-flex items-center gap-2 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors"
           >
-            <span aria-hidden="true" style={{ opacity: 0.6 }}>
-              ${' '}
+            <span className="font-mono-data">
+              <span aria-hidden="true" style={{ opacity: 0.6 }}>
+                ${' '}
+              </span>
+              cd ~
             </span>
-            cd ~<span className="sr-only"> Go to homepage</span>
+            <span className="sr-only"> Go to homepage</span>
           </Link>
         </div>
         <div className="flex flex-col md:flex-row gap-8">
