@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConnectionsPanel } from '@/components/ConnectionsPanel';
 import { ContributionsView } from '@/components/ContributionsView';
@@ -221,6 +222,18 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
   return (
     <>
       <main className="max-w-6xl mx-auto px-4 pt-8 pb-12">
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="text-xs font-mono-data hover:opacity-70 transition-opacity"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            <span aria-hidden="true" style={{ opacity: 0.6 }}>
+              ${' '}
+            </span>
+            cd ~<span className="sr-only"> Go to homepage</span>
+          </Link>
+        </div>
         <div className="flex flex-col md:flex-row gap-8">
           {/* ── Left column: identity + connections ─────────────── */}
           <aside className="md:w-72 shrink-0 space-y-6">
