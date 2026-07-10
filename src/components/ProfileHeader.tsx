@@ -107,17 +107,12 @@ export function ProfileHeader({ primary, connections }: ProfileHeaderProps) {
           className="text-xs flex items-center gap-1.5 mt-0.5 flex-wrap list-none m-0 p-0 [&>li::marker]:content-none"
           style={{ color: 'var(--text-secondary)', paddingInlineStart: 0 }}
         >
-          {connected.map((provider, index) => (
+          {connected.map((provider) => (
             <li
               key={provider}
               className="inline-flex items-center gap-1"
               style={{ listStyle: 'none' }}
             >
-              {index > 0 && (
-                <span aria-hidden="true" style={{ opacity: 0.5 }}>
-                  ·
-                </span>
-              )}
               <span style={{ color: PROVIDER_RING[provider] }}>
                 <ProviderIcon provider={provider} size={12} />
               </span>
