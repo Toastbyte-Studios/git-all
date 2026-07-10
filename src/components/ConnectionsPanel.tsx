@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { CopyableUsername } from '@/components/CopyableUsername';
 import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
 import { GitHubIcon } from '@/components/icons/GitHubIcon';
 import { GitLabIcon } from '@/components/icons/GitLabIcon';
@@ -16,6 +17,10 @@ interface ClientConnection {
 interface ConnectionsPanelProps {
   connections: Partial<Record<ConnectionProvider, ClientConnection>>;
   availableProviders: ConnectionProvider[];
+  onCopyUsernameResult?: (result: {
+    success: boolean;
+    username: string;
+  }) => void;
 }
 
 const ALL_PROVIDERS: ConnectionProvider[] = ['github', 'gitlab', 'bitbucket'];
@@ -41,6 +46,7 @@ function ProviderIcon({ provider }: { provider: ConnectionProvider }) {
 export function ConnectionsPanel({
   connections,
   availableProviders,
+  onCopyUsernameResult,
 }: ConnectionsPanelProps) {
   const router = useRouter();
   const [disconnecting, setDisconnecting] = useState<ConnectionProvider | null>(
@@ -124,12 +130,12 @@ export function ConnectionsPanel({
               {connection ? (
                 <>
                   <div className="flex-1 min-w-0 flex flex-col items-start gap-1">
-                    <span
+                    <CopyableUsername
+                      username={connection.username}
                       className="font-medium"
                       style={{ color: 'var(--text-primary)' }}
-                    >
-                      @{connection.username}
-                    </span>
+                      onCopyResult={onCopyUsernameResult}
+                    />
                     <span
                       className="verified-badge"
                       aria-label={`${PROVIDER_LABELS[provider]} verified`}
