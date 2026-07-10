@@ -79,7 +79,7 @@ ANALYTICS_GA4_MEASUREMENT_ID=G-XXXXXXXXXX
 ANALYTICS_GA4_API_SECRET=your_ga4_measurement_protocol_api_secret
 ```
 
-Optional consent gating (for GA4/identifiers):
+Optional consent gating (for client-side analytics events):
 
 ```bash
 NEXT_PUBLIC_ANALYTICS_REQUIRE_CONSENT=1
