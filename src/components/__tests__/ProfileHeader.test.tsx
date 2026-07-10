@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProfileHeader } from '../ProfileHeader';
 
 vi.mock('next/image', () => ({
-  default: (props: Record<string, unknown>) => (
+  default: (props: JSX.IntrinsicElements['img']) => (
     // eslint-disable-next-line @next/next/no-img-element
-    <img {...props} alt={(props.alt as string) ?? ''} />
+    <img {...props} alt={props.alt ?? ''} />
   ),
 }));
 
@@ -33,7 +33,7 @@ describe('ProfileHeader', () => {
     const list = screen.getByRole('list');
     expect(list.tagName).toBe('UL');
     expect(list.className).toContain('list-none');
-    expect((list as HTMLElement).style.paddingInlineStart).toBe('0');
+    expect((list as HTMLElement).style.paddingInlineStart).toMatch(/^0(px)?$/);
 
     const items = screen.getAllByRole('listitem');
     expect(items).toHaveLength(2);
