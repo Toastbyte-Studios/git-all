@@ -25,6 +25,7 @@ export function AnalyticsConsentBanner() {
   return (
     <div
       role="dialog"
+      aria-label="Analytics consent"
       aria-live="polite"
       className="fixed bottom-4 left-4 right-4 md:left-auto md:w-[420px] z-50 rounded-lg p-4 text-sm shadow-lg"
       style={{

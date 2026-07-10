@@ -87,4 +87,46 @@ describe('sendServerAnalyticsEvent', () => {
     });
     expect(body.events[0]?.params).not.toHaveProperty('ignored');
   });
+
+  it('uses only the first forwarded IP for client_id stability', async () => {
+    process.env.ANALYTICS_GA4_MEASUREMENT_ID = 'G-TEST123';
+    process.env.ANALYTICS_GA4_API_SECRET = 'secret-123';
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await sendServerAnalyticsEvent(
+      new NextRequest('https://gitall.app/api/github?username=octocat', {
+        headers: {
+          'x-forwarded-for': '203.0.113.10, 10.0.0.1',
+          'user-agent': 'vitest',
+          'accept-language': 'en-US',
+        },
+      }),
+      ANALYTICS_EVENTS.lookupSuccess,
+      { provider: 'github' },
+    );
+    await sendServerAnalyticsEvent(
+      new NextRequest('https://gitall.app/api/github?username=octocat', {
+        headers: {
+          'x-forwarded-for': '203.0.113.10',
+          'user-agent': 'vitest',
+          'accept-language': 'en-US',
+        },
+      }),
+      ANALYTICS_EVENTS.lookupSuccess,
+      { provider: 'github' },
+    );
+
+    const firstBody = JSON.parse(
+      String(fetchMock.mock.calls[0]?.[1]?.body),
+    ) as { client_id: string };
+    const secondBody = JSON.parse(
+      String(fetchMock.mock.calls[1]?.[1]?.body),
+    ) as { client_id: string };
+
+    expect(firstBody.client_id).toBe(secondBody.client_id);
+  });
 });

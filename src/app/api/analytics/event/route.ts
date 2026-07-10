@@ -10,6 +10,19 @@ const ALLOWED_EVENTS = new Set<AnalyticsEventName>(
 );
 
 export async function POST(request: NextRequest) {
+  const contentType = request.headers.get('content-type')?.toLowerCase() ?? '';
+  if (!contentType.includes('application/json')) {
+    return NextResponse.json(
+      { error: 'Content-Type must be application/json.' },
+      { status: 415 },
+    );
+  }
+
+  const origin = request.headers.get('origin');
+  if (origin && origin !== request.nextUrl.origin) {
+    return NextResponse.json({ error: 'Origin not allowed.' }, { status: 403 });
+  }
+
   const body = (await request.json().catch(() => null)) as {
     eventName?: string;
     params?: Record<string, string | number | boolean | null | undefined>;

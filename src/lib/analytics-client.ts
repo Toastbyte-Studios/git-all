@@ -35,7 +35,11 @@ function hasConsent() {
     return false;
   }
 
-  return window.localStorage.getItem(CONSENT_STORAGE_KEY) === 'granted';
+  try {
+    return window.localStorage.getItem(CONSENT_STORAGE_KEY) === 'granted';
+  } catch {
+    return false;
+  }
 }
 
 export function getAnalyticsConsentRequirement() {
@@ -47,10 +51,14 @@ export function setAnalyticsConsent(granted: boolean) {
     return;
   }
 
-  window.localStorage.setItem(
-    CONSENT_STORAGE_KEY,
-    granted ? 'granted' : 'denied',
-  );
+  try {
+    window.localStorage.setItem(
+      CONSENT_STORAGE_KEY,
+      granted ? 'granted' : 'denied',
+    );
+  } catch {
+    // no-op
+  }
 
   try {
     window.zaraz?.consent?.setAll?.(granted);
@@ -64,7 +72,12 @@ export function readAnalyticsConsent() {
   if (!CONSENT_REQUIRED || typeof window === 'undefined') {
     return 'not-required' as const;
   }
-  const value = window.localStorage.getItem(CONSENT_STORAGE_KEY);
+  let value: string | null = null;
+  try {
+    value = window.localStorage.getItem(CONSENT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
   return value === 'granted' || value === 'denied' ? value : null;
 }
 

@@ -20,12 +20,12 @@ function getGa4Config() {
 
 function toClientId(request: NextRequest) {
   const forwardedFor = request.headers.get('x-forwarded-for') ?? '';
+  const clientIp = forwardedFor.split(',')[0]?.trim() ?? '';
   const userAgent = request.headers.get('user-agent') ?? '';
   const acceptLanguage = request.headers.get('accept-language') ?? '';
-  const seed = `${forwardedFor}|${userAgent}|${acceptLanguage}`;
+  const seed = `${clientIp}|${userAgent}|${acceptLanguage}`;
   const digest = createHash('sha256').update(seed).digest('hex');
-  const seconds = Math.floor(Date.now() / 1000);
-  return `${digest.slice(0, 16)}.${seconds}`;
+  return `${digest.slice(0, 10)}.${digest.slice(10, 20)}`;
 }
 
 function sanitizeParamKey(value: string) {
