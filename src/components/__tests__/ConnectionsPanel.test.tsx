@@ -40,9 +40,9 @@ describe('ConnectionsPanel', () => {
         />,
       );
 
-      expect(
-        container.firstElementChild?.getAttribute('data-ui-chrome'),
-      ).not.toBeNull();
+      expect(container.firstElementChild?.hasAttribute('data-ui-chrome')).toBe(
+        true,
+      );
       expect(screen.getByText('@octocat')).toBeTruthy();
       expect(screen.getAllByText(/✓ Verified/).length).toBeGreaterThan(0);
     });

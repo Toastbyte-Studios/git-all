@@ -30,9 +30,9 @@ describe('ProfileHeader', () => {
       />,
     );
 
-    expect(
-      container.firstElementChild?.getAttribute('data-ui-chrome'),
-    ).not.toBeNull();
+    expect(container.firstElementChild?.hasAttribute('data-ui-chrome')).toBe(
+      true,
+    );
     const list = screen.getByRole('list');
     expect(list.tagName).toBe('UL');
     expect(list.className).toContain('list-none');

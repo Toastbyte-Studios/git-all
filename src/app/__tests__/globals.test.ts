@@ -11,7 +11,7 @@ describe('global selection styling', () => {
     expect(css).toContain('-webkit-user-select: none;');
     expect(css).toContain('user-select: none;');
     expect(css).toMatch(
-      /:where\(input, textarea, code, pre, a\[href\], \[data-selectable\]\)\s*\{/,
+      /:where\(input, textarea, code, pre, \[data-selectable\]\)\s*\{/,
     );
     expect(css).toContain('-webkit-user-select: text;');
     expect(css).toContain('user-select: text;');

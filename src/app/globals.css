@@ -394,7 +394,7 @@ body {
   user-select: none;
 }
 
-:where(input, textarea, code, pre, a[href], [data-selectable]) {
+:where(input, textarea, code, pre, [data-selectable]) {
   -webkit-user-select: text;
   user-select: text;
 }
