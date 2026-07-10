@@ -88,6 +88,7 @@ export function ConnectionsPanel({
 
   return (
     <div
+      data-ui-chrome
       className="rounded-lg overflow-hidden"
       style={{ border: '1px solid var(--border)' }}
     >

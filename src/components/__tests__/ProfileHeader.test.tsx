@@ -12,7 +12,7 @@ vi.mock('next/image', () => ({
 
 describe('ProfileHeader', () => {
   it('renders connected providers as an unstyled semantic list', () => {
-    render(
+    const { container } = render(
       <ProfileHeader
         primary="github"
         connections={{
@@ -30,6 +30,9 @@ describe('ProfileHeader', () => {
       />,
     );
 
+    expect(
+      container.firstElementChild?.getAttribute('data-ui-chrome'),
+    ).not.toBeNull();
     const list = screen.getByRole('list');
     expect(list.tagName).toBe('UL');
     expect(list.className).toContain('list-none');
