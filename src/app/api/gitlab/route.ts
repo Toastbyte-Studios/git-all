@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
 import {
   DEFAULT_CONTRIBUTION_PERIOD,
@@ -83,7 +85,7 @@ export async function GET(request: NextRequest) {
     // dateRange reflects the actual slice returned to the client after
     // intersecting the requested range with GitLab's trailing-year calendar.
     // The UI uses it to show when older requested dates were truncated.
-    return NextResponse.json({
+    const payload = {
       platform: 'gitlab',
       username,
       totalContributions,
@@ -92,7 +94,12 @@ export async function GET(request: NextRequest) {
         to: calendar[calendar.length - 1]?.date ?? null,
       },
       calendar,
+    };
+    void sendServerAnalyticsEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+      provider: 'gitlab',
+      total_contributions: totalContributions,
     });
+    return NextResponse.json(payload);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });

@@ -6,6 +6,7 @@ import { ContributionsView } from '@/components/ContributionsView';
 import { MultiUserForm } from '@/components/MultiUserForm';
 import { SearchForm } from '@/components/SearchForm';
 import { TimePeriodSelector } from '@/components/TimePeriodSelector';
+import { ANALYTICS_EVENTS, trackClientEvent } from '@/lib/analytics-client';
 import {
   DEFAULT_CONTRIBUTION_PERIOD,
   getContributionDateRange,
@@ -178,6 +179,11 @@ export function ContributionExplorer() {
       setGlobalError('Enter at least one username.');
       return;
     }
+    trackClientEvent(ANALYTICS_EVENTS.lookupRun, {
+      authenticated: false,
+      entry_count: newEntries.length,
+      includes_gitea: newEntries.some((entry) => entry.platform === 'gitea'),
+    });
     setGlobalError(null);
     setEntries(newEntries);
   };
@@ -208,6 +214,11 @@ export function ContributionExplorer() {
       seen.add(key);
       return true;
     });
+    trackClientEvent(ANALYTICS_EVENTS.lookupRun, {
+      authenticated: true,
+      entry_count: deduped.length,
+      includes_gitea: deduped.some((entry) => entry.platform === 'gitea'),
+    });
     setEntries(deduped);
   };
 
@@ -225,6 +236,10 @@ export function ContributionExplorer() {
 
     const nextRange = getContributionDateRange(nextPeriod, getTodayUtc());
     updatePeriodInUrl(nextPeriod, nextRange);
+    trackClientEvent(ANALYTICS_EVENTS.timeRangeSelected, {
+      period: nextPeriod,
+      mode: 'preset',
+    });
   };
 
   const handleApplyCustomRange = () => {
@@ -244,8 +259,21 @@ export function ContributionExplorer() {
 
     setGlobalError(null);
     updatePeriodInUrl('custom', customRange);
+    trackClientEvent(ANALYTICS_EVENTS.timeRangeSelected, {
+      period: 'custom',
+      mode: 'custom',
+    });
     // Trigger re-fetch by bumping entries identity
     setEntries((prev) => [...prev]);
+  };
+
+  const handleViewModeChange = (nextMode: ViewMode) => {
+    setViewMode(nextMode);
+    if (nextMode === 'integrated') {
+      trackClientEvent(ANALYTICS_EVENTS.integratedViewUsed, {
+        entry_count: entries.length,
+      });
+    }
   };
 
   const showMultiUser = authenticated === true;
@@ -294,7 +322,7 @@ export function ContributionExplorer() {
       <ContributionsView
         entries={entries}
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={handleViewModeChange}
         from={appliedDateRange.from}
         to={appliedDateRange.to}
         onLoadingChange={setLoading}

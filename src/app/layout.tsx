@@ -1,3 +1,4 @@
+import { AnalyticsConsentBanner } from '@/components/AnalyticsConsentBanner';
 import { Header } from '@/components/Header';
 import { FAQ_ITEMS } from '@/lib/faq';
 import './globals.css';
@@ -87,6 +88,9 @@ const structuredData = [
   },
 ];
 
+const cfWebAnalyticsToken =
+  process.env.NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN?.trim();
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -109,10 +113,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
         <link rel="preconnect" href="https://api.github.com" />
         <link rel="preconnect" href="https://gitlab.com" />
+        {cfWebAnalyticsToken && (
+          <script
+            defer
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon={JSON.stringify({ token: cfWebAnalyticsToken })}
+          />
+        )}
       </head>
       <body className="min-h-screen antialiased">
         <Header />
         {children}
+        <AnalyticsConsentBanner />
       </body>
     </html>
   );
