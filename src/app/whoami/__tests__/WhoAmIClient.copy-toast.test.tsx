@@ -1,11 +1,5 @@
 // @vitest-environment happy-dom
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WhoAmIClient } from '../WhoAmIClient';
 import type { ClientSession } from '../page';
@@ -55,6 +49,7 @@ afterEach(() => {
     value: originalIsSecureContext,
     configurable: true,
   });
+  vi.useRealTimers();
 });
 
 describe('WhoAmIClient copy toast', () => {
@@ -74,34 +69,31 @@ describe('WhoAmIClient copy toast', () => {
     const copyButtons = screen.getAllByRole('button', {
       name: /copy username octocat to clipboard/i,
     });
-    fireEvent.click(copyButtons[0]);
 
-    await waitFor(() => {
-      expect(screen.getByRole('status')).toBeTruthy();
-      expect(writeText).toHaveBeenCalledWith('octocat');
+    vi.useFakeTimers();
+    await act(async () => {
+      fireEvent.click(copyButtons[0]);
     });
+    expect(screen.getByRole('status')).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith('octocat');
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      vi.advanceTimersByTime(1500);
     });
     await act(async () => {
       fireEvent.click(copyButtons[0]);
     });
 
-    await waitFor(() => {
-      expect(screen.getAllByRole('status')).toHaveLength(1);
-    });
+    expect(screen.getAllByRole('status')).toHaveLength(1);
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      vi.advanceTimersByTime(700);
     });
     expect(screen.getByRole('status')).toBeTruthy();
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1300));
+      vi.advanceTimersByTime(1300);
     });
-    await waitFor(() => {
-      expect(screen.queryByRole('status')).toBeNull();
-    });
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });
