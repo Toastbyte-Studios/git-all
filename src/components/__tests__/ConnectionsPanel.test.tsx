@@ -81,9 +81,14 @@ describe('ConnectionsPanel', () => {
       const btn = screen.getByRole('button', { name: /disconnect github/i });
       expect(btn).toBeTruthy();
       // Visible label is now "kill" in monospace
-      expect(btn.querySelector('[aria-hidden="true"]')).toBeTruthy();
       const visibleSpan = btn.querySelector('[aria-hidden="true"]');
-      expect(visibleSpan!.textContent).toContain('kill');
+      expect(visibleSpan).toBeTruthy();
+      const labels = visibleSpan!.querySelectorAll('span');
+      const visibleLabel = Array.from(labels).find(
+        (s) => (s as HTMLElement).style.position === 'absolute',
+      );
+      expect(visibleLabel).toBeTruthy();
+      expect(visibleLabel!.textContent).toBe('kill');
     });
 
     it('swaps visible label to "kill -9" on hover', async () => {
