@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConnectionsPanel } from '@/components/ConnectionsPanel';
 import { ContributionsView } from '@/components/ContributionsView';
+import { CopyToast } from '@/components/CopyToast';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimePeriodSelector } from '@/components/TimePeriodSelector';
 import {
@@ -23,6 +24,12 @@ interface StoredTimeRange {
   period: ContributionPeriod;
   customFrom: string;
   customTo: string;
+}
+
+interface CopyToastState {
+  visible: boolean;
+  success: boolean;
+  username: string;
 }
 
 function readStorage<T>(key: string, fallback: T): T {
@@ -54,6 +61,14 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
   const [customTo, setCustomTo] = useState('');
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copyToast, setCopyToast] = useState<CopyToastState>({
+    visible: false,
+    success: true,
+    username: '',
+  });
+  const toastDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const hydrated = useRef(false);
 
   // Hydrate preferences from localStorage on mount.
@@ -75,6 +90,15 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
     setCustomFrom(savedRange.customFrom);
     setCustomTo(savedRange.customTo);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (toastDismissTimerRef.current) {
+        clearTimeout(toastDismissTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -177,6 +201,23 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
     (p) => session.connections[p],
   ).length;
 
+  const handleCopyUsernameResult = ({
+    success,
+    username,
+  }: {
+    success: boolean;
+    username: string;
+  }) => {
+    if (toastDismissTimerRef.current) {
+      clearTimeout(toastDismissTimerRef.current);
+    }
+    setCopyToast({ visible: true, success, username });
+    toastDismissTimerRef.current = setTimeout(() => {
+      setCopyToast((prev) => ({ ...prev, visible: false }));
+      toastDismissTimerRef.current = null;
+    }, 2000);
+  };
+
   return (
     <>
       <main className="max-w-6xl mx-auto px-4 pt-8 pb-12">
@@ -187,12 +228,14 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
               <ProfileHeader
                 primary={session.primary}
                 connections={session.connections}
+                onCopyUsernameResult={handleCopyUsernameResult}
               />
             )}
 
             <ConnectionsPanel
               connections={session.connections}
               availableProviders={session.availableProviders}
+              onCopyUsernameResult={handleCopyUsernameResult}
             />
 
             {connectionCount === 1 && (
@@ -229,6 +272,9 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
           </div>
         </div>
       </main>
+      {copyToast.visible && (
+        <CopyToast success={copyToast.success} username={copyToast.username} />
+      )}
     </>
   );
 }

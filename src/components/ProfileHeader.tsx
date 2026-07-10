@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { CopyableUsername } from '@/components/CopyableUsername';
 import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
 import { GitHubIcon } from '@/components/icons/GitHubIcon';
 import { GitLabIcon } from '@/components/icons/GitLabIcon';
@@ -20,6 +21,10 @@ interface ProfileHeaderConnection {
 interface ProfileHeaderProps {
   primary: ConnectionProvider;
   connections: Partial<Record<ConnectionProvider, ProfileHeaderConnection>>;
+  onCopyUsernameResult?: (result: {
+    success: boolean;
+    username: string;
+  }) => void;
 }
 
 function ProviderIcon({
@@ -34,7 +39,11 @@ function ProviderIcon({
   return <BitbucketIcon size={size} />;
 }
 
-export function ProfileHeader({ primary, connections }: ProfileHeaderProps) {
+export function ProfileHeader({
+  primary,
+  connections,
+  onCopyUsernameResult,
+}: ProfileHeaderProps) {
   const handleShare = () => {
     // Share is stubbed — public profile URL ships in the companion persistence issue.
     if (navigator.clipboard) {
@@ -97,12 +106,12 @@ export function ProfileHeader({ primary, connections }: ProfileHeaderProps) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <p
-          className="font-semibold text-base truncate"
+        <CopyableUsername
+          username={primaryConnection.username}
+          className="font-semibold text-base truncate max-w-full"
           style={{ color: 'var(--text-primary)' }}
-        >
-          @{primaryConnection.username}
-        </p>
+          onCopyResult={onCopyUsernameResult}
+        />
         <ul
           className="text-xs flex items-center gap-1.5 mt-0.5 flex-wrap list-none m-0 p-0 [&>li::marker]:content-none"
           style={{ color: 'var(--text-secondary)', paddingInlineStart: 0 }}
