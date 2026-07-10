@@ -103,12 +103,16 @@ export function ProfileHeader({ primary, connections }: ProfileHeaderProps) {
         >
           @{primaryConnection.username}
         </p>
-        <p
-          className="text-xs flex items-center gap-1.5 mt-0.5 flex-wrap"
-          style={{ color: 'var(--text-secondary)' }}
+        <ul
+          className="text-xs flex items-center gap-1.5 mt-0.5 flex-wrap list-none m-0 p-0 [&>li::marker]:content-none"
+          style={{ color: 'var(--text-secondary)', paddingInlineStart: 0 }}
         >
           {connected.map((provider, index) => (
-            <span key={provider} className="inline-flex items-center gap-1">
+            <li
+              key={provider}
+              className="inline-flex items-center gap-1"
+              style={{ listStyle: 'none' }}
+            >
               {index > 0 && (
                 <span aria-hidden="true" style={{ opacity: 0.5 }}>
                   ·
@@ -118,9 +122,9 @@ export function ProfileHeader({ primary, connections }: ProfileHeaderProps) {
                 <ProviderIcon provider={provider} size={12} />
               </span>
               {PROVIDER_LABELS[provider]}
-            </span>
+            </li>
           ))}
-        </p>
+        </ul>
       </div>
 
       <button
