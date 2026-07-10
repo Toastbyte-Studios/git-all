@@ -225,14 +225,13 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
         <div className="mb-6">
           <Link
             href="/"
-            aria-label="Go to homepage"
             className="text-xs font-mono-data hover:opacity-70 transition-opacity"
             style={{ color: 'var(--text-secondary)' }}
           >
             <span aria-hidden="true" style={{ opacity: 0.6 }}>
               ${' '}
             </span>
-            cd ~
+            cd ~<span className="sr-only"> Go to homepage</span>
           </Link>
         </div>
         <div className="flex flex-col md:flex-row gap-8">

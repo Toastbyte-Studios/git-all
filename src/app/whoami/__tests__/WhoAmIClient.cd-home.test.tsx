@@ -38,10 +38,10 @@ const SESSION: ClientSession = {
 };
 
 describe('WhoAmIClient cd ~ link', () => {
-  it('renders a link labelled "Go to homepage" pointing to /', () => {
+  it('renders a link labelled "cd ~ Go to homepage" pointing to /', () => {
     render(<WhoAmIClient session={SESSION} />);
 
-    const link = screen.getByRole('link', { name: /go to homepage/i });
+    const link = screen.getByRole('link', { name: /cd ~ go to homepage/i });
     expect(link).toBeTruthy();
     expect(link.getAttribute('href')).toBe('/');
   });
@@ -49,14 +49,14 @@ describe('WhoAmIClient cd ~ link', () => {
   it('displays "cd ~" as the visible text', () => {
     render(<WhoAmIClient session={SESSION} />);
 
-    const link = screen.getByRole('link', { name: /go to homepage/i });
+    const link = screen.getByRole('link', { name: /cd ~ go to homepage/i });
     expect(link.textContent).toContain('cd ~');
   });
 
   it('marks the $ prompt prefix as aria-hidden', () => {
     render(<WhoAmIClient session={SESSION} />);
 
-    const link = screen.getByRole('link', { name: /go to homepage/i });
+    const link = screen.getByRole('link', { name: /cd ~ go to homepage/i });
     const hiddenPrefix = link.querySelector('[aria-hidden="true"]');
     expect(hiddenPrefix).toBeTruthy();
     expect(hiddenPrefix!.textContent).toContain('$');
