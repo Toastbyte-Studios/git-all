@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
 import {
   getAuthSessionFromRequest,
@@ -217,6 +219,12 @@ export async function GET(request: NextRequest) {
     if (!shouldBypassCache) {
       const cached = getCachedContribution(cacheKey);
       if (!refresh && cached) {
+        void sendServerAnalyticsEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+          provider: 'github',
+          cache_status: 'hit',
+          authenticated_lookup: Boolean(userToken),
+          self_lookup: isSelfLookup,
+        });
         return createCachedResponse(cached, 'HIT');
       }
     }
@@ -303,6 +311,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    void sendServerAnalyticsEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+      provider: 'github',
+      cache_status: shouldBypassCache || refresh ? 'bypass' : 'miss',
+      authenticated_lookup: Boolean(userToken),
+      self_lookup: isSelfLookup,
+    });
     return createCachedResponse(
       payload,
       shouldBypassCache || refresh ? 'BYPASS' : 'MISS',

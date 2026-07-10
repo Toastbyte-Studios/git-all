@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
 import {
   SESSION_COOKIE_NAME,
@@ -197,15 +199,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const existingSession = await getAuthSessionFromRequest(request);
-    const serializedSession = await encodeAuthSession(
-      mergeConnectionIntoSession(existingSession, {
-        provider: providerParam,
-        accountId: identity.accountId,
-        username: identity.username,
-        avatarUrl: identity.avatarUrl,
-        verifiedAt: Date.now(),
-      }),
-    );
+    const mergedSession = mergeConnectionIntoSession(existingSession, {
+      provider: providerParam,
+      accountId: identity.accountId,
+      username: identity.username,
+      avatarUrl: identity.avatarUrl,
+      verifiedAt: Date.now(),
+    });
+    const serializedSession = await encodeAuthSession(mergedSession);
 
     if (!serializedSession) {
       return createErrorRedirect(
@@ -245,6 +246,33 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     clearStateCookie(response, providerParam);
+
+    const hadProviderConnection = Boolean(
+      existingSession?.connections[providerParam],
+    );
+    const existingConnectionCount = Object.keys(
+      existingSession?.connections ?? {},
+    ).length;
+    const mergedConnectionCount = Object.keys(mergedSession.connections).length;
+    const primaryEvent =
+      existingConnectionCount > 0 && !hadProviderConnection
+        ? ANALYTICS_EVENTS.connectProvider
+        : ANALYTICS_EVENTS.signIn;
+
+    await sendServerAnalyticsEvent(request, primaryEvent, {
+      provider: providerParam,
+      connection_count: mergedConnectionCount,
+    });
+    if (!hadProviderConnection && mergedConnectionCount >= 2) {
+      await sendServerAnalyticsEvent(
+        request,
+        ANALYTICS_EVENTS.multiAccountConnected,
+        {
+          provider: providerParam,
+          connection_count: mergedConnectionCount,
+        },
+      );
+    }
 
     return response;
   } catch (error) {

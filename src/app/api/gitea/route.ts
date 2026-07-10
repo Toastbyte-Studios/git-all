@@ -1,6 +1,8 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { NextRequest, NextResponse } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
 import {
   formatUtcDate,
@@ -133,20 +135,24 @@ export async function GET(request: NextRequest) {
       0,
     );
 
-    return NextResponse.json(
-      {
-        platform: 'gitea',
-        username,
-        instanceUrl: normalizedInstanceUrl,
-        totalContributions,
-        dateRange: {
-          from: calendar[0]?.date ?? null,
-          to: calendar[calendar.length - 1]?.date ?? null,
-        },
-        calendar,
+    const payload = {
+      platform: 'gitea',
+      username,
+      instanceUrl: normalizedInstanceUrl,
+      totalContributions,
+      dateRange: {
+        from: calendar[0]?.date ?? null,
+        to: calendar[calendar.length - 1]?.date ?? null,
       },
-      { headers: { 'Cache-Control': 'no-store' } },
-    );
+      calendar,
+    };
+    void sendServerAnalyticsEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+      provider: 'gitea',
+      total_contributions: totalContributions,
+    });
+    return NextResponse.json(payload, {
+      headers: { 'Cache-Control': 'no-store' },
+    });
   } catch (error) {
     if (error instanceof Error && error.name === 'TimeoutError') {
       return NextResponse.json(
