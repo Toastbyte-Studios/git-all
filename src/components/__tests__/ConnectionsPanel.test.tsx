@@ -33,13 +33,16 @@ beforeEach(() => {
 describe('ConnectionsPanel', () => {
   describe('connected provider', () => {
     it('shows the username and verified chip for a connected provider', () => {
-      render(
+      const { container } = render(
         <ConnectionsPanel
           connections={{ github: GITHUB_CONNECTION }}
           availableProviders={['github']}
         />,
       );
 
+      expect(container.firstElementChild?.hasAttribute('data-ui-chrome')).toBe(
+        true,
+      );
       expect(screen.getByText('@octocat')).toBeTruthy();
       expect(screen.getAllByText(/✓ Verified/).length).toBeGreaterThan(0);
     });

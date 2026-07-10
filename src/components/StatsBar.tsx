@@ -48,10 +48,11 @@ export function StatsBar({ results }: StatsBarProps) {
     showToggle && !expanded ? withData.slice(0, COLLAPSE_THRESHOLD) : withData;
 
   return (
-    <div className="flex flex-wrap gap-4 text-sm items-center">
+    <div className="flex flex-wrap gap-4 text-sm items-center" data-ui-chrome>
       {visible.map((r) => (
         <span
           key={r.entry.id}
+          className="stat-label"
           style={{
             color: PLATFORM_COLOR[r.entry.platform] ?? 'var(--text-primary)',
           }}
@@ -76,7 +77,7 @@ export function StatsBar({ results }: StatsBarProps) {
         </button>
       )}
       {withData.length > 1 && (
-        <span style={{ color: 'var(--ga-level-4)' }}>
+        <span className="stat-label" style={{ color: 'var(--ga-level-4)' }}>
           Total: <strong>{total.toLocaleString()}</strong>
         </span>
       )}

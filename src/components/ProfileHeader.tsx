@@ -54,7 +54,7 @@ export function ProfileHeader({ primary, connections }: ProfileHeaderProps) {
   if (!primaryConnection) return null;
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3" data-ui-chrome>
       <div className="flex shrink-0">
         {stackOrder.map((provider, index) => {
           const conn = connections[provider]!;
