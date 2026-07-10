@@ -77,10 +77,10 @@ export async function sendServerAnalyticsEvent(
     return false;
   }
 
-  const eventParams = sanitizeParams({
-    ...params,
+  const eventParams = {
+    ...sanitizeParams(params),
     engagement_time_msec: 1,
-  });
+  };
 
   try {
     const response = await fetch(
@@ -90,6 +90,7 @@ export async function sendServerAnalyticsEvent(
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(5_000),
         body: JSON.stringify({
           client_id: toClientId(request),
           non_personalized_ads: true,

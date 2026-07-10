@@ -259,12 +259,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
         ? ANALYTICS_EVENTS.connectProvider
         : ANALYTICS_EVENTS.signIn;
 
-    void sendServerAnalyticsEvent(request, primaryEvent, {
+    await sendServerAnalyticsEvent(request, primaryEvent, {
       provider: providerParam,
       connection_count: mergedConnectionCount,
     });
     if (!hadProviderConnection && mergedConnectionCount >= 2) {
-      void sendServerAnalyticsEvent(
+      await sendServerAnalyticsEvent(
         request,
         ANALYTICS_EVENTS.multiAccountConnected,
         {

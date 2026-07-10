@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   }
 
   const origin = request.headers.get('origin');
-  if (origin && origin !== request.nextUrl.origin) {
+  if (!origin || origin !== request.nextUrl.origin) {
     return NextResponse.json({ error: 'Origin not allowed.' }, { status: 403 });
   }
 
@@ -38,10 +38,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const rawParams = body.params ?? {};
+  const primitiveParams: Record<
+    string,
+    string | number | boolean | null | undefined
+  > = Object.fromEntries(
+    Object.entries(rawParams).filter(
+      ([, v]) =>
+        v === null ||
+        v === undefined ||
+        typeof v === 'string' ||
+        typeof v === 'number' ||
+        typeof v === 'boolean',
+    ),
+  );
+
   await sendServerAnalyticsEvent(
     request,
     body.eventName as AnalyticsEventName,
-    body.params ?? {},
+    primitiveParams,
   );
 
   return NextResponse.json(
