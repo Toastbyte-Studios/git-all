@@ -49,6 +49,9 @@ export function ConnectionsPanel({
   const [errors, setErrors] = useState<
     Partial<Record<ConnectionProvider, string>>
   >({});
+  const [hoveredKill, setHoveredKill] = useState<ConnectionProvider | null>(
+    null,
+  );
 
   const handleDisconnect = async (provider: ConnectionProvider) => {
     setDisconnecting(provider);
@@ -141,10 +144,35 @@ export function ConnectionsPanel({
                       className="text-xs cursor-pointer bg-transparent border-0 p-0 hover:opacity-70 transition-opacity disabled:opacity-50"
                       style={{ color: 'var(--text-secondary)' }}
                       aria-label={`Disconnect ${PROVIDER_LABELS[provider]}`}
+                      onMouseEnter={() => setHoveredKill(provider)}
+                      onMouseLeave={() => setHoveredKill(null)}
+                      onFocus={() => setHoveredKill(provider)}
+                      onBlur={() => setHoveredKill(null)}
                     >
-                      {disconnecting === provider
-                        ? 'Disconnecting…'
-                        : 'Disconnect'}
+                      {disconnecting === provider ? (
+                        'Disconnecting…'
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="font-mono-data"
+                          style={{
+                            position: 'relative',
+                            display: 'inline-block',
+                          }}
+                        >
+                          {/* Invisible spacer reserves the max width so kill -9 causes no layout shift */}
+                          <span
+                            style={{ visibility: 'hidden', userSelect: 'none' }}
+                          >
+                            kill -9
+                          </span>
+                          <span
+                            style={{ position: 'absolute', top: 0, left: 0 }}
+                          >
+                            {hoveredKill === provider ? 'kill -9' : 'kill'}
+                          </span>
+                        </span>
+                      )}
                     </button>
                     {errors[provider] && (
                       <span

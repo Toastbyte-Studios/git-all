@@ -69,7 +69,29 @@ describe('ConnectionsPanel', () => {
       expect(gitlabBadge.className).not.toContain('ml-2');
     });
 
-    it('renders a Disconnect button for a connected provider', () => {
+    it('renders a kill button (visible label) for a connected provider', () => {
+      render(
+        <ConnectionsPanel
+          connections={{ github: GITHUB_CONNECTION }}
+          availableProviders={['github']}
+        />,
+      );
+
+      // Accessible name is still "Disconnect GitHub" for screen readers
+      const btn = screen.getByRole('button', { name: /disconnect github/i });
+      expect(btn).toBeTruthy();
+      // Visible label is now "kill" in monospace
+      const visibleSpan = btn.querySelector('[aria-hidden="true"]');
+      expect(visibleSpan).toBeTruthy();
+      const labels = visibleSpan!.querySelectorAll('span');
+      const visibleLabel = Array.from(labels).find(
+        (s) => (s as HTMLElement).style.position === 'absolute',
+      );
+      expect(visibleLabel).toBeTruthy();
+      expect(visibleLabel!.textContent).toBe('kill');
+    });
+
+    it('swaps visible label to "kill -9" on hover', async () => {
       render(
         <ConnectionsPanel
           connections={{ github: GITHUB_CONNECTION }}
@@ -78,7 +100,55 @@ describe('ConnectionsPanel', () => {
       );
 
       const btn = screen.getByRole('button', { name: /disconnect github/i });
-      expect(btn).toBeTruthy();
+      fireEvent.mouseEnter(btn);
+
+      await waitFor(() => {
+        const visibleSpan = btn.querySelector('[aria-hidden="true"]');
+        // The absolutely-positioned label should now show kill -9
+        const labels = visibleSpan!.querySelectorAll('span');
+        const visibleLabel = Array.from(labels).find(
+          (s) => (s as HTMLElement).style.position === 'absolute',
+        );
+        expect(visibleLabel!.textContent).toBe('kill -9');
+      });
+    });
+
+    it('swaps visible label back to "kill" on mouse leave', async () => {
+      render(
+        <ConnectionsPanel
+          connections={{ github: GITHUB_CONNECTION }}
+          availableProviders={['github']}
+        />,
+      );
+
+      const btn = screen.getByRole('button', { name: /disconnect github/i });
+      fireEvent.mouseEnter(btn);
+      fireEvent.mouseLeave(btn);
+
+      await waitFor(() => {
+        const visibleSpan = btn.querySelector('[aria-hidden="true"]');
+        const labels = visibleSpan!.querySelectorAll('span');
+        const visibleLabel = Array.from(labels).find(
+          (s) => (s as HTMLElement).style.position === 'absolute',
+        );
+        expect(visibleLabel!.textContent).toBe('kill');
+      });
+    });
+
+    it('does not change aria-label on hover (accessible name is always Disconnect)', async () => {
+      render(
+        <ConnectionsPanel
+          connections={{ github: GITHUB_CONNECTION }}
+          availableProviders={['github']}
+        />,
+      );
+
+      const btn = screen.getByRole('button', { name: /disconnect github/i });
+      fireEvent.mouseEnter(btn);
+
+      await waitFor(() => {
+        expect(btn.getAttribute('aria-label')).toBe('Disconnect GitHub');
+      });
     });
 
     it('calls DELETE and router.refresh on disconnect', async () => {
