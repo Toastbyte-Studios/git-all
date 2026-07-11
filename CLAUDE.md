@@ -66,7 +66,7 @@ Each platform has its own API route that fetches and normalises data to the shar
 | Bitbucket | `/api/bitbucket` | Public REST API (aggregated) |
 | Gitea/Forgejo | `/api/gitea` | `/api/v1/users/{username}/heatmap` |
 
-The GitHub route maintains an **in-memory per-instance LRU cache** (15 min TTL, max 500 entries) and deduplicates concurrent in-flight requests with a `Map<string, Promise>`. This cache is not shared across Worker instances; there is a comment indicating R2/Workers Cache as a future upgrade path. Authenticated users bypass this cache and use their own OAuth token, which may include private contributions.
+The GitHub route maintains an **in-memory per-instance TTL cache** (15 min TTL, max 500 entries) with oldest-entry eviction and deduplicates concurrent in-flight requests with a `Map<string, Promise>`. This cache is not shared across Worker instances; there is a comment indicating Workers Cache or KV as a future upgrade path. Authenticated users bypass this cache and use their own OAuth token, which may include private contributions.
 
 ### Two-mode UI
 
@@ -91,7 +91,7 @@ OAuth is implemented without a library. The flow lives in `src/app/api/auth/`:
 
 `SESSION_VERSION` in `auth-session.ts` is bumped when the stored session shape changes, causing old cookies to be silently invalidated.
 
-The `/me` page (`src/app/me/`) shows the signed-in user's own contributions by reading the session server-side. The `/whoami` page displays identity info for verified connections.
+The `/me` page (`src/app/me/`) is a permanent redirect to `/whoami` to preserve older links. The `/whoami` page displays identity info for verified connections.
 
 ### Analytics stack
 
