@@ -1,19 +1,29 @@
 import { NextRequest } from 'next/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '../route';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { _resetRateLimitForTest, POST } from '../route';
 
 function makeRequest(
   body: unknown,
-  options: { contentType?: string; origin?: string | null } = {},
+  options: {
+    contentType?: string;
+    origin?: string | null;
+    ip?: string;
+  } = {},
 ) {
-  const { contentType = 'application/json', origin = 'https://gitall.app' } =
-    options;
+  const {
+    contentType = 'application/json',
+    origin = 'https://gitall.app',
+    ip,
+  } = options;
   const headers: Record<string, string> = {};
   if (contentType) {
     headers['Content-Type'] = contentType;
   }
   if (origin !== null) {
     headers['Origin'] = origin;
+  }
+  if (ip) {
+    headers['X-Forwarded-For'] = ip;
   }
   return new NextRequest('https://gitall.app/api/analytics/event', {
     method: 'POST',
@@ -23,6 +33,10 @@ function makeRequest(
 }
 
 describe('POST /api/analytics/event', () => {
+  beforeEach(() => {
+    _resetRateLimitForTest();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -110,5 +124,96 @@ describe('POST /api/analytics/event', () => {
 
     delete process.env.ANALYTICS_GA4_MEASUREMENT_ID;
     delete process.env.ANALYTICS_GA4_API_SECRET;
+  });
+
+  describe('rate limiting', () => {
+    it('returns 200 for requests within the rate limit', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn<typeof fetch>()
+          .mockResolvedValue(new Response('', { status: 200 })),
+      );
+
+      const response = await POST(
+        makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.1' }),
+      );
+      expect(response.status).toBe(200);
+    });
+
+    it('returns 429 after exceeding 20 requests per minute from the same IP', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn<typeof fetch>()
+          .mockResolvedValue(new Response('', { status: 200 })),
+      );
+
+      for (let i = 0; i < 20; i++) {
+        const res = await POST(
+          makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.2' }),
+        );
+        expect(res.status).toBe(200);
+      }
+
+      const limited = await POST(
+        makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.2' }),
+      );
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get('Retry-After')).toBe('60');
+    });
+
+    it('does not rate limit a different IP', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn<typeof fetch>()
+          .mockResolvedValue(new Response('', { status: 200 })),
+      );
+
+      for (let i = 0; i < 20; i++) {
+        await POST(
+          makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.3' }),
+        );
+      }
+
+      // A request from a different IP should still succeed.
+      const response = await POST(
+        makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.4' }),
+      );
+      expect(response.status).toBe(200);
+    });
+
+    it('allows requests again after the window expires', async () => {
+      vi.useFakeTimers();
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn<typeof fetch>()
+          .mockResolvedValue(new Response('', { status: 200 })),
+      );
+
+      for (let i = 0; i < 20; i++) {
+        await POST(
+          makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.5' }),
+        );
+      }
+
+      // Verify limit is hit.
+      const limited = await POST(
+        makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.5' }),
+      );
+      expect(limited.status).toBe(429);
+
+      // Advance time past the 60-second window.
+      vi.advanceTimersByTime(61_000);
+
+      const allowed = await POST(
+        makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.5' }),
+      );
+      expect(allowed.status).toBe(200);
+
+      vi.useRealTimers();
+    });
   });
 });
