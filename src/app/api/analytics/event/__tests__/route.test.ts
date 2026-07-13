@@ -1,6 +1,11 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { _resetRateLimitForTest, POST } from '../route';
+import {
+  _getRateLimitMapSizeForTest,
+  _resetRateLimitForTest,
+  checkRateLimit,
+} from '../rate-limit';
+import { POST } from '../route';
 
 function makeRequest(
   body: unknown,
@@ -38,6 +43,7 @@ describe('POST /api/analytics/event', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -212,8 +218,22 @@ describe('POST /api/analytics/event', () => {
         makeRequest({ eventName: 'lookup_run' }, { ip: '203.0.113.5' }),
       );
       expect(allowed.status).toBe(200);
+    });
 
-      vi.useRealTimers();
+    it('evicts the oldest entries to keep the limiter map bounded', async () => {
+      vi.useFakeTimers();
+
+      for (let i = 0; i <= 10_000; i++) {
+        expect(
+          checkRateLimit(
+            new NextRequest('https://gitall.app/api/analytics/event', {
+              headers: { 'X-Forwarded-For': `ip-${i}` },
+            }),
+          ),
+        ).toBe(true);
+      }
+
+      expect(_getRateLimitMapSizeForTest()).toBe(10_000);
     });
   });
 });

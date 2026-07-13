@@ -1,63 +1,14 @@
-import { createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   ANALYTICS_EVENTS,
   type AnalyticsEventName,
 } from '@/lib/analytics-events';
 import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
+import { checkRateLimit } from './rate-limit';
 
 const ALLOWED_EVENTS = new Set<AnalyticsEventName>(
   Object.values(ANALYTICS_EVENTS),
 );
-
-// Rate limiting: sliding window per hashed client IP.
-// This cache is intentionally per-instance (not shared across Workers).
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 20;
-const MAX_RATE_LIMIT_ENTRIES = 10_000;
-
-const rateLimitMap = new Map<string, number[]>();
-
-function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for') ?? '';
-  return forwarded.split(',')[0]?.trim() || 'unknown';
-}
-
-function checkRateLimit(request: NextRequest): boolean {
-  const ip = getClientIp(request);
-  const key = createHash('sha256').update(ip).digest('hex').slice(0, 16);
-  const now = Date.now();
-  const windowStart = now - RATE_LIMIT_WINDOW_MS;
-
-  // Evict excess entries when the map grows too large.
-  if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
-    for (const [k, timestamps] of rateLimitMap.entries()) {
-      const kept = timestamps.filter((t) => t > windowStart);
-      if (kept.length === 0) {
-        rateLimitMap.delete(k);
-      } else {
-        rateLimitMap.set(k, kept);
-      }
-    }
-  }
-
-  const timestamps = rateLimitMap.get(key) ?? [];
-  const recent = timestamps.filter((t) => t > windowStart);
-
-  if (recent.length >= RATE_LIMIT_MAX_REQUESTS) {
-    rateLimitMap.set(key, recent);
-    return false;
-  }
-
-  recent.push(now);
-  rateLimitMap.set(key, recent);
-  return true;
-}
-
-/** Clears rate-limit state. Exposed for unit tests only. */
-export function _resetRateLimitForTest() {
-  rateLimitMap.clear();
-}
 
 export async function POST(request: NextRequest) {
   const contentType = request.headers.get('content-type')?.toLowerCase() ?? '';
