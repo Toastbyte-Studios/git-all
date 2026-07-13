@@ -5,11 +5,19 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 const MAX_RATE_LIMIT_ENTRIES = 10_000;
 
+// Per-process/per-instance map — not shared across Worker instances and resets on cold starts.
+// This provides best-effort throttling only; a global limit would require Workers KV or a Durable Object.
 const rateLimitMap = new Map<string, number[]>();
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for') ?? '';
-  return forwarded.split(',')[0]?.trim() || 'unknown';
+  // Use the last non-empty segment: in common proxy setups the rightmost entry is
+  // appended by the closest trusted proxy and cannot be spoofed by the client.
+  const segments = forwarded
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return segments[segments.length - 1] ?? 'unknown';
 }
 
 function pruneStaleEntries(windowStart: number) {
@@ -24,23 +32,14 @@ function pruneStaleEntries(windowStart: number) {
 }
 
 function evictOldestEntries(maxEntries: number) {
+  // The Map is insertion-ordered; delete the first (oldest-inserted) key in O(1)
+  // until we are within the cap.
   while (rateLimitMap.size > maxEntries) {
-    let oldestKey: string | undefined;
-    let oldestTimestamp = Number.POSITIVE_INFINITY;
-
-    for (const [key, timestamps] of rateLimitMap.entries()) {
-      const firstTimestamp = timestamps[0];
-      if (firstTimestamp !== undefined && firstTimestamp < oldestTimestamp) {
-        oldestKey = key;
-        oldestTimestamp = firstTimestamp;
-      }
-    }
-
-    if (!oldestKey) {
+    const firstKey = rateLimitMap.keys().next().value;
+    if (firstKey === undefined) {
       break;
     }
-
-    rateLimitMap.delete(oldestKey);
+    rateLimitMap.delete(firstKey);
   }
 }
 
