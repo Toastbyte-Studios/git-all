@@ -4,6 +4,7 @@ import {
   type AnalyticsEventName,
 } from '@/lib/analytics-events';
 import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
+import { checkRateLimit } from './rate-limit';
 
 const ALLOWED_EVENTS = new Set<AnalyticsEventName>(
   Object.values(ANALYTICS_EVENTS),
@@ -21,6 +22,13 @@ export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin');
   if (!origin || origin !== request.nextUrl.origin) {
     return NextResponse.json({ error: 'Origin not allowed.' }, { status: 403 });
+  }
+
+  if (!checkRateLimit(request)) {
+    return NextResponse.json(
+      { error: 'Too many requests.' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    );
   }
 
   const body = (await request.json().catch(() => null)) as {
