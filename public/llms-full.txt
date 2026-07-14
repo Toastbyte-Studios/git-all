@@ -35,6 +35,7 @@ platform and instantly see combined git activity — no account or login require
 - No account required for public contribution data — anonymous lookup supported
 - Free to use, no paid tiers
 - Custom Gitea/Forgejo instance URL support — point to any self-hosted instance
+- Embeddable SVG heatmap — add your contribution graph to GitHub READMEs, portfolios, and personal sites
 
 ---
 
@@ -54,6 +55,39 @@ GitAll proxies platform APIs to avoid CORS restrictions and cache responses:
 - `GET /api/gitlab?username=<user>` — GitLab contribution data
 - `GET /api/bitbucket?username=<user>` — Bitbucket contribution data
 - `GET /api/gitea?username=<user>&instanceUrl=<url>` — Gitea/Forgejo contribution data
+
+---
+
+## Embeddable Heatmap
+
+GitAll generates embeddable SVG contribution heatmaps that can be used in GitHub READMEs, portfolio sites, and anywhere that supports image embeds.
+
+### Embed endpoint
+
+```
+GET /embed/<github_username>.svg
+GET /embed/<github_username>.svg?github=<user>&gitlab=<user>&bitbucket=<user>&gitea=<user>&instance=<url>
+```
+
+**Query parameters:**
+- `github` — GitHub username (overrides the path username)
+- `gitlab` — GitLab username
+- `bitbucket` — Bitbucket workspace slug
+- `gitea` — Gitea/Forgejo username
+- `instance` — Gitea/Forgejo instance URL (default: codeberg.org)
+- `theme` — `dark` (default) or `light`
+
+**Markdown snippet (GitHub README):**
+```markdown
+![GitAll contributions](https://gitall.app/embed/octocat.svg)
+```
+
+**HTML snippet:**
+```html
+<img src="https://gitall.app/embed/octocat.svg" alt="Contribution heatmap" />
+```
+
+The embed is cached at the Cloudflare edge for 24 hours and includes a subtle "Powered by GitAll" watermark.
 
 ---
 
