@@ -2,8 +2,12 @@
 
 import { useState } from 'react';
 
-const SITE_URL =
-  typeof window !== 'undefined' ? window.location.origin : 'https://gitall.app';
+// Always generate embed snippets against the canonical production domain.
+// Embed URLs get copied into READMEs permanently, so never derive this from
+// window.location.origin — preview deployments and the typo-catcher domains
+// (git-all.com / git-all.app, which only redirect here) must not leak into
+// user snippets. See issue #96 / #41.
+const SITE_URL = 'https://gitall.app';
 
 function buildEmbedUrl(
   github: string,

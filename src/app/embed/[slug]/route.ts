@@ -6,6 +6,18 @@ import {
 import { generateHeatmapSvg, type EmbedTheme } from '@/lib/embed-svg';
 import type { ContributionData } from '@/lib/types';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// OPERATIONAL CONSTRAINT (issue #96): this endpoint is consumed by GitHub's
+// camo image proxy, which cannot execute JavaScript and therefore cannot pass
+// Cloudflare bot challenges. Bot Fight Mode must stay OFF on the gitall.app
+// zone — it applies zone-wide and CANNOT be skipped per-path with WAF custom
+// rules on the free plan. Enabling it silently breaks every embedded heatmap
+// in the wild. Abuse is mitigated instead by the 24h edge cache below, a
+// Cloudflare rate limiting rule scoped to /embed/*, and the "Block AI bots"
+// managed rule (issue #97). If the zone is ever upgraded to Pro, use Super
+// Bot Fight Mode with a skip rule on /embed/* and /api/* instead.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // 24-hour edge cache; stale responses are served for up to 1 hour while
 // revalidating so that GitHub's camo proxy always gets a quick response.
 const CACHE_CONTROL = 'public, s-maxage=86400, stale-while-revalidate=3600';
@@ -58,6 +70,10 @@ export async function GET(
   const origin = request.nextUrl.origin;
 
   // Fetch contributions from all requested platforms in parallel.
+  // NOTE: these loop back through our own public /api/* routes from the
+  // server's egress IP. Keep any Cloudflare rate limiting rule scoped to
+  // /embed/* only — a per-IP limit on /api/* would throttle this endpoint's
+  // own internal calls under load.
   const fetchTasks: Array<Promise<ContributionData | null>> = [];
 
   if (githubUsername) {
