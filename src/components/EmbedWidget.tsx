@@ -281,9 +281,9 @@ export function EmbedWidget() {
           <SnippetRow label="HTML" value={htmlSnippet} />
 
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and
-            the heatmap links back to gitall.app. Refreshes daily via
-            Cloudflare edge cache.
+            Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and the
+            heatmap links back to gitall.app. Refreshes daily via Cloudflare
+            edge cache.
           </p>
         </div>
       ) : (
