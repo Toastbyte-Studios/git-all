@@ -223,6 +223,54 @@ describe('embed route GET', () => {
     expect(body).toContain('No contribution data found');
   });
 
+  it('error SVG responses include X-Robots-Tag: noindex', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/.svg'),
+      makeParams('.svg'),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('X-Robots-Tag')).toBe('noindex');
+  });
+
+  it('treats empty ?github= param as absent and falls back to path username', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(makeContributionResponse({ username: 'octocat' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/octocat.svg?github='),
+      makeParams('octocat.svg'),
+    );
+
+    // Should still succeed using path username as GitHub username
+    expect(response.status).toBe(200);
+    const calledUrl = fetchMock.mock.calls[0]?.[0] as string;
+    expect(calledUrl).toContain('/api/github');
+    expect(calledUrl).toContain('username=octocat');
+  });
+
+  it('treats whitespace-only ?github= param as absent', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(makeContributionResponse({ username: 'octocat' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/octocat.svg?github=   '),
+      makeParams('octocat.svg'),
+    );
+
+    expect(response.status).toBe(200);
+    const calledUrl = fetchMock.mock.calls[0]?.[0] as string;
+    expect(calledUrl).toContain('/api/github');
+    expect(calledUrl).toContain('username=octocat');
+  });
+
   it('applies the dark theme by default', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

@@ -47,11 +47,14 @@ export async function GET(
 
   const searchParams = request.nextUrl.searchParams;
 
-  const explicitGithub = searchParams.get('github');
-  const gitlabUsername = searchParams.get('gitlab');
-  const bitbucketUsername = searchParams.get('bitbucket');
-  const giteaUsername = searchParams.get('gitea');
-  const giteaInstance = searchParams.get('instance');
+  // Normalize: treat empty/whitespace-only param values the same as absent.
+  // Without this, `?github=` sets hasExplicitParams=true but produces no fetch,
+  // returning "No platform usernames provided" even when a valid path slug exists.
+  const explicitGithub = searchParams.get('github')?.trim() || null;
+  const gitlabUsername = searchParams.get('gitlab')?.trim() || null;
+  const bitbucketUsername = searchParams.get('bitbucket')?.trim() || null;
+  const giteaUsername = searchParams.get('gitea')?.trim() || null;
+  const giteaInstance = searchParams.get('instance')?.trim() || null;
 
   // When no explicit platform params are given, the path username is the
   // GitHub username (simple single-platform case: /embed/octocat.svg).
@@ -207,6 +210,7 @@ function svgError(message: string, status: number) {
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',
       'Cache-Control': 'no-store',
+      'X-Robots-Tag': 'noindex',
     },
   });
 }
