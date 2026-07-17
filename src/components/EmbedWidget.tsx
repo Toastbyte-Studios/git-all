@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 // Always generate embed snippets against the canonical production domain.
 // Embed URLs get copied into READMEs permanently, so never derive this from
@@ -46,23 +46,12 @@ interface CopyButtonProps {
 
 function CopyButton({ text }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-    };
-  }, []);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
       setCopied(true);
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        setCopied(false);
-      }, 2000);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API not available — silently ignore
     }
@@ -281,9 +270,9 @@ export function EmbedWidget() {
           <SnippetRow label="HTML" value={htmlSnippet} />
 
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and
-            the heatmap links back to gitall.app. Refreshes daily via
-            Cloudflare edge cache.
+            Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and the
+            heatmap links back to gitall.app. Refreshes daily via Cloudflare
+            edge cache.
           </p>
         </div>
       ) : (
