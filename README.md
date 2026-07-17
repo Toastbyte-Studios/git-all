@@ -62,15 +62,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Analytics foundation (Cloudflare + server-side events)
+### Analytics (Cloudflare + server-side events)
 
-This repo ships a first-party analytics foundation for the monetization funnel:
+This repo ships optional first-party analytics:
 
-- **Phase A (cookieless baseline):** optional Cloudflare Web Analytics beacon via `NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN`.
-- **Phase B (event tracking):**
+- **Cookieless baseline:** optional Cloudflare Web Analytics beacon via `NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN`.
+- **Event tracking:**
   - Client product events use `window.zaraz.track(...)` when Zaraz is enabled.
   - If Zaraz is unavailable (blocked or disabled), client events fall back to first-party `POST /api/analytics/event`.
-  - High-value conversions are emitted server-side via GA4 Measurement Protocol from API/auth routes.
+  - Some events are emitted server-side via the GA4 Measurement Protocol from API/auth routes.
 
 Server-side GA4 credentials:
 
@@ -85,7 +85,7 @@ Optional consent gating (for client-side analytics events):
 NEXT_PUBLIC_ANALYTICS_REQUIRE_CONSENT=1
 ```
 
-Implemented event catalog (foundation + roadmap placeholders):
+Tracked events:
 
 - `lookup_run`
 - `lookup_success`
@@ -94,11 +94,6 @@ Implemented event catalog (foundation + roadmap placeholders):
 - `multi_account_connected`
 - `integrated_view_used`
 - `time_range_selected`
-- `embed_generated` (reserved for #41)
-- `pro_page_view` (reserved for #41)
-- `pro_checkout_started` (reserved for #41)
-- `pro_checkout_completed` (reserved for #41)
-- `teams_waitlist_signup` (reserved for teams waitlist page)
 
 > CSP note: if you set `NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN`, allow `https://static.cloudflareinsights.com` in `script-src`. Zaraz/GA4 origins should be added in your deployment CSP policy as part of your centralized CSP configuration.
 
