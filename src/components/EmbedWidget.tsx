@@ -59,7 +59,10 @@ function CopyButton({ text }: CopyButtonProps) {
       await navigator.clipboard.writeText(text);
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       setCopied(true);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        setCopied(false);
+      }, 2000);
     } catch {
       // Clipboard API not available — silently ignore
     }
@@ -124,12 +127,16 @@ export function EmbedWidget() {
 
   const embedUrl = buildEmbedUrl(github, gitlab, bitbucket, gitea, instance);
 
+  // Wrap the image in a link back to the site. Links *inside* the SVG are
+  // not clickable on GitHub — camo-proxied images are sandboxed — so the
+  // click-through has to live in the snippet, making the whole heatmap a
+  // link to GitAll.
   const markdownSnippet = embedUrl
-    ? `![GitAll contributions](${embedUrl})`
+    ? `[![GitAll contributions](${embedUrl})](${SITE_URL})`
     : null;
 
   const htmlSnippet = embedUrl
-    ? `<img src="${embedUrl}" alt="Contribution heatmap" />`
+    ? `<a href="${SITE_URL}"><img src="${embedUrl}" alt="Contribution heatmap" /></a>`
     : null;
 
   const inputStyle = {
@@ -274,8 +281,9 @@ export function EmbedWidget() {
           <SnippetRow label="HTML" value={htmlSnippet} />
 
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark.
-            Refreshes daily via Cloudflare edge cache.
+            Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and
+            the heatmap links back to gitall.app. Refreshes daily via
+            Cloudflare edge cache.
           </p>
         </div>
       ) : (
