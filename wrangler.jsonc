@@ -23,5 +23,14 @@
 		// Enable image optimization
 		// see https://opennext.js.org/cloudflare/howtos/image
 		"binding": "IMAGES"
-	}
+	},
+	"d1_databases": [
+		{
+			// Run `wrangler d1 create gitall` to create the database and fill in the id.
+			"binding": "DB",
+			"database_name": "gitall",
+			"database_id": "<fill-in-after-wrangler-d1-create-gitall>",
+			"migrations_dir": "migrations"
+		}
+	]
 }

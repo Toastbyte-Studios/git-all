@@ -29,6 +29,28 @@ export interface Connection {
 
 export type Platform = 'github' | 'gitlab' | 'bitbucket' | 'gitea';
 
+/** A connection record as stored in D1 (no access token). */
+export interface StoredConnection {
+  userId: string;
+  provider: ConnectionProvider;
+  accountId: string;
+  username: string;
+  avatarUrl: string | null;
+  verifiedAt: number;
+}
+
+/** A persistent user profile as stored in D1. */
+export interface Profile {
+  id: string;
+  handle: string;
+  displayName: string | null;
+  primaryProvider: ConnectionProvider;
+  handleChangedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+  connections: StoredConnection[];
+}
+
 export type ViewMode = 'side-by-side' | 'integrated';
 
 export interface UserEntry {

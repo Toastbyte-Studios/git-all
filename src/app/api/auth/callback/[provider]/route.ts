@@ -18,6 +18,11 @@ import {
   hasOAuthConfig,
   OAUTH_PROVIDERS,
 } from '@/lib/oauth-providers';
+import {
+  findUserByProviderAccount,
+  upsertConnection,
+  upsertUser,
+} from '@/lib/profiles';
 import type { ConnectionProvider } from '@/lib/types';
 
 interface RouteContext {
@@ -199,13 +204,46 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const existingSession = await getAuthSessionFromRequest(request);
-    const mergedSession = mergeConnectionIntoSession(existingSession, {
-      provider: providerParam,
-      accountId: identity.accountId,
-      username: identity.username,
-      avatarUrl: identity.avatarUrl,
-      verifiedAt: Date.now(),
-    });
+
+    // ── Persist to D1 (non-fatal: plain next dev has no DB binding) ──────
+    let userId: string | undefined;
+    try {
+      if (existingSession?.userId) {
+        // Additional connection on existing user.
+        userId = existingSession.userId;
+        await upsertUser(userId, providerParam, identity.username);
+      } else {
+        // Look up by (provider, accountId) in case the user signed in before
+        // (even after cookie loss).
+        const existingUserId = await findUserByProviderAccount(
+          providerParam,
+          identity.accountId,
+        );
+        userId =
+          (await upsertUser(
+            existingUserId ?? undefined,
+            providerParam,
+            identity.username,
+          )) ?? undefined;
+      }
+      if (userId) {
+        await upsertConnection(userId, providerParam, identity);
+      }
+    } catch (dbError) {
+      console.warn('[auth callback] D1 upsert failed (non-fatal):', dbError);
+    }
+
+    const mergedSession = mergeConnectionIntoSession(
+      existingSession,
+      {
+        provider: providerParam,
+        accountId: identity.accountId,
+        username: identity.username,
+        avatarUrl: identity.avatarUrl,
+        verifiedAt: Date.now(),
+      },
+      userId,
+    );
     const serializedSession = await encodeAuthSession(mergedSession);
 
     if (!serializedSession) {

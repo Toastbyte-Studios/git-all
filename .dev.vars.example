@@ -16,3 +16,9 @@ GITLAB_CLIENT_SECRET=your_gitlab_application_client_secret
 
 BITBUCKET_CLIENT_KEY=your_bitbucket_oauth_consumer_key
 BITBUCKET_CLIENT_SECRET=your_bitbucket_oauth_consumer_secret
+
+# ── Cloudflare D1 (persistent profiles) ─────────────────────────────
+# The DB binding is configured in wrangler.jsonc (d1_databases).
+# Run `wrangler d1 migrations apply gitall --local` to initialise the
+# local SQLite file under .wrangler/state/v3/d1/ before using cf:preview.
+

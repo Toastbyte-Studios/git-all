@@ -1,6 +1,6 @@
 {
   "name": "git-all",
-  "version": "1.22.2",
+  "version": "1.23.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -14,6 +14,8 @@
     "cf:build": "npx @opennextjs/cloudflare build",
     "cf:preview": "npm run cf:build && wrangler dev",
     "cf:deploy": "npm run cf:build && wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply gitall",
+    "db:migrate:local": "wrangler d1 migrations apply gitall --local",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
