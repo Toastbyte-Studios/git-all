@@ -96,14 +96,13 @@ describe('generateHeatmapSvg', () => {
     expect(svg).not.toContain('#161b22');
   });
 
-  it('escapes XML in username and data', () => {
-    const xssData: ContributionData = {
-      ...SAMPLE_DATA,
-      username: '<script>alert("xss")</script>',
-    };
-    const svg = generateHeatmapSvg(xssData);
+  it('escapes XML special characters in the siteUrl watermark link', () => {
+    const svg = generateHeatmapSvg(SAMPLE_DATA, {
+      siteUrl: 'https://example.com/?a=1&b=2&q=<script>',
+    });
     expect(svg).not.toContain('<script>');
-    expect(svg).not.toContain('alert("xss")');
+    expect(svg).toContain('&lt;script&gt;');
+    expect(svg).toContain('&amp;');
   });
 
   it('produces an SVG with a non-zero positive width and height for a full year', () => {

@@ -166,7 +166,7 @@ export function generateHeatmapSvg(
   for (const m of monthHeaders) {
     const x = PADDING_LEFT + m.col * TOTAL;
     parts.push(
-      `<text x="${x}" y="12" fill="${escapeXml(theme.textMuted)}" font-size="10" font-family="system-ui,-apple-system,sans-serif">${escapeXml(m.label)}</text>`,
+      `<text x="${x}" y="10" fill="${escapeXml(theme.textMuted)}" font-size="10" font-family="system-ui,-apple-system,sans-serif">${escapeXml(m.label)}</text>`,
     );
   }
 
