@@ -25,6 +25,13 @@ const CACHE_CONTROL = 'public, s-maxage=86400, stale-while-revalidate=3600';
 // Approximate base URL for the "Powered by GitAll" watermark link.
 const SITE_URL = 'https://gitall.app';
 
+// Hard deadline per upstream platform fetch. GitHub's camo proxy only waits
+// a few seconds for the image before rendering a broken placeholder, so a
+// single hung platform must degrade to a partial heatmap (that platform is
+// simply omitted from the merge) rather than stall the whole response past
+// camo's timeout.
+const PLATFORM_FETCH_TIMEOUT_MS = 4000;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
@@ -141,12 +148,16 @@ async function fetchPlatformContributions(
   url: string,
 ): Promise<ContributionData | null> {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(PLATFORM_FETCH_TIMEOUT_MS),
+    });
     if (!response.ok) return null;
     const data: ContributionData & { error?: string } = await response.json();
     if (data.error) return null;
     return data;
   } catch {
+    // Covers network errors, JSON parse failures, and the AbortSignal
+    // timeout — all degrade to "this platform contributes nothing".
     return null;
   }
 }
