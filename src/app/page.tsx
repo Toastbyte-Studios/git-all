@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { AuthStatus } from '@/components/AuthStatus';
 import { ContributionExplorer } from '@/components/ContributionExplorer';
+import { EmbedWidget } from '@/components/EmbedWidget';
 import { GitAllLogo } from '@/components/GitAllLogo';
 import { SignInBanner } from '@/components/SignInBanner';
 import { FAQ_ITEMS } from '@/lib/faq';
@@ -119,6 +120,29 @@ export default function Home() {
               </span>
             </li>
           </ol>
+        </section>
+
+        {/* ── Embed your heatmap ────────────────────────────────── */}
+        <section
+          id="embed"
+          aria-labelledby="embed-heading"
+          className="mt-16 max-w-2xl mx-auto"
+        >
+          <h2
+            id="embed-heading"
+            className="text-lg font-semibold mb-2 text-center"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Embed your heatmap
+          </h2>
+          <p
+            className="text-sm text-center mb-4"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Add your unified contribution graph to your GitHub README, portfolio
+            site, or anywhere that supports images.
+          </p>
+          <EmbedWidget />
         </section>
 
         {/* ── Supported platforms ───────────────────────────────── */}
