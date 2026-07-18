@@ -110,8 +110,7 @@ export function isValidHandleFormat(handle: string): boolean {
   if (handle.startsWith('-') || handle.endsWith('-')) return false;
   if (CONSECUTIVE_DASH.test(handle)) return false;
   if (RESERVED_HANDLES.has(handle)) return false;
-  // Ensure the regex matches (catches single-char edge-case)
-  return HANDLE_PATTERN.test(handle) || handle.length >= 2;
+  return HANDLE_PATTERN.test(handle);
 }
 
 // ── D1 row shapes ─────────────────────────────────────────────────────
@@ -169,7 +168,11 @@ export async function findAvailableHandle(base: string): Promise<string> {
     if (await isHandleAvailable(candidate)) {
       return candidate;
     }
-    candidate = `${normalized.slice(0, 29)}-${suffix}`;
+    const suffixStr = `-${suffix}`;
+    const trimmedBase = normalized
+      .slice(0, 32 - suffixStr.length)
+      .replace(/-+$/, '');
+    candidate = `${trimmedBase}${suffixStr}`;
     suffix++;
   }
 }
@@ -216,9 +219,6 @@ export async function upsertUser(
 
 /**
  * Upserts a `connections` row for `(userId, provider)`.
- * Also looks up an existing user by `(provider, accountId)` if `userId` is
- * not yet known — returns `{ userId }` so the caller can persist it in the
- * session.
  */
 export async function upsertConnection(
   userId: string,

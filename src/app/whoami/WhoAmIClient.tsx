@@ -142,6 +142,10 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
           setSaveError(
             'Invalid handle. Use 2–32 lowercase letters, numbers, or hyphens.',
           );
+        } else if (data.error === 'db_unavailable') {
+          setSaveError(
+            'Profile database is unavailable. Run cf:preview or wrangler dev to use D1.',
+          );
         } else {
           setSaveError('Something went wrong. Please try again.');
         }
