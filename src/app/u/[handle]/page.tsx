@@ -3,6 +3,11 @@ import { getProfileByHandle } from '@/lib/profiles';
 import { PublicProfileClient } from './PublicProfileClient';
 import type { Metadata } from 'next';
 
+// The edge Cache-Control header for this route is configured in next.config.ts
+// (`headers()` → `/u/:handle`), which emits a real HTTP response header. Do not
+// set caching via `generateMetadata().other` — that only renders a <meta> tag
+// and has no effect on edge caching.
+
 interface PageProps {
   params: Promise<{ handle: string }>;
 }
