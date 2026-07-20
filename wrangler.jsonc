@@ -26,9 +26,10 @@
 	},
 	"d1_databases": [
 		{
-			"binding": "gitall",
+			"binding": "DB",
 			"database_name": "gitall",
-			"database_id": "04c609bc-284e-4032-ad75-58ed5d359e73"
+			"database_id": "04c609bc-284e-4032-ad75-58ed5d359e73",
+			"migrations_dir": "migrations"
 		}
 	]
 }
