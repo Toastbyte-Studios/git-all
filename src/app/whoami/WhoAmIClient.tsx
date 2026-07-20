@@ -74,25 +74,34 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkRequestIdRef = useRef(0);
+  const checkAbortRef = useRef<AbortController | null>(null);
 
   const profileUrl = handle ? `https://${APP_URL}/u/${handle}` : null;
 
   const checkAvailability = useCallback((candidate: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    checkAbortRef.current?.abort();
     setAvailability('idle');
 
     if (!candidate.trim()) return;
 
     debounceRef.current = setTimeout(async () => {
+      const requestId = ++checkRequestIdRef.current;
+      const abortController = new AbortController();
+      checkAbortRef.current = abortController;
       setAvailability('checking');
       try {
         const res = await fetch(
           `/api/profile/handle?candidate=${encodeURIComponent(candidate)}`,
+          { signal: abortController.signal },
         );
+        if (requestId !== checkRequestIdRef.current) return;
         const data = (await res.json()) as {
           available: boolean;
           valid: boolean;
         };
+        if (requestId !== checkRequestIdRef.current) return;
         if (!data.valid) {
           setAvailability('invalid');
         } else if (data.available) {
@@ -101,10 +110,19 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
           setAvailability('taken');
         }
       } catch {
+        if (requestId !== checkRequestIdRef.current) return;
         setAvailability('idle');
       }
     }, HANDLE_DEBOUNCE_MS);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      checkAbortRef.current?.abort();
+    },
+    [],
+  );
 
   const handleInputChange = (value: string) => {
     setInputValue(value);

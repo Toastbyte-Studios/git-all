@@ -51,6 +51,11 @@ describe('normalizeHandle', () => {
     expect(result!.length).toBeLessThanOrEqual(32);
   });
 
+  it('does not leave a trailing hyphen after truncation', () => {
+    const result = normalizeHandle(`${'a'.repeat(31)}-b`);
+    expect(result).toBe('a'.repeat(31));
+  });
+
   it('returns null when no valid characters remain', () => {
     expect(normalizeHandle('!!!')).toBeNull();
     expect(normalizeHandle('-')).toBeNull();

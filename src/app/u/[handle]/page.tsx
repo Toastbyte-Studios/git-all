@@ -26,10 +26,6 @@ export async function generateMetadata({
       title: `${displayName} on GitAll`,
       description: `Verified contributions for ${displayName}`,
     },
-    other: {
-      // Edge cache: 15-minute fresh window, 1-hour stale-while-revalidate.
-      'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=3600',
-    },
   };
 }
 

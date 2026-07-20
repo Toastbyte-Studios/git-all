@@ -90,10 +90,12 @@ export function normalizeHandle(username: string): string | null {
     .replace(/-+$/, '')
     .replace(/--+/g, '-');
 
-  if (candidate.length < 2) {
+  const truncated = candidate.slice(0, 32).replace(/-+$/, '');
+
+  if (truncated.length < 2) {
     return null;
   }
-  return candidate.slice(0, 32);
+  return truncated;
 }
 
 /**
@@ -239,6 +241,7 @@ export async function upsertConnection(
       `INSERT INTO connections (user_id, provider, account_id, username, avatar_url, verified_at)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
        ON CONFLICT(user_id, provider) DO UPDATE SET
+         account_id = excluded.account_id,
          username   = excluded.username,
          avatar_url = excluded.avatar_url,
          verified_at = excluded.verified_at`,
@@ -284,10 +287,12 @@ export async function getProfileByHandle(
 ): Promise<Profile | null> {
   const db = getDb();
   if (!db) return null;
+  const normalizedHandle = normalizeHandle(handle);
+  if (!normalizedHandle) return null;
 
   const userRow = await db
     .prepare('SELECT * FROM users WHERE handle = ?1 LIMIT 1')
-    .bind(handle)
+    .bind(normalizedHandle)
     .first<UserRow>();
 
   if (!userRow) return null;
