@@ -36,8 +36,7 @@ export async function generateMetadata({
 
 export default async function PublicProfilePage({ params }: PageProps) {
   const { handle } = await params;
-  const profile = await getProfileByHandle(handle);
-
+  const profile = await getProfileByHandleCached(handle);
   if (!profile) {
     notFound();
   }
