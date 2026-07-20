@@ -26,11 +26,9 @@
 	},
 	"d1_databases": [
 		{
-			// Run `wrangler d1 create gitall` to create the database and fill in the id.
-			"binding": "DB",
+			"binding": "gitall",
 			"database_name": "gitall",
-			"database_id": "<fill-in-after-wrangler-d1-create-gitall>",
-			"migrations_dir": "migrations"
+			"database_id": "04c609bc-284e-4032-ad75-58ed5d359e73"
 		}
 	]
 }
