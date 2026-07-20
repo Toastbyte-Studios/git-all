@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getAuthSession } from '@/lib/auth-session';
 import { getAvailableOAuthProviders } from '@/lib/oauth-providers';
+import { getHandleByUserId } from '@/lib/profiles';
 import type { Connection, ConnectionProvider } from '@/lib/types';
 import { WhoAmIClient } from './WhoAmIClient';
 
@@ -17,6 +18,10 @@ export interface ClientSession {
   primary: ConnectionProvider;
   connections: Partial<Record<ConnectionProvider, ClientConnection>>;
   availableProviders: ConnectionProvider[];
+  /** Public profile handle, or null if not yet set. */
+  handle: string | null;
+  /** D1 user id, used to authorise handle changes. */
+  userId: string | null;
 }
 
 function sanitizeConnection(connection: Connection): ClientConnection {
@@ -50,10 +55,22 @@ export default async function WhoAmIPage() {
     }
   }
 
+  // Attempt to load the user's profile handle from D1 (non-fatal).
+  let handle: string | null = null;
+  try {
+    if (session.userId) {
+      handle = await getHandleByUserId(session.userId);
+    }
+  } catch {
+    // DB unavailable in plain next dev — handle stays null
+  }
+
   const clientSession: ClientSession = {
     primary: session.primary,
     connections: sanitizedConnections,
     availableProviders: getAvailableOAuthProviders(),
+    handle,
+    userId: session.userId ?? null,
   };
 
   return <WhoAmIClient session={clientSession} />;

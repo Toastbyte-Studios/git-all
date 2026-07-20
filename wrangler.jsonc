@@ -23,5 +23,13 @@
 		// Enable image optimization
 		// see https://opennext.js.org/cloudflare/howtos/image
 		"binding": "IMAGES"
-	}
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "gitall",
+			"database_id": "04c609bc-284e-4032-ad75-58ed5d359e73",
+			"migrations_dir": "migrations"
+		}
+	]
 }

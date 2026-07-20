@@ -26,11 +26,14 @@ interface StoredAuthSession {
   primary: ConnectionProvider;
   connections: Partial<Record<ConnectionProvider, StoredConnection>>;
   expiresAt: number;
+  userId?: string;
 }
 
 export interface AuthSession {
   primary: ConnectionProvider;
   connections: Partial<Record<ConnectionProvider, Connection>>;
+  /** D1 user id — populated after the first successful profile upsert. */
+  userId?: string;
 }
 
 export {
@@ -88,14 +91,20 @@ export function getProviderTokenCookieName(provider: ConnectionProvider) {
 export function mergeConnectionIntoSession(
   session: AuthSession | null,
   connection: Connection,
+  userId?: string,
 ): AuthSession {
-  return {
+  const result: AuthSession = {
     primary: connection.provider,
     connections: {
       ...(session?.connections ?? {}),
       [connection.provider]: connection,
     },
   };
+  const resolvedUserId = userId ?? session?.userId;
+  if (resolvedUserId) {
+    result.userId = resolvedUserId;
+  }
+  return result;
 }
 
 export function removeConnectionFromSession(
@@ -113,11 +122,15 @@ export function removeConnectionFromSession(
     return null;
   }
 
-  return {
+  const result: AuthSession = {
     primary:
       session.primary === provider ? remainingProviders[0] : session.primary,
     connections,
   };
+  if (session.userId) {
+    result.userId = session.userId;
+  }
+  return result;
 }
 
 function isConnectionProvider(value: unknown): value is ConnectionProvider {
@@ -248,6 +261,9 @@ export async function encodeAuthSession(
     connections: storedConnections,
     expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
   };
+  if (session.userId) {
+    payload.userId = session.userId;
+  }
 
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
   return encryptValue(key, plaintext);
@@ -344,7 +360,11 @@ export async function decodeAuthSession(
       return null;
     }
 
-    return { primary: session.primary, connections };
+    const result: AuthSession = { primary: session.primary, connections };
+    if (typeof session.userId === 'string' && session.userId.length > 0) {
+      result.userId = session.userId;
+    }
+    return result;
   } catch {
     return null;
   }

@@ -34,6 +34,24 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        // Public profile pages are identical for every viewer (rendered from
+        // D1, no session), so they can be safely edge-cached. This emits a real
+        // Cache-Control HTTP response header — unlike a metadata `other` entry,
+        // which only renders a <meta> tag and has no effect on caching.
+        // 15-minute fresh window, 1-hour stale-while-revalidate.
+        source: '/u/:handle',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, s-maxage=900, stale-while-revalidate=3600',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
