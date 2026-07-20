@@ -354,7 +354,9 @@ export async function setHandle(
 
   // Check current handle + cooldown (only enforced when the handle actually changes)
   const userRow = await db
-    .prepare('SELECT handle, handle_changed_at FROM users WHERE id = ?1 LIMIT 1')
+    .prepare(
+      'SELECT handle, handle_changed_at FROM users WHERE id = ?1 LIMIT 1',
+    )
     .bind(userId)
     .first<Pick<UserRow, 'handle' | 'handle_changed_at'>>();
 
