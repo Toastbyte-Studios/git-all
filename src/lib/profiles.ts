@@ -352,11 +352,15 @@ export async function setHandle(
   const db = getDb();
   if (!db) return { ok: false, reason: 'no_db' };
 
-  // Check cooldown
+  // Check current handle + cooldown (only enforced when the handle actually changes)
   const userRow = await db
-    .prepare('SELECT handle_changed_at FROM users WHERE id = ?1 LIMIT 1')
+    .prepare('SELECT handle, handle_changed_at FROM users WHERE id = ?1 LIMIT 1')
     .bind(userId)
-    .first<Pick<UserRow, 'handle_changed_at'>>();
+    .first<Pick<UserRow, 'handle' | 'handle_changed_at'>>();
+
+  if (userRow?.handle === newHandle) {
+    return { ok: true };
+  }
 
   if (
     userRow?.handle_changed_at !== null &&
