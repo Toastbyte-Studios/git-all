@@ -180,11 +180,16 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore clipboard errors
     }
   };
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timeout);
+  }, [copied]);
 
   if (!userId) return null;
 
