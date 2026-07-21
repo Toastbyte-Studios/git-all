@@ -12,6 +12,8 @@ import {
 } from '@/lib/provider-ui';
 import type { ConnectionProvider } from '@/lib/types';
 
+const APP_URL = 'gitall.app';
+
 interface ProfileHeaderConnection {
   provider: ConnectionProvider;
   username: string;
@@ -21,6 +23,8 @@ interface ProfileHeaderConnection {
 interface ProfileHeaderProps {
   primary: ConnectionProvider;
   connections: Partial<Record<ConnectionProvider, ProfileHeaderConnection>>;
+  /** Canonical GitAll handle, or null if not yet set. */
+  handle: string | null;
   onCopyUsernameResult?: (result: {
     success: boolean;
     username: string;
@@ -42,15 +46,9 @@ function ProviderIcon({
 export function ProfileHeader({
   primary,
   connections,
+  handle,
   onCopyUsernameResult,
 }: ProfileHeaderProps) {
-  const handleShare = () => {
-    // Share is stubbed — public profile URL ships in the companion persistence issue.
-    if (navigator.clipboard) {
-      void navigator.clipboard.writeText(window.location.href);
-    }
-  };
-
   // Connected providers in stable order. The primary is rendered last so it
   // sits on top of the overlapping avatar stack.
   const connected = PROVIDER_ORDER.filter((p) => connections[p]);
@@ -61,6 +59,10 @@ export function ProfileHeader({
 
   const primaryConnection = connections[primary] ?? connections[connected[0]];
   if (!primaryConnection) return null;
+
+  const profileUrl = handle
+    ? `https://${APP_URL}/u/${encodeURIComponent(handle)}`
+    : null;
 
   return (
     <div className="flex items-center gap-3" data-ui-chrome>
@@ -106,12 +108,18 @@ export function ProfileHeader({
       </div>
 
       <div className="flex-1 min-w-0">
-        <CopyableUsername
-          username={primaryConnection.username}
-          className="font-semibold text-base truncate max-w-full"
-          style={{ color: 'var(--text-primary)' }}
-          onCopyResult={onCopyUsernameResult}
-        />
+        {handle ? (
+          <CopyableUsername
+            username={handle}
+            className="font-semibold text-base max-w-full [&>span:first-child]:break-all [&>span:first-child]:whitespace-normal"
+            style={{ color: 'var(--text-primary)' }}
+            onCopyResult={onCopyUsernameResult}
+          />
+        ) : (
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            No handle set
+          </span>
+        )}
         <ul
           className="text-xs flex items-center gap-1.5 mt-0.5 flex-wrap list-none m-0 p-0 [&>li::marker]:content-none"
           style={{ color: 'var(--text-secondary)', paddingInlineStart: 0 }}
@@ -131,20 +139,38 @@ export function ProfileHeader({
         </ul>
       </div>
 
-      <button
-        type="button"
-        onClick={handleShare}
-        title="Share your profile (coming soon)"
-        aria-label="Share your profile (coming soon)"
-        className="shrink-0 text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          color: 'var(--text-secondary)',
-        }}
-      >
-        Share
-      </button>
+      {profileUrl ? (
+        <a
+          href={profileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View your public profile"
+          aria-label="View your public profile"
+          className="shrink-0 text-xs px-3 py-1.5 rounded-lg transition-colors"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          Share
+        </a>
+      ) : (
+        <button
+          type="button"
+          disabled
+          title="Set a handle to share your profile"
+          aria-label="Set a handle to share your profile"
+          className="shrink-0 text-xs px-3 py-1.5 rounded-lg transition-colors opacity-50 cursor-not-allowed"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          Share
+        </button>
+      )}
     </div>
   );
 }

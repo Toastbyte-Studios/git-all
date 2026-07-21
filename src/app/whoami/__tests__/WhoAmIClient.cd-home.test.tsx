@@ -35,6 +35,8 @@ const SESSION: ClientSession = {
     },
   },
   availableProviders: ['github'],
+  handle: null,
+  userId: null,
 };
 
 describe('WhoAmIClient cd ~ link', () => {

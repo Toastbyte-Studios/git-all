@@ -27,6 +27,7 @@ describe('ProfileHeader', () => {
             avatarUrl: 'https://gitlab.com/avatar.png',
           },
         }}
+        handle="octocat"
       />,
     );
 
@@ -43,5 +44,156 @@ describe('ProfileHeader', () => {
     for (const item of items) {
       expect((item as HTMLElement).style.listStyle).toBe('none');
     }
+  });
+
+  it('displays the canonical GitAll handle as a click-to-copy button', () => {
+    render(
+      <ProfileHeader
+        primary="github"
+        connections={{
+          github: {
+            provider: 'github',
+            username: 'octocat',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1',
+          },
+        }}
+        handle="my-gitall-handle"
+      />,
+    );
+
+    const copyBtn = screen.getByRole('button', {
+      name: /copy username my-gitall-handle to clipboard/i,
+    });
+    expect(copyBtn).toBeTruthy();
+    expect(copyBtn.textContent).toContain('my-gitall-handle');
+  });
+
+  it('does not truncate a 32-character handle', () => {
+    const longHandle = 'a'.repeat(32);
+    render(
+      <ProfileHeader
+        primary="github"
+        connections={{
+          github: {
+            provider: 'github',
+            username: 'octocat',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1',
+          },
+        }}
+        handle={longHandle}
+      />,
+    );
+
+    const copyBtn = screen.getByRole('button', {
+      name: new RegExp(`copy username ${longHandle} to clipboard`, 'i'),
+    });
+    expect(copyBtn.className).not.toContain('truncate');
+  });
+
+  it('shows "No handle set" placeholder when handle is null', () => {
+    render(
+      <ProfileHeader
+        primary="github"
+        connections={{
+          github: {
+            provider: 'github',
+            username: 'octocat',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1',
+          },
+        }}
+        handle={null}
+      />,
+    );
+
+    expect(screen.getByText('No handle set')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /copy username/i })).toBeNull();
+  });
+
+  it('renders a share link to /u/<handle> when handle is set', () => {
+    render(
+      <ProfileHeader
+        primary="github"
+        connections={{
+          github: {
+            provider: 'github',
+            username: 'octocat',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1',
+          },
+        }}
+        handle="octocat"
+      />,
+    );
+
+    const shareLink = screen.getByRole('link', {
+      name: /view your public profile/i,
+    });
+    expect(shareLink.getAttribute('href')).toContain('/u/octocat');
+  });
+
+  it('URL-encodes the handle in the share link', () => {
+    render(
+      <ProfileHeader
+        primary="github"
+        connections={{
+          github: {
+            provider: 'github',
+            username: 'octocat',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1',
+          },
+        }}
+        handle="octo/cat"
+      />,
+    );
+
+    const shareLink = screen.getByRole('link', {
+      name: /view your public profile/i,
+    });
+    expect(shareLink.getAttribute('href')).toContain('/u/octo%2Fcat');
+  });
+
+  it('renders a disabled Share button when handle is null', () => {
+    render(
+      <ProfileHeader
+        primary="github"
+        connections={{
+          github: {
+            provider: 'github',
+            username: 'octocat',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1',
+          },
+        }}
+        handle={null}
+      />,
+    );
+
+    const shareBtn = screen.getByRole('button', {
+      name: /set a handle to share your profile/i,
+    });
+    expect(shareBtn).toBeTruthy();
+    expect((shareBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('does not display the provider username in the header identity area', () => {
+    render(
+      <ProfileHeader
+        primary="github"
+        connections={{
+          github: {
+            provider: 'github',
+            username: 'octocat',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1',
+          },
+        }}
+        handle="my-gitall-handle"
+      />,
+    );
+
+    // The provider username should not appear as a copyable identity in the header.
+    // (It lives in ConnectionsPanel, not here.)
+    expect(
+      screen.queryByRole('button', {
+        name: /copy username octocat to clipboard/i,
+      }),
+    ).toBeNull();
   });
 });
