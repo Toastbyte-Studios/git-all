@@ -60,7 +60,9 @@ export function ProfileHeader({
   const primaryConnection = connections[primary] ?? connections[connected[0]];
   if (!primaryConnection) return null;
 
-  const profileUrl = handle ? `https://${APP_URL}/u/${handle}` : null;
+  const profileUrl = handle
+    ? `https://${APP_URL}/u/${encodeURIComponent(handle)}`
+    : null;
 
   return (
     <div className="flex items-center gap-3" data-ui-chrome>
@@ -109,7 +111,7 @@ export function ProfileHeader({
         {handle ? (
           <CopyableUsername
             username={handle}
-            className="font-semibold text-base"
+            className="font-semibold text-base max-w-full [&>span:first-child]:break-all [&>span:first-child]:whitespace-normal"
             style={{ color: 'var(--text-primary)' }}
             onCopyResult={onCopyUsernameResult}
           />

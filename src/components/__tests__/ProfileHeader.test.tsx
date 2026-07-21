@@ -130,6 +130,27 @@ describe('ProfileHeader', () => {
     expect(shareLink.getAttribute('href')).toContain('/u/octocat');
   });
 
+  it('URL-encodes the handle in the share link', () => {
+    render(
+      <ProfileHeader
+        primary="github"
+        connections={{
+          github: {
+            provider: 'github',
+            username: 'octocat',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1',
+          },
+        }}
+        handle="octo/cat"
+      />,
+    );
+
+    const shareLink = screen.getByRole('link', {
+      name: /view your public profile/i,
+    });
+    expect(shareLink.getAttribute('href')).toContain('/u/octo%2Fcat');
+  });
+
   it('renders a disabled Share button when handle is null', () => {
     render(
       <ProfileHeader
