@@ -547,6 +547,7 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
               <ProfileHeader
                 primary={session.primary}
                 connections={session.connections}
+                handle={session.handle}
                 onCopyUsernameResult={handleCopyUsernameResult}
               />
             )}

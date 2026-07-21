@@ -38,6 +38,8 @@ const SESSION: ClientSession = {
     },
   },
   availableProviders: ['github'],
+  handle: null,
+  userId: null,
 };
 
 afterEach(() => {
