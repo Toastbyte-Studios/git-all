@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { getAuthSession } from '@/lib/auth-session';
+import { getAuthSession, type AuthSession } from '@/lib/auth-session';
 import {
   PROVIDER_LABELS,
   PROVIDER_ORDER,
@@ -11,8 +11,12 @@ import {
  * Renders the connected-account avatar stack in the site header.
  * Reads the auth session server-side to avoid a client-side round-trip.
  */
-export async function HeaderAvatars() {
-  const session = await getAuthSession();
+export async function HeaderAvatars({
+  session: providedSession,
+}: {
+  session?: AuthSession | null;
+} = {}) {
+  const session = providedSession ?? (await getAuthSession());
 
   if (!session?.primary || !session.connections) {
     return null;

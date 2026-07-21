@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { WhoAmIClient } from '../WhoAmIClient';
-import type { ClientSession } from '../page';
+import type { Profile } from '@/lib/types';
+import { PublicProfileClient } from '../PublicProfileClient';
 
 vi.mock('next/image', () => ({
   default: (props: JSX.IntrinsicElements['img']) => (
@@ -11,37 +11,29 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
-}));
-
 vi.mock('@/components/ContributionsView', () => ({
   ContributionsView: () => <div>ContributionsView</div>,
 }));
 
-vi.mock('@/components/TimePeriodSelector', () => ({
-  TimePeriodSelector: () => <div>TimePeriodSelector</div>,
-}));
-
-const SESSION: ClientSession = {
-  primary: 'github',
-  connections: {
-    github: {
+const PROFILE: Profile = {
+  handle: 'octocat',
+  primaryProvider: 'github',
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  connections: [
+    {
       provider: 'github',
       accountId: '1',
       username: 'octocat',
       avatarUrl: 'https://avatars.githubusercontent.com/u/1',
       verifiedAt: Date.now(),
     },
-  },
-  availableProviders: ['github'],
-  handle: null,
-  userId: null,
+  ],
 };
 
-describe('WhoAmIClient navigation buttons', () => {
+describe('PublicProfileClient navigation buttons', () => {
   it('does not render the cd ~ homepage link inside page content', () => {
-    render(<WhoAmIClient session={SESSION} />);
+    render(<PublicProfileClient profile={PROFILE} />);
 
     expect(
       screen.queryByRole('link', { name: /cd ~ go to homepage/i }),

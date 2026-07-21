@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { ContributionsView } from '@/components/ContributionsView';
 import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
@@ -74,21 +73,6 @@ export function PublicProfileClient({ profile }: { profile: Profile }) {
 
   return (
     <main className="max-w-6xl mx-auto px-4 pt-8 pb-12">
-      <div className="mb-6">
-        <Link
-          href="/"
-          className="whoami-btn inline-flex items-center gap-2 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors"
-        >
-          <span className="font-mono-data">
-            <span aria-hidden="true" style={{ opacity: 0.6 }}>
-              ${' '}
-            </span>
-            cd ~
-          </span>
-          <span className="sr-only"> Go to homepage</span>
-        </Link>
-      </div>
-
       <div className="flex flex-col md:flex-row gap-8">
         {/* ── Left column: identity ────────────────────────────────── */}
         <aside className="md:w-72 shrink-0 space-y-6">

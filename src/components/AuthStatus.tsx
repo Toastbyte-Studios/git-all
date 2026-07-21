@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState, type ReactElement } from 'react';
 import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
 import { GitHubIcon } from '@/components/icons/GitHubIcon';
@@ -54,8 +53,6 @@ const PROVIDER_SIGN_IN_CLASS: Record<ConnectionProvider, string> = {
   gitlab: 'gl-sign-in-btn',
   bitbucket: 'bb-sign-in-btn',
 };
-
-const PROVIDER_ORDER: ConnectionProvider[] = ['github', 'gitlab', 'bitbucket'];
 
 export function AuthStatus() {
   const [session, setSession] = useState<AuthSessionResponse | null>(null);
@@ -118,25 +115,12 @@ export function AuthStatus() {
   const visibleProviders = getVisibleOAuthProviders(session.availableProviders);
 
   if (session.authenticated && primaryConnection) {
-    const connected = PROVIDER_ORDER.filter((p) => session.connections?.[p]);
-    const accountsLabel = connected
-      .map((p) => `${PROVIDER_LABELS[p]} @${session.connections![p]!.username}`)
-      .join(', ');
-
-    return (
-      <Link
-        href="/whoami"
-        aria-label={`Open your profile — signed in as ${accountsLabel}`}
-        className="whoami-btn inline-flex items-center gap-2 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors"
-      >
-        <span className="font-mono-data">
-          <span aria-hidden="true" style={{ opacity: 0.6 }}>
-            ${' '}
-          </span>
-          whoami
-        </span>
-      </Link>
-    );
+    return errorMessage ? (
+      <AuthErrorNotice
+        message={errorMessage}
+        onDismiss={() => setAuthError(null)}
+      />
+    ) : null;
   }
 
   return (
