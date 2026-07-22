@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
-import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
+import { trackServerEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
 import {
   SESSION_COOKIE_NAME,
@@ -319,19 +319,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
         ? ANALYTICS_EVENTS.connectProvider
         : ANALYTICS_EVENTS.signIn;
 
-    await sendServerAnalyticsEvent(request, primaryEvent, {
+    trackServerEvent(request, primaryEvent, {
       provider: providerParam,
       connection_count: mergedConnectionCount,
     });
     if (!hadProviderConnection && mergedConnectionCount >= 2) {
-      await sendServerAnalyticsEvent(
-        request,
-        ANALYTICS_EVENTS.multiAccountConnected,
-        {
-          provider: providerParam,
-          connection_count: mergedConnectionCount,
-        },
-      );
+      trackServerEvent(request, ANALYTICS_EVENTS.multiAccountConnected, {
+        provider: providerParam,
+        connection_count: mergedConnectionCount,
+      });
     }
 
     return response;

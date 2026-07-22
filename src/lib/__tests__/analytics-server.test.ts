@@ -1,7 +1,15 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
-import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
+import {
+  sendServerAnalyticsEvent,
+  trackServerEvent,
+} from '@/lib/analytics-server';
+
+// Top-level mock so it is hoisted before any module imports
+vi.mock('@opennextjs/cloudflare', () => ({
+  getCloudflareContext: vi.fn(),
+}));
 
 const ORIGINAL_ENV = {
   ANALYTICS_GA4_MEASUREMENT_ID: process.env.ANALYTICS_GA4_MEASUREMENT_ID,
@@ -128,5 +136,84 @@ describe('sendServerAnalyticsEvent', () => {
     ) as { client_id: string };
 
     expect(firstBody.client_id).toBe(secondBody.client_id);
+  });
+});
+
+describe('trackServerEvent', () => {
+  it('registers delivery with ctx.waitUntil() when a Cloudflare context is present', async () => {
+    process.env.ANALYTICS_GA4_MEASUREMENT_ID = 'G-TEST123';
+    process.env.ANALYTICS_GA4_API_SECRET = 'secret-123';
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const waitUntilMock = vi.fn<(p: Promise<unknown>) => void>();
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    vi.mocked(getCloudflareContext).mockReturnValue({
+      ctx: { waitUntil: waitUntilMock } as unknown as ExecutionContext,
+      env: {} as CloudflareEnv,
+      cf: {} as CfProperties,
+    });
+
+    const request = new NextRequest(
+      'https://gitall.app/api/github?username=octocat',
+      {
+        headers: {
+          'x-forwarded-for': '203.0.113.10',
+          'user-agent': 'vitest',
+          'accept-language': 'en-US',
+        },
+      },
+    );
+
+    trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+      provider: 'github',
+    });
+
+    expect(waitUntilMock).toHaveBeenCalledTimes(1);
+    const deliveryArg = waitUntilMock.mock.calls[0]?.[0];
+    expect(deliveryArg).toBeInstanceOf(Promise);
+
+    // Ensure the underlying fetch actually runs when the promise settles
+    await deliveryArg;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw and fires a floating promise when no Cloudflare context is available', async () => {
+    process.env.ANALYTICS_GA4_MEASUREMENT_ID = 'G-TEST123';
+    process.env.ANALYTICS_GA4_API_SECRET = 'secret-123';
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    vi.mocked(getCloudflareContext).mockImplementation(() => {
+      throw new Error('Not a Cloudflare Worker');
+    });
+
+    const request = new NextRequest(
+      'https://gitall.app/api/github?username=octocat',
+      {
+        headers: {
+          'x-forwarded-for': '203.0.113.10',
+          'user-agent': 'vitest',
+          'accept-language': 'en-US',
+        },
+      },
+    );
+
+    expect(() =>
+      trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+        provider: 'github',
+      }),
+    ).not.toThrow();
+
+    // Allow the floating promise to settle
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

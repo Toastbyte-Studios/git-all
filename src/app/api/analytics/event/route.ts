@@ -3,7 +3,7 @@ import {
   ANALYTICS_EVENTS,
   type AnalyticsEventName,
 } from '@/lib/analytics-events';
-import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
+import { trackServerEvent } from '@/lib/analytics-server';
 import { checkRateLimit } from './rate-limit';
 
 const ALLOWED_EVENTS = new Set<AnalyticsEventName>(
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     ),
   );
 
-  await sendServerAnalyticsEvent(
+  trackServerEvent(
     request,
     body.eventName as AnalyticsEventName,
     primitiveParams,

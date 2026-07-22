@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
-import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
+import { trackServerEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
 import {
   formatUtcDate,
@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
   try {
     const cached = getCachedContribution(cacheKey);
     if (!refresh && cached) {
-      void sendServerAnalyticsEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+      trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
         provider: 'bitbucket',
         cache_status: 'hit',
       });
@@ -274,7 +274,7 @@ export async function GET(request: NextRequest) {
       },
     );
 
-    void sendServerAnalyticsEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+    trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
       provider: 'bitbucket',
       cache_status: refresh ? 'bypass' : 'miss',
     });

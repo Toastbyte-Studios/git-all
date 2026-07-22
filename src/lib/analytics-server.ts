@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 import type { AnalyticsEventName } from '@/lib/analytics-events';
 import type { NextRequest } from 'next/server';
 
@@ -106,5 +107,26 @@ export async function sendServerAnalyticsEvent(
     return response.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Fire an analytics event without blocking the response.
+ *
+ * In Workers, pending promises are cancelled when the response is returned,
+ * so delivery must be registered with ctx.waitUntil(). Outside a Worker
+ * (next dev, tests) getCloudflareContext() throws and we fall back to a
+ * plain floating promise, which is fine in a long-lived Node process.
+ */
+export function trackServerEvent(
+  request: NextRequest,
+  eventName: AnalyticsEventName,
+  params: AnalyticsParams = {},
+): void {
+  const delivery = sendServerAnalyticsEvent(request, eventName, params);
+  try {
+    getCloudflareContext().ctx.waitUntil(delivery);
+  } catch {
+    void delivery;
   }
 }
