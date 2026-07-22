@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   STATE_MAX_AGE_SECONDS,
   createOAuthState,
+  getReturnToCookieName,
   getStateCookieName,
 } from '@/lib/auth-session';
 import {
@@ -41,6 +42,19 @@ export async function GET(request: NextRequest) {
     path: '/',
     maxAge: STATE_MAX_AGE_SECONDS,
   });
+
+  const returnTo = request.nextUrl.searchParams.get('returnTo');
+  if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+    response.cookies.set({
+      name: getReturnToCookieName('gitlab'),
+      value: returnTo,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: STATE_MAX_AGE_SECONDS,
+    });
+  }
 
   return response;
 }

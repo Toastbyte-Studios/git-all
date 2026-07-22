@@ -5,6 +5,7 @@ const SESSION_VERSION = 3;
 const SESSION_COOKIE_NAME = 'gitall_session';
 const STATE_COOKIE_PREFIX = 'gitall_oauth_state_';
 const PROVIDER_TOKEN_COOKIE_PREFIX = 'gitall_token_';
+const RETURN_TO_COOKIE_PREFIX = 'gitall_oauth_return_to_';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const STATE_MAX_AGE_SECONDS = 60 * 10;
 
@@ -86,6 +87,10 @@ export function getStateCookieName(provider: ConnectionProvider) {
 
 export function getProviderTokenCookieName(provider: ConnectionProvider) {
   return `${PROVIDER_TOKEN_COOKIE_PREFIX}${provider}`;
+}
+
+export function getReturnToCookieName(provider: ConnectionProvider) {
+  return `${RETURN_TO_COOKIE_PREFIX}${provider}`;
 }
 
 export function mergeConnectionIntoSession(
