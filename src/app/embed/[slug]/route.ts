@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { trackServerEvent } from '@/lib/analytics-server';
 import {
   DEFAULT_CONTRIBUTION_PERIOD,
   getContributionDateRange,
@@ -138,6 +140,23 @@ export async function GET(
   const merged = mergeContributions(validResults);
   const svg = generateHeatmapSvg(merged, { theme, siteUrl: SITE_URL });
 
+  // Fire embed_served for origin renders only. The 24h edge cache (CACHE_CONTROL)
+  // means this fires once per cache-fill cycle, not once per impression — cached
+  // responses are served by the edge without reaching this handler.
+  const refererHost = (() => {
+    try {
+      return new URL(request.headers.get('Referer') ?? '').hostname;
+    } catch {
+      return undefined;
+    }
+  })();
+  trackServerEvent(request, ANALYTICS_EVENTS.embedServed, {
+    platforms: validResults.map((r) => r.platform).join('+'),
+    platform_count: validResults.length,
+    theme,
+    ...(refererHost ? { referer_host: refererHost } : {}),
+  });
+
   return new Response(svg, {
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',
@@ -152,6 +171,7 @@ async function fetchPlatformContributions(
 ): Promise<ContributionData | null> {
   try {
     const response = await fetch(url, {
+      headers: { 'x-gitall-internal': 'embed' },
       signal: AbortSignal.timeout(PLATFORM_FETCH_TIMEOUT_MS),
     });
     if (!response.ok) return null;

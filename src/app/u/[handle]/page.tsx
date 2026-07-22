@@ -1,4 +1,8 @@
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
+import { NextRequest } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { trackServerEvent } from '@/lib/analytics-server';
 import { getProfileByHandle } from '@/lib/profiles';
 import { PublicProfileClient } from './PublicProfileClient';
 import type { Metadata } from 'next';
@@ -40,6 +44,20 @@ export default async function PublicProfilePage({ params }: PageProps) {
   if (!profile) {
     notFound();
   }
+
+  // Fire profile_view server-side — deliberate: the route is edge-cached
+  // (s-maxage=900) and client-side events would be blocked by ad blockers for
+  // much of this audience. Do not send the handle as an event param — it is a
+  // direct identifier and must not go into GA4.
+  const headersList = await headers();
+  const requestForAnalytics = new NextRequest(
+    `https://gitall.app/u/${handle}`,
+    { headers: headersList },
+  );
+  trackServerEvent(requestForAnalytics, ANALYTICS_EVENTS.profileView, {
+    has_display_name: profile.displayName !== null,
+    connection_count: profile.connections.length,
+  });
 
   return <PublicProfileClient profile={profile} />;
 }

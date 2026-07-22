@@ -206,10 +206,13 @@ export async function GET(request: NextRequest) {
   try {
     const cached = getCachedContribution(cacheKey);
     if (!refresh && cached) {
-      trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
-        provider: 'bitbucket',
-        cache_status: 'hit',
-      });
+      const isInternal = request.headers.get('x-gitall-internal') !== null;
+      if (!isInternal) {
+        trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+          provider: 'bitbucket',
+          cache_status: 'hit',
+        });
+      }
       return createCachedResponse(cached, 'HIT');
     }
 
@@ -274,10 +277,13 @@ export async function GET(request: NextRequest) {
       },
     );
 
-    trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
-      provider: 'bitbucket',
-      cache_status: refresh ? 'bypass' : 'miss',
-    });
+    const isInternal = request.headers.get('x-gitall-internal') !== null;
+    if (!isInternal) {
+      trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+        provider: 'bitbucket',
+        cache_status: refresh ? 'bypass' : 'miss',
+      });
+    }
     return createCachedResponse(payload, refresh ? 'BYPASS' : 'MISS');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

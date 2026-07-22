@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { trackClientEvent } from '@/lib/analytics-client';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 
 // Always generate embed snippets against the canonical production domain.
 // Embed URLs get copied into READMEs permanently, so never derive this from
@@ -8,6 +10,11 @@ import { useEffect, useRef, useState } from 'react';
 // (git-all.com / git-all.app, which only redirect here) must not leak into
 // user snippets. See issue #96 / #41.
 const SITE_URL = 'https://gitall.app';
+
+// UTM params appended to the link wrapping the heatmap image. Standard UTM
+// lets GA4 attribute click-throughs automatically as "embed / referral" without
+// any custom configuration.
+const REFERRAL_URL = `${SITE_URL}?utm_source=embed&utm_medium=referral&utm_campaign=heatmap`;
 
 function buildEmbedUrl(
   github: string,
@@ -42,9 +49,10 @@ function buildEmbedUrl(
 
 interface CopyButtonProps {
   text: string;
+  onCopy?: () => void;
 }
 
-function CopyButton({ text }: CopyButtonProps) {
+function CopyButton({ text, onCopy }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -57,6 +65,7 @@ function CopyButton({ text }: CopyButtonProps) {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
+      onCopy?.();
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       setCopied(true);
       timerRef.current = setTimeout(() => {
@@ -89,9 +98,10 @@ function CopyButton({ text }: CopyButtonProps) {
 interface SnippetRowProps {
   label: string;
   value: string;
+  onCopy?: () => void;
 }
 
-function SnippetRow({ label, value }: SnippetRowProps) {
+function SnippetRow({ label, value, onCopy }: SnippetRowProps) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
@@ -111,7 +121,7 @@ function SnippetRow({ label, value }: SnippetRowProps) {
         >
           {value}
         </code>
-        <CopyButton text={value} />
+        <CopyButton text={value} onCopy={onCopy} />
       </div>
     </div>
   );
@@ -130,14 +140,19 @@ export function EmbedWidget() {
   // Wrap the image in a link back to the site. Links *inside* the SVG are
   // not clickable on GitHub — camo-proxied images are sandboxed — so the
   // click-through has to live in the snippet, making the whole heatmap a
-  // link to GitAll.
+  // link to GitAll. UTM params let GA4 attribute click-throughs automatically
+  // as "embed / referral" without any custom configuration.
   const markdownSnippet = embedUrl
-    ? `[![GitAll contributions](${embedUrl})](${SITE_URL})`
+    ? `[![GitAll contributions](${embedUrl})](${REFERRAL_URL})`
     : null;
 
   const htmlSnippet = embedUrl
-    ? `<a href="${SITE_URL}"><img src="${embedUrl}" alt="Contribution heatmap" /></a>`
+    ? `<a href="${REFERRAL_URL}"><img src="${embedUrl}" alt="Contribution heatmap" /></a>`
     : null;
+
+  const platformCount = [github, gitlab, bitbucket, gitea].filter((v) =>
+    v.trim(),
+  ).length;
 
   const inputStyle = {
     backgroundColor: 'var(--bg-surface)',
@@ -277,8 +292,23 @@ export function EmbedWidget() {
           <SnippetRow
             label="Markdown (GitHub README)"
             value={markdownSnippet}
+            onCopy={() =>
+              trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
+                snippet_type: 'markdown',
+                platform_count: platformCount,
+              })
+            }
           />
-          <SnippetRow label="HTML" value={htmlSnippet} />
+          <SnippetRow
+            label="HTML"
+            value={htmlSnippet}
+            onCopy={() =>
+              trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
+                snippet_type: 'html',
+                platform_count: platformCount,
+              })
+            }
+          />
 
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and the

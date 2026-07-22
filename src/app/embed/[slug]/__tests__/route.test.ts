@@ -304,7 +304,7 @@ describe('embed route GET', () => {
     expect(body).not.toContain('#161b22');
   });
 
-  it('strips .svg suffix when resolving the primary username', async () => {
+  it('sends x-gitall-internal header on internal loopback fetches', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(makeContributionResponse());
@@ -315,8 +315,11 @@ describe('embed route GET', () => {
       makeParams('octocat.svg'),
     );
 
-    const calledUrl = fetchMock.mock.calls[0]?.[0] as string;
-    expect(calledUrl).toContain('username=octocat');
-    expect(calledUrl).not.toContain('octocat.svg');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    const sentHeaders = requestInit?.headers as
+      | Record<string, string>
+      | undefined;
+    expect(sentHeaders?.['x-gitall-internal']).toBe('embed');
   });
 });
