@@ -146,10 +146,13 @@ export async function GET(request: NextRequest) {
       },
       calendar,
     };
-    trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
-      provider: 'gitea',
-      total_contributions: totalContributions,
-    });
+    const isInternal = request.headers.get('x-gitall-internal') !== null;
+    if (!isInternal) {
+      trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+        provider: 'gitea',
+        total_contributions: totalContributions,
+      });
+    }
     return NextResponse.json(payload, {
       headers: { 'Cache-Control': 'no-store' },
     });

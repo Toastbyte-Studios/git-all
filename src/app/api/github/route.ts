@@ -219,12 +219,15 @@ export async function GET(request: NextRequest) {
     if (!shouldBypassCache) {
       const cached = getCachedContribution(cacheKey);
       if (!refresh && cached) {
-        trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
-          provider: 'github',
-          cache_status: 'hit',
-          authenticated_lookup: Boolean(userToken),
-          self_lookup: isSelfLookup,
-        });
+        const isInternal = request.headers.get('x-gitall-internal') !== null;
+        if (!isInternal) {
+          trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+            provider: 'github',
+            cache_status: 'hit',
+            authenticated_lookup: Boolean(userToken),
+            self_lookup: isSelfLookup,
+          });
+        }
         return createCachedResponse(cached, 'HIT');
       }
     }
@@ -311,12 +314,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
-      provider: 'github',
-      cache_status: shouldBypassCache || refresh ? 'bypass' : 'miss',
-      authenticated_lookup: Boolean(userToken),
-      self_lookup: isSelfLookup,
-    });
+    const isInternal = request.headers.get('x-gitall-internal') !== null;
+    if (!isInternal) {
+      trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+        provider: 'github',
+        cache_status: shouldBypassCache || refresh ? 'bypass' : 'miss',
+        authenticated_lookup: Boolean(userToken),
+        self_lookup: isSelfLookup,
+      });
+    }
     return createCachedResponse(
       payload,
       shouldBypassCache || refresh ? 'BYPASS' : 'MISS',

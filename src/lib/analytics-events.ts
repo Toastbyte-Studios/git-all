@@ -7,6 +7,8 @@ export const ANALYTICS_EVENTS = {
   integratedViewUsed: 'integrated_view_used',
   timeRangeSelected: 'time_range_selected',
   embedGenerated: 'embed_generated',
+  embedServed: 'embed_served',
+  profileView: 'profile_view',
   proPageView: 'pro_page_view',
   proCheckoutStarted: 'pro_checkout_started',
   proCheckoutCompleted: 'pro_checkout_completed',

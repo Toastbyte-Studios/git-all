@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as analyticsServer from '@/lib/analytics-server';
 import {
   SESSION_COOKIE_NAME,
   encodeAuthSession,
@@ -104,6 +105,51 @@ describe('GitHub contribution route', () => {
       process.env.GITHUB_TOKEN ?? '',
     );
     expect(firstRequestHeaders.Authorization).not.toContain('user-token');
+  });
+
+  it('skips lookup_success analytics when x-gitall-internal header is present', async () => {
+    const trackSpy = vi
+      .spyOn(analyticsServer, 'trackServerEvent')
+      .mockReturnValue(undefined);
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(githubContributionResponse('octocat', 3));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      new NextRequest(
+        'https://gitall.app/api/github?username=octointernaltest',
+        {
+          headers: { 'x-gitall-internal': 'embed' },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(trackSpy).not.toHaveBeenCalled();
+  });
+
+  it('fires lookup_success analytics for normal (non-internal) requests', async () => {
+    const trackSpy = vi
+      .spyOn(analyticsServer, 'trackServerEvent')
+      .mockReturnValue(undefined);
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(githubContributionResponse('octocat', 3));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      new NextRequest('https://gitall.app/api/github?username=octonormaltest'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(trackSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      'lookup_success',
+      expect.objectContaining({ provider: 'github' }),
+    );
   });
 
   it('uses shared caching when falling back to GITHUB_TOKEN for a GitHub session', async () => {
