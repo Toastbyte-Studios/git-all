@@ -2,7 +2,7 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import { NextRequest, NextResponse } from 'next/server';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
-import { sendServerAnalyticsEvent } from '@/lib/analytics-server';
+import { trackServerEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
 import {
   formatUtcDate,
@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
       },
       calendar,
     };
-    void sendServerAnalyticsEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
+    trackServerEvent(request, ANALYTICS_EVENTS.lookupSuccess, {
       provider: 'gitea',
       total_contributions: totalContributions,
     });
