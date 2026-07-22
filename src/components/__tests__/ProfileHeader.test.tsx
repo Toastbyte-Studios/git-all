@@ -2,6 +2,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileHeader } from '../ProfileHeader';
+import type { JSX } from 'react';
 
 vi.mock('next/image', () => ({
   default: (props: JSX.IntrinsicElements['img']) => (

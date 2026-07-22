@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Profile } from '@/lib/types';
 import { PublicProfileClient } from '../PublicProfileClient';
+import type { JSX } from 'react';
 
 vi.mock('next/image', () => ({
   default: (props: JSX.IntrinsicElements['img']) => (
@@ -15,13 +16,19 @@ vi.mock('@/components/ContributionsView', () => ({
   ContributionsView: () => <div>ContributionsView</div>,
 }));
 
+const USER_ID = '01JZZZZZZZZZZZZZZZZZZZZZZZ';
+
 const PROFILE: Profile = {
+  id: USER_ID,
   handle: 'octocat',
+  displayName: null,
   primaryProvider: 'github',
+  handleChangedAt: null,
   createdAt: Date.now(),
   updatedAt: Date.now(),
   connections: [
     {
+      userId: USER_ID,
       provider: 'github',
       accountId: '1',
       username: 'octocat',
