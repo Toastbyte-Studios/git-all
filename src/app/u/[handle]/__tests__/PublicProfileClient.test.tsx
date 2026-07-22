@@ -24,6 +24,7 @@ const PROFILE: Profile = {
   displayName: null,
   primaryProvider: 'github',
   handleChangedAt: null,
+  isPublic: true,
   createdAt: Date.now(),
   updatedAt: Date.now(),
   connections: [

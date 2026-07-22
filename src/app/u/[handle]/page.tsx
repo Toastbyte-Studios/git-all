@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 import { trackServerEvent } from '@/lib/analytics-server';
@@ -27,10 +27,20 @@ export async function generateMetadata({
   }
 
   const displayName = profile.displayName ?? `@${profile.handle}`;
+  const canonicalUrl = `https://gitall.app/u/${profile.handle}`;
+
+  if (!profile.isPublic) {
+    return {
+      title: `${displayName} — GitAll`,
+      robots: { index: false, follow: false },
+      alternates: { canonical: canonicalUrl },
+    };
+  }
 
   return {
     title: `${displayName} — GitAll`,
     description: `${displayName}'s verified contribution heatmap across ${profile.connections.length} platform(s) on GitAll.`,
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title: `${displayName} on GitAll`,
       description: `Verified contributions for ${displayName}`,
@@ -43,6 +53,13 @@ export default async function PublicProfilePage({ params }: PageProps) {
   const profile = await getProfileByHandle(handle);
   if (!profile) {
     notFound();
+  }
+
+  // 308 redirect non-canonical handle forms (e.g. Jane_Doe → jane-doe).
+  // The Cache-Control header in next.config.ts only applies to 200 responses,
+  // so this redirect is unaffected by edge caching.
+  if (handle !== profile.handle) {
+    permanentRedirect(`/u/${profile.handle}`);
   }
 
   // Fire profile_view server-side — deliberate: the route is edge-cached

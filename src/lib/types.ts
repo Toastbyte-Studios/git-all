@@ -46,6 +46,7 @@ export interface Profile {
   displayName: string | null;
   primaryProvider: ConnectionProvider;
   handleChangedAt: number | null;
+  isPublic: boolean;
   createdAt: number;
   updatedAt: number;
   connections: StoredConnection[];
