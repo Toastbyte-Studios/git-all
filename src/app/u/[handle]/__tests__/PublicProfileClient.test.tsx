@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { render, screen } from '@testing-library/react';
-import type { JSX } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Profile } from '@/lib/types';
 import { PublicProfileClient } from '../PublicProfileClient';
+import type { JSX } from 'react';
 
 vi.mock('next/image', () => ({
   default: (props: JSX.IntrinsicElements['img']) => (
