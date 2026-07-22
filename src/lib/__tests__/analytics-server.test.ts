@@ -151,11 +151,13 @@ describe('trackServerEvent', () => {
 
     const waitUntilMock = vi.fn<(p: Promise<unknown>) => void>();
     const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-    vi.mocked(getCloudflareContext).mockReturnValue({
-      ctx: { waitUntil: waitUntilMock } as unknown as ExecutionContext,
-      env: {} as CloudflareEnv,
-      cf: {} as CfProperties,
-    });
+vi.mocked(getCloudflareContext).mockReturnValue({
+  ctx: { waitUntil: waitUntilMock } as unknown as {
+    waitUntil(p: Promise<unknown>): void;
+  },
+  env: {} as CloudflareEnv,
+  cf: {} as Record<string, unknown>,
+} as unknown as ReturnType<typeof getCloudflareContext>);
 
     const request = new NextRequest(
       'https://gitall.app/api/github?username=octocat',
