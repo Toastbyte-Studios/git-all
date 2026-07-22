@@ -1,5 +1,5 @@
-import { NextRequest } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { NextRequest } from 'next/server';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 import { trackServerEvent } from '@/lib/analytics-server';
 import {
@@ -124,7 +124,12 @@ export async function GET(
   if (cache) {
     const hit = await cache.match(cacheKey);
     if (hit) {
-      trackEmbedServed(request, hit.headers.get('x-gitall-platforms'), theme, 'hit');
+      trackEmbedServed(
+        request,
+        hit.headers.get('x-gitall-platforms'),
+        theme,
+        'hit',
+      );
       return hit;
     }
   }
