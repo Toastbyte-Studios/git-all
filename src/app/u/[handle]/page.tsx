@@ -78,4 +78,3 @@ export default async function PublicProfilePage({ params }: PageProps) {
 
   return <PublicProfileClient profile={profile} />;
 }
-
