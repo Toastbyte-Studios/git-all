@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { render, screen } from '@testing-library/react';
+import type { JSX } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { WhoAmIClient } from '../WhoAmIClient';
 import type { ClientSession } from '../page';
