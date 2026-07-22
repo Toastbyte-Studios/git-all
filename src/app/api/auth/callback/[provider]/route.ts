@@ -9,6 +9,7 @@ import {
   encodeProviderToken,
   getAuthSessionFromRequest,
   getProviderTokenCookieName,
+  getReturnToCookieName,
   getStateCookieName,
   mergeConnectionIntoSession,
 } from '@/lib/auth-session';
@@ -255,7 +256,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const response = NextResponse.redirect(
-      new URL('/', request.nextUrl.origin),
+      new URL(
+        (() => {
+          const returnTo = request.cookies.get(
+            getReturnToCookieName(providerParam),
+          )?.value;
+          return returnTo &&
+            returnTo.startsWith('/') &&
+            !returnTo.startsWith('//')
+            ? returnTo
+            : '/whoami';
+        })(),
+        request.nextUrl.origin,
+      ),
     );
     response.cookies.set({
       name: SESSION_COOKIE_NAME,
@@ -284,6 +297,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     clearStateCookie(response, providerParam);
+    response.cookies.set({
+      name: getReturnToCookieName(providerParam),
+      value: '',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 0,
+    });
 
     const hadProviderConnection = Boolean(
       existingSession?.connections[providerParam],

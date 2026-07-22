@@ -11,6 +11,7 @@ import {
   decodeProviderToken,
   encodeAuthSession,
   getProviderTokenCookieName,
+  getReturnToCookieName,
   getStateCookieName,
   type AuthSession,
 } from '../auth-session';
@@ -110,7 +111,7 @@ describe('OAuth callback route', () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('https://gitall.app/');
+    expect(response.headers.get('location')).toBe('https://gitall.app/whoami');
 
     const nextCookie = response.cookies.get(SESSION_COOKIE_NAME)?.value;
     expect(nextCookie).toBeTruthy();
@@ -396,6 +397,93 @@ describe('OAuth callback route', () => {
       'sample-workspace',
     );
   });
+
+  it('redirects to /whoami by default after a successful OAuth callback', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'ghp-token' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 1,
+          login: 'octocat',
+          avatar_url: 'https://avatars.githubusercontent.com/u/1',
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/github?code=abc&state=state-gh',
+        { [getStateCookieName('github')]: 'state-gh' },
+      ),
+      { params: Promise.resolve({ provider: 'github' }) },
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://gitall.app/whoami');
+  });
+
+  it('honours a valid returnTo cookie over the /whoami default', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'ghp-token' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 1,
+          login: 'octocat',
+          avatar_url: 'https://avatars.githubusercontent.com/u/1',
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/github?code=abc&state=state-gh',
+        {
+          [getStateCookieName('github')]: 'state-gh',
+          [getReturnToCookieName('github')]: '/some/page',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'github' }) },
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'https://gitall.app/some/page',
+    );
+    // returnTo cookie should be cleared
+    expect(response.cookies.get(getReturnToCookieName('github'))?.value).toBe(
+      '',
+    );
+  });
+
+  it('ignores a protocol-relative returnTo cookie and falls back to /whoami', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'ghp-token' }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 1,
+          login: 'octocat',
+          avatar_url: 'https://avatars.githubusercontent.com/u/1',
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callbackGet(
+      createRequest(
+        'https://gitall.app/api/auth/callback/github?code=abc&state=state-gh',
+        {
+          [getStateCookieName('github')]: 'state-gh',
+          [getReturnToCookieName('github')]: '//evil.example.com',
+        },
+      ),
+      { params: Promise.resolve({ provider: 'github' }) },
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://gitall.app/whoami');
+  });
 });
 
 describe('OAuth init routes', () => {
@@ -454,6 +542,46 @@ describe('OAuth init routes', () => {
       'https://gitall.app/?auth_error=oauth_not_configured',
     );
   });
+
+  it.each([
+    { provider: 'github', routeGet: githubAuthGet },
+    { provider: 'gitlab', routeGet: gitlabAuthGet },
+    { provider: 'bitbucket', routeGet: bitbucketAuthGet },
+  ] as const)(
+    'stores a valid returnTo cookie when ?returnTo= is supplied for $provider',
+    async ({ provider, routeGet }) => {
+      const response = await routeGet(
+        createRequest(
+          `https://gitall.app/api/auth/${provider}?returnTo=/dashboard`,
+        ),
+      );
+
+      expect(response.status).toBe(307);
+      expect(response.cookies.get(getReturnToCookieName(provider))?.value).toBe(
+        '/dashboard',
+      );
+    },
+  );
+
+  it.each([
+    { provider: 'github', routeGet: githubAuthGet },
+    { provider: 'gitlab', routeGet: gitlabAuthGet },
+    { provider: 'bitbucket', routeGet: bitbucketAuthGet },
+  ] as const)(
+    'does not store a returnTo cookie for protocol-relative URLs for $provider',
+    async ({ provider, routeGet }) => {
+      const response = await routeGet(
+        createRequest(
+          `https://gitall.app/api/auth/${provider}?returnTo=//evil.example.com`,
+        ),
+      );
+
+      expect(response.status).toBe(307);
+      expect(
+        response.cookies.get(getReturnToCookieName(provider)),
+      ).toBeUndefined();
+    },
+  );
 });
 
 describe('disconnect route', () => {
