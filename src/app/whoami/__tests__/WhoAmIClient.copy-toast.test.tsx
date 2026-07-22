@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WhoAmIClient } from '../WhoAmIClient';
 import type { ClientSession } from '../page';
+import type { JSX } from 'react';
 
 vi.mock('next/image', () => ({
   default: (props: JSX.IntrinsicElements['img']) => (
