@@ -123,6 +123,7 @@ interface UserRow {
   display_name: string | null;
   primary_provider: string;
   handle_changed_at: number | null;
+  is_public: number;
   created_at: number;
   updated_at: number;
 }
@@ -319,6 +320,7 @@ export async function getProfileByHandle(
     displayName: userRow.display_name,
     primaryProvider: userRow.primary_provider as ConnectionProvider,
     handleChangedAt: userRow.handle_changed_at,
+    isPublic: userRow.is_public !== 0,
     createdAt: userRow.created_at,
     updatedAt: userRow.updated_at,
     connections,
@@ -415,6 +417,29 @@ export async function getHandleByUserId(
     .first<{ handle: string }>();
 
   return row?.handle ?? null;
+}
+
+/**
+ * Returns all public handles with their `updated_at` timestamps for sitemap
+ * generation.
+ *
+ * Note: this enumerates directly from D1 and is fine at current volume.
+ * Past a few thousand public handles this should use `generateSitemaps()`
+ * chunking with a paginated query (LIMIT / OFFSET or cursor-based).
+ */
+export async function getPublicHandlesForSitemap(): Promise<
+  Array<{ handle: string; updatedAt: number }>
+> {
+  const db = getDb();
+  if (!db) return [];
+
+  const { results } = await db
+    .prepare(
+      'SELECT handle, updated_at FROM users WHERE is_public = 1 ORDER BY updated_at DESC',
+    )
+    .all<{ handle: string; updated_at: number }>();
+
+  return results.map((r) => ({ handle: r.handle, updatedAt: r.updated_at }));
 }
 
 function isConnectionProvider(value: string): value is ConnectionProvider {
