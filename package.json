@@ -1,6 +1,6 @@
 {
   "name": "git-all",
-  "version": "1.24.2",
+  "version": "1.24.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -49,5 +49,11 @@
     "typescript": "^5.7.0",
     "vitest": "^4.1.8",
     "wrangler": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "overrides": {
+    "sharp": "^0.35.0"
   }
 }
