@@ -4,6 +4,10 @@
  * All colors are hardcoded (no CSS custom properties) so the SVG is
  * self-contained and renders correctly when fetched by image proxies such as
  * GitHub's camo or embedded in third-party HTML pages.
+ *
+ * LICENSING: the "Powered by GitAll" watermark rendered by this module is
+ * subject to an additional attribution term under AGPL section 7(b). See
+ * ADDITIONAL_TERMS.md at the repository root.
  */
 
 import type { ContributionData } from '@/lib/types';
@@ -199,6 +203,10 @@ export function generateHeatmapSvg(
   // Watermark: "Powered by GitAll" — rendered as plain text + a tspan link anchor
   // Note: SVG <a> links are not clickable when served via <img> tags, but the
   // text is still visible as a subtle attribution.
+  //
+  // This attribution is a required term under AGPL section 7(b); see
+  // ADDITIONAL_TERMS.md. Modified versions may repoint `siteUrl` but must not
+  // remove or obscure it.
   const watermarkY = PADDING_TOP + gridHeight + WATERMARK_HEIGHT - 4;
   const totalLabel = `${data.totalContributions.toLocaleString()} contribution${data.totalContributions !== 1 ? 's' : ''} · `;
   parts.push(

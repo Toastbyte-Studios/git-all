@@ -22,6 +22,7 @@ GitAll reads contribution calendars from GitHub, GitLab, Bitbucket, and Gitea/Fo
 [![Deploy](https://github.com/Toastbyte-Studios/git-all/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/Toastbyte-Studios/git-all/actions/workflows/deploy.yml)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-3DA639?logo=gnu&logoColor=white)](LICENSE)
 
 </div>
 
@@ -244,6 +245,12 @@ Issues and pull requests are welcome. Two things to know before you open a PR:
 
 1. Run `npm run cleanup` &mdash; CI runs the same checks.
 2. Bump the `version` in `package.json` following semver. A workflow fails the PR if the version matches `main`.
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE) &mdash; Copyright &copy; 2026 Toastbyte Studios.
+
+Use it, modify it, self-host it. The one condition worth knowing up front: if you run a modified version as a network service, section 13 requires you to offer your users the source of that modified version.
 
 ## Built by
 
