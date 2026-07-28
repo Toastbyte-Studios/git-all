@@ -52,6 +52,39 @@ export interface Profile {
   connections: StoredConnection[];
 }
 
+/**
+ * A single connection as exposed on the public profile page.
+ *
+ * Deliberately narrower than {@link StoredConnection}: `userId` is the internal
+ * ULID (repeated once per connection) and `accountId` is a provider-side
+ * identifier. Neither is needed to render the page.
+ */
+export interface PublicConnection {
+  provider: ConnectionProvider;
+  username: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * The subset of a profile that is safe to serialise into the public
+ * `/u/[handle]` page payload.
+ *
+ * Deliberately narrower than {@link Profile}. `id` is a ULID and therefore
+ * time-sortable — its first 10 characters are a base32-encoded millisecond
+ * timestamp, so shipping it discloses account creation time to anyone who
+ * decodes it. `handleChangedAt` reveals whether and when the user renamed.
+ *
+ * This type is the public/private boundary: adding a field here is a deliberate
+ * act of publication, and a new column on `users` does not become public by
+ * omission. Build it with `toPublicProfile()` rather than by casting.
+ */
+export interface PublicProfile {
+  handle: string;
+  displayName: string | null;
+  primaryProvider: ConnectionProvider;
+  connections: PublicConnection[];
+}
+
 export type ViewMode = 'side-by-side' | 'integrated';
 
 export interface UserEntry {
