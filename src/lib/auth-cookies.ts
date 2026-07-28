@@ -1,10 +1,10 @@
-import type { NextResponse } from 'next/server';
 import {
   SESSION_COOKIE_NAME,
   getProviderTokenCookieName,
   getStateCookieName,
 } from '@/lib/auth-session';
 import { CONNECTION_PROVIDERS } from '@/lib/oauth-providers';
+import type { NextResponse } from 'next/server';
 
 /**
  * Expires every auth cookie this app sets: the session cookie, and the OAuth
