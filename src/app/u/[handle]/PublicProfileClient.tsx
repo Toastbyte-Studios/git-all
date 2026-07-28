@@ -19,7 +19,7 @@ import {
 } from '@/lib/provider-ui';
 import type {
   ConnectionProvider,
-  Profile,
+  PublicProfile,
   UserEntry,
   ViewMode,
 } from '@/lib/types';
@@ -36,7 +36,24 @@ function ProviderIcon({
   return <BitbucketIcon size={size} />;
 }
 
-export function PublicProfileClient({ profile }: { profile: Profile }) {
+/**
+ * Renders a public profile.
+ *
+ * The `profile` prop is deliberately typed as {@link PublicProfile} rather than
+ * `Profile`: this is a client component, so every field on the prop is
+ * serialised into the page payload and is readable by anyone who views source.
+ * Widening this type publishes data. If a new field is genuinely needed, add it
+ * to `PublicProfile` and `toPublicProfile()` so the decision is visible in one
+ * place.
+ */
+export function PublicProfileClient({
+  profile,
+  ownerPreview = false,
+}: {
+  profile: PublicProfile;
+  /** True when the viewer is the owner and the profile is not published. */
+  ownerPreview?: boolean;
+}) {
   const [viewMode, setViewMode] = useState<ViewMode>('side-by-side');
 
   const period: ContributionPeriod = DEFAULT_CONTRIBUTION_PERIOD;
@@ -73,8 +90,36 @@ export function PublicProfileClient({ profile }: { profile: Profile }) {
 
   return (
     <main className="max-w-6xl mx-auto px-4 pt-8 pb-12">
+      {ownerPreview && (
+        <div
+          className="mb-6 rounded-lg px-4 py-3 flex flex-wrap items-center gap-x-2 gap-y-1"
+          style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+          }}
+          data-ui-chrome
+        >
+          <span
+            className="text-xs font-semibold uppercase tracking-wide"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Private
+          </span>
+          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            Only you can see this page. Anyone else visiting this URL gets a 404.
+          </span>
+          <a
+            href="/whoami"
+            className="text-xs hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            Make it public
+          </a>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row gap-8">
-        {/* ── Left column: identity ────────────────────────────────── */}
+        {/* ── Left column: identity ─────────────────────────────── */}
         <aside className="md:w-72 shrink-0 space-y-6">
           <div className="flex items-center gap-3" data-ui-chrome>
             {/* Avatar stack */}
@@ -188,7 +233,7 @@ export function PublicProfileClient({ profile }: { profile: Profile }) {
           </p>
         </aside>
 
-        {/* ── Right column: contributions ──────────────────────────── */}
+        {/* ── Right column: contributions ─────────────────────── */}
         <div className="flex-1 min-w-0">
           <ContributionsView
             entries={entries}
