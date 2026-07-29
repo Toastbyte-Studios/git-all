@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { getDb } from '@/lib/db';
 import type {
   ConnectionProvider,
@@ -6,7 +7,7 @@ import type {
   StoredConnection,
 } from '@/lib/types';
 
-// ── ULID generation ───────────────────────────────────────────────────
+// ── ULID generation ──────────────────────────────────────────────
 
 const ULID_CHARS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
@@ -45,7 +46,7 @@ export function generateId(): string {
   return timeChars.join('') + randChars.join('');
 }
 
-// ── Handle rules ──────────────────────────────────────────────────────
+// ── Handle rules ─────────────────────────────────────────────────
 
 const HANDLE_PATTERN = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$|^[a-z0-9]{2,3}$/;
 const CONSECUTIVE_DASH = /--/;
@@ -116,7 +117,7 @@ export function isValidHandleFormat(handle: string): boolean {
   return HANDLE_PATTERN.test(handle);
 }
 
-// ── D1 row shapes ─────────────────────────────────────────────────────
+// ── D1 row shapes ───────────────────────────────────────────────
 
 interface UserRow {
   id: string;
@@ -138,7 +139,7 @@ interface ConnectionRow {
   verified_at: number;
 }
 
-// ── Exported helpers ──────────────────────────────────────────────────
+// ── Exported helpers ────────────────────────────────────────────
 
 /**
  * Checks whether `handle` is available (syntactically valid, not reserved,
@@ -293,9 +294,16 @@ export async function findUserByProviderAccount(
  * result to a client component; project it through {@link toPublicProfile}
  * first, or use {@link getPublicProfileByHandle} instead.
  *
+ * Memoised with React's `cache()` for the duration of a single request.
+ * `/u/[handle]` reads the profile twice — once in `generateMetadata()` and once
+ * in the page body — and without this that is two round-trips, four D1 queries,
+ * for one page view. `cache()` is per-request and per-argument, so nothing is
+ * ever shared between visitors or between handles; outside a request scope
+ * (route handlers, tests) it degrades to a plain call.
+ *
  * Returns `null` if no user with that handle exists.
  */
-export async function getProfileByHandle(
+export const getProfileByHandle = cache(async function getProfileByHandle(
   handle: string,
 ): Promise<Profile | null> {
   const db = getDb();
@@ -337,7 +345,7 @@ export async function getProfileByHandle(
     updatedAt: userRow.updated_at,
     connections,
   };
-}
+});
 
 /**
  * Narrows a stored `Profile` to the fields that are safe to serialise into a
