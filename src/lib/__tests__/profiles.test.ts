@@ -11,7 +11,10 @@ const store = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/db', () => {
-  function exec(sql: string, params: unknown[]): Array<Record<string, unknown>> {
+  function exec(
+    sql: string,
+    params: unknown[],
+  ): Array<Record<string, unknown>> {
     const q = sql.replace(/\s+/g, ' ').trim();
 
     if (q.startsWith('SELECT * FROM users WHERE handle')) {

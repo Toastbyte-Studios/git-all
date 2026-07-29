@@ -106,7 +106,8 @@ export function PublicProfileClient({
             Private
           </span>
           <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            Only you can see this page. Anyone else visiting this URL gets a 404.
+            Only you can see this page. Anyone else visiting this URL gets a
+            404.
           </span>
           <a
             href="/whoami"

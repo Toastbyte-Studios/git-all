@@ -10,8 +10,7 @@ const auth = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth-session', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@/lib/auth-session')>();
+  const actual = await importOriginal<typeof import('@/lib/auth-session')>();
   return { ...actual, getAuthSession: async () => auth.session };
 });
 
@@ -79,9 +78,8 @@ vi.mock('@/lib/db', () => {
 });
 
 const { DELETE } = await import('@/app/api/profile/route');
-const { POST: setVisibilityRoute } = await import(
-  '@/app/api/profile/visibility/route'
-);
+const { POST: setVisibilityRoute } =
+  await import('@/app/api/profile/visibility/route');
 
 function jsonRequest(url: string, method: string, body: unknown) {
   return new NextRequest(url, {

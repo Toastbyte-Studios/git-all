@@ -40,6 +40,7 @@ const SESSION: ClientSession = {
   },
   availableProviders: ['github'],
   handle: null,
+  isPublic: false,
   userId: null,
 };
 
