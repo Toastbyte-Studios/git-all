@@ -52,7 +52,7 @@ function writeStorage(key: string, value: unknown) {
 
 const PROVIDER_ORDER: ConnectionProvider[] = ['github', 'gitlab', 'bitbucket'];
 
-// ── Handle editor ─────────────────────────────────────────────────────
+// ── Handle editor ────────────────────────────────────────────────────
 
 const HANDLE_DEBOUNCE_MS = 300;
 const APP_URL = 'gitall.app';
@@ -204,7 +204,7 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
         className="text-xs font-semibold uppercase tracking-wide"
         style={{ color: 'var(--text-secondary)' }}
       >
-        Public profile
+        Profile handle
       </p>
 
       {!editing ? (
@@ -339,6 +339,299 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
               type="button"
               onClick={() => setEditing(false)}
               className="text-xs px-3 py-1 rounded transition-colors cursor-pointer"
+              style={{
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Visibility toggle ────────────────────────────────────────────────
+
+interface VisibilityToggleProps {
+  initialIsPublic: boolean;
+  handle: string | null;
+  userId: string | null;
+}
+
+/**
+ * Opt-in control for publishing the profile. Off by default — there is
+ * deliberately no first-run modal or interstitial, and nothing pre-checked:
+ * a consent prompt the user has to dismiss is the pattern this feature exists
+ * to avoid. The copy states plainly what enabling it does rather than leaving
+ * the user to infer it from the label.
+ */
+function VisibilityToggle({
+  initialIsPublic,
+  handle,
+  userId,
+}: VisibilityToggleProps) {
+  const [isPublic, setIsPublic] = useState(initialIsPublic);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleToggle = async () => {
+    const next = !isPublic;
+    setSaving(true);
+    setError(null);
+    // Optimistic — rolled back below if the write fails, so the switch never
+    // shows "public" for a profile the server still has as private.
+    setIsPublic(next);
+
+    try {
+      const res = await fetch('/api/profile/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: next }),
+      });
+
+      if (!res.ok) {
+        setIsPublic(!next);
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setError(
+          data?.error === 'db_unavailable'
+            ? 'Profile database is unavailable. Run cf:preview or wrangler dev to use D1.'
+            : 'Could not update visibility. Please try again.',
+        );
+      }
+    } catch {
+      setIsPublic(!next);
+      setError('Network error. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!userId) return null;
+
+  return (
+    <div
+      className="rounded-lg p-3 space-y-2"
+      style={{
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <p
+            className="text-xs font-semibold uppercase tracking-wide"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Public profile
+          </p>
+          <p
+            className="text-xs mt-1"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {isPublic
+              ? `On. Anyone can read ${APP_URL}/u/${handle ?? 'your-handle'}, and search engines can index it.`
+              : 'Off. Your profile is private — that URL returns “not found” for everyone except you.'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isPublic}
+          aria-label="Publish profile publicly"
+          disabled={saving}
+          onClick={handleToggle}
+          className="shrink-0 relative rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            width: 36,
+            height: 20,
+            background: isPublic ? 'var(--accent)' : 'var(--bg)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <span
+            className="absolute rounded-full transition-all"
+            style={{
+              width: 14,
+              height: 14,
+              top: 2,
+              left: isPublic ? 18 : 2,
+              background: isPublic ? '#0d1117' : 'var(--text-secondary)',
+            }}
+          />
+        </button>
+      </div>
+
+      {isPublic && (
+        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+          Turning this off takes effect immediately, though browsers may hold a
+          copy of the page for up to a minute.
+        </p>
+      )}
+
+      {error && (
+        <p className="text-xs" style={{ color: 'var(--error, #f85149)' }}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Account deletion ─────────────────────────────────────────────────
+
+interface DeleteAccountProps {
+  handle: string | null;
+  userId: string | null;
+}
+
+/**
+ * Destructive-action confirmation: the user has to type their handle, matching
+ * how GitHub and Stripe gate irreversible deletes. The typed value is also sent
+ * to the API and re-checked server-side.
+ */
+function DeleteAccount({ handle, userId }: DeleteAccountProps) {
+  const [open, setOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const confirmed = handle !== null && confirmation.trim() === handle;
+
+  const handleDelete = async () => {
+    if (!confirmed || handle === null) return;
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle }),
+      });
+
+      if (res.ok) {
+        // Full navigation rather than a router push: the session cookie is gone
+        // and every cached RSC payload for this session is now stale.
+        window.location.href = '/?deleted=1';
+        return;
+      }
+
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setError(
+        data?.error === 'db_unavailable'
+          ? 'Profile database is unavailable. Run cf:preview or wrangler dev to use D1.'
+          : 'Could not delete your account. Please try again.',
+      );
+      setDeleting(false);
+    } catch {
+      setError('Network error. Please try again.');
+      setDeleting(false);
+    }
+  };
+
+  if (!userId || !handle) return null;
+
+  return (
+    <div
+      className="rounded-lg p-3 space-y-2"
+      style={{
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--error, #f85149)',
+      }}
+    >
+      <p
+        className="text-xs font-semibold uppercase tracking-wide"
+        style={{ color: 'var(--error, #f85149)' }}
+      >
+        Delete account
+      </p>
+
+      {!open ? (
+        <>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            Removes your profile, your handle, and every connected account from
+            GitAll. Your contributions on GitHub, GitLab and Bitbucket are not
+            affected.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmation('');
+              setError(null);
+              setOpen(true);
+            }}
+            className="text-xs px-3 py-1 rounded transition-colors cursor-pointer"
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--error, #f85149)',
+              color: 'var(--error, #f85149)',
+            }}
+          >
+            Delete my account
+          </button>
+        </>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            This cannot be undone. Type <strong>{handle}</strong> to confirm.
+          </p>
+
+          <input
+            type="text"
+            value={confirmation}
+            onChange={(e) => {
+              setConfirmation(e.target.value);
+              setError(null);
+            }}
+            placeholder={handle}
+            aria-label={`Type ${handle} to confirm deletion`}
+            className="w-full text-xs rounded px-2 py-1"
+            style={{
+              background: 'var(--bg)',
+              border: `1px solid ${
+                confirmation && !confirmed
+                  ? 'var(--error, #f85149)'
+                  : 'var(--border)'
+              }`,
+              color: 'var(--text-primary)',
+              outline: 'none',
+            }}
+            autoFocus
+          />
+
+          {error && (
+            <p className="text-xs" style={{ color: 'var(--error, #f85149)' }}>
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={!confirmed || deleting}
+              className="text-xs px-3 py-1 rounded font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'var(--error, #f85149)',
+                color: '#0d1117',
+              }}
+            >
+              {deleting ? 'Deleting…' : 'Permanently delete'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              disabled={deleting}
+              className="text-xs px-3 py-1 rounded transition-colors cursor-pointer disabled:opacity-50"
               style={{
                 background: 'var(--bg)',
                 border: '1px solid var(--border)',
@@ -526,7 +819,7 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
     <>
       <main className="max-w-6xl mx-auto px-4 pt-8 pb-12">
         <div className="flex flex-col md:flex-row gap-8">
-          {/* ── Left column: identity + connections ─────────────── */}
+          {/* ── Left column: identity + connections ────────────── */}
           <aside className="md:w-72 shrink-0 space-y-6">
             {primaryConnection && (
               <ProfileHeader
@@ -542,6 +835,12 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
               userId={session.userId}
             />
 
+            <VisibilityToggle
+              initialIsPublic={session.isPublic}
+              handle={session.handle}
+              userId={session.userId}
+            />
+
             <ConnectionsPanel
               connections={session.connections}
               availableProviders={session.availableProviders}
@@ -553,9 +852,11 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
                 Connect more providers to compare them side by side.
               </p>
             )}
+
+            <DeleteAccount handle={session.handle} userId={session.userId} />
           </aside>
 
-          {/* ── Right column: contributions ──────────────────────── */}
+          {/* ── Right column: contributions ────────────────────── */}
           <div className="flex-1 min-w-0">
             <TimePeriodSelector
               period={period}

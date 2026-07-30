@@ -37,16 +37,34 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Public profile pages are identical for every viewer (rendered from
-        // D1, no session), so they can be safely edge-cached. This emits a real
-        // Cache-Control HTTP response header — unlike a metadata `other` entry,
-        // which only renders a <meta> tag and has no effect on caching.
-        // 15-minute fresh window, 1-hour stale-while-revalidate.
+        // Public profile pages are rendered from D1 and are broadly cacheable,
+        // but they are no longer identical for every viewer: the route reads
+        // the session cookie so an owner can preview their own private profile.
+        // `Vary: Cookie` is what stops a shared cache from serving that private
+        // view to an anonymous visitor. Anonymous visitors send no session
+        // cookie, so they still share a single cache entry.
+        //
+        // s-maxage is deliberately short. A profile switched to private, or an
+        // account deleted outright, must stop resolving quickly — 900s fresh
+        // plus 3600s stale-while-revalidate meant someone could click "delete
+        // my account" and still find their page served for the best part of an
+        // hour. 60s with no stale window keeps that to something defensible.
+        //
+        // Cache purge by URL was considered and rejected: Cloudflare does not
+        // populate its edge cache from `s-maxage` on a Worker-generated
+        // response (measured against production — see the EDGE CACHING note in
+        // src/app/embed/[slug]/route.ts), so a purge hook would have had
+        // nothing to purge. This header governs browsers and other downstream
+        // caches, which is exactly what the short TTL is for.
         source: '/u/:handle',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, s-maxage=900, stale-while-revalidate=3600',
+            value: 'public, s-maxage=60',
+          },
+          {
+            key: 'Vary',
+            value: 'Cookie',
           },
         ],
       },

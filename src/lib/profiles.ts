@@ -1,11 +1,13 @@
+import { cache } from 'react';
 import { getDb } from '@/lib/db';
 import type {
   ConnectionProvider,
   Profile,
+  PublicProfile,
   StoredConnection,
 } from '@/lib/types';
 
-// ── ULID generation ───────────────────────────────────────────────────
+// ── ULID generation ──────────────────────────────────────────────
 
 const ULID_CHARS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
@@ -44,7 +46,7 @@ export function generateId(): string {
   return timeChars.join('') + randChars.join('');
 }
 
-// ── Handle rules ──────────────────────────────────────────────────────
+// ── Handle rules ─────────────────────────────────────────────────
 
 const HANDLE_PATTERN = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$|^[a-z0-9]{2,3}$/;
 const CONSECUTIVE_DASH = /--/;
@@ -115,7 +117,7 @@ export function isValidHandleFormat(handle: string): boolean {
   return HANDLE_PATTERN.test(handle);
 }
 
-// ── D1 row shapes ─────────────────────────────────────────────────────
+// ── D1 row shapes ───────────────────────────────────────────────
 
 interface UserRow {
   id: string;
@@ -137,7 +139,7 @@ interface ConnectionRow {
   verified_at: number;
 }
 
-// ── Exported helpers ──────────────────────────────────────────────────
+// ── Exported helpers ────────────────────────────────────────────
 
 /**
  * Checks whether `handle` is available (syntactically valid, not reserved,
@@ -209,10 +211,14 @@ export async function upsertUser(
   const handle = await findAvailableHandle(username);
   const newId = generateId();
 
+  // `is_public` is named and written explicitly rather than left to the column
+  // default. Migration 0002 created the column with DEFAULT 1, and that default
+  // cannot be changed without rebuilding the table (see 0003 for why we don't).
+  // Signing in must never publish a profile, so 0 is written here directly.
   await db
     .prepare(
-      `INSERT INTO users (id, handle, display_name, primary_provider, handle_changed_at, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6)`,
+      `INSERT INTO users (id, handle, display_name, primary_provider, handle_changed_at, is_public, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, NULL, 0, ?5, ?6)`,
     )
     .bind(newId, handle, username, primaryProvider, now, now)
     .run();
@@ -280,10 +286,24 @@ export async function findUserByProviderAccount(
 }
 
 /**
- * Returns the full `Profile` for `handle`, including all connections.
+ * Returns the full `Profile` for `handle`, including all connections and the
+ * `is_public` flag, regardless of visibility.
+ *
+ * This is the **owner/authenticated** read path — it returns internal fields
+ * (`id`, `handleChangedAt`) and does not filter on visibility. Do not hand the
+ * result to a client component; project it through {@link toPublicProfile}
+ * first, or use {@link getPublicProfileByHandle} instead.
+ *
+ * Memoised with React's `cache()` for the duration of a single request.
+ * `/u/[handle]` reads the profile twice — once in `generateMetadata()` and once
+ * in the page body — and without this that is two round-trips, four D1 queries,
+ * for one page view. `cache()` is per-request and per-argument, so nothing is
+ * ever shared between visitors or between handles; outside a request scope
+ * (route handlers, tests) it degrades to a plain call.
+ *
  * Returns `null` if no user with that handle exists.
  */
-export async function getProfileByHandle(
+export const getProfileByHandle = cache(async function getProfileByHandle(
   handle: string,
 ): Promise<Profile | null> {
   const db = getDb();
@@ -325,6 +345,124 @@ export async function getProfileByHandle(
     updatedAt: userRow.updated_at,
     connections,
   };
+});
+
+/**
+ * Narrows a stored `Profile` to the fields that are safe to serialise into a
+ * public page payload.
+ *
+ * This is the one place the public/private boundary is drawn. It is an
+ * allow-list, not a delete-list: a column added to `users` later does not
+ * silently become public.
+ */
+export function toPublicProfile(profile: Profile): PublicProfile {
+  return {
+    handle: profile.handle,
+    displayName: profile.displayName,
+    primaryProvider: profile.primaryProvider,
+    connections: profile.connections.map((connection) => ({
+      provider: connection.provider,
+      username: connection.username,
+      avatarUrl: connection.avatarUrl,
+    })),
+  };
+}
+
+/**
+ * Returns the public projection of `handle`, or `null` if the profile does not
+ * exist **or is private**.
+ *
+ * Callers cannot distinguish the two cases, which is intentional: a response
+ * that confirms a private handle exists leaks the existence of an account for
+ * any guessable username. Render a 404 for `null`, never a 403.
+ */
+export async function getPublicProfileByHandle(
+  handle: string,
+): Promise<PublicProfile | null> {
+  const profile = await getProfileByHandle(handle);
+  if (!profile || !profile.isPublic) return null;
+  return toPublicProfile(profile);
+}
+
+/**
+ * Sets the public visibility of a profile.
+ * Returns `false` when the DB is unavailable.
+ */
+export async function setVisibility(
+  userId: string,
+  isPublic: boolean,
+): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+
+  await db
+    .prepare('UPDATE users SET is_public = ?1, updated_at = ?2 WHERE id = ?3')
+    .bind(isPublic ? 1 : 0, Date.now(), userId)
+    .run();
+
+  return true;
+}
+
+/**
+ * Deletes a user and every connection belonging to them.
+ *
+ * `connections.user_id` is declared ON DELETE CASCADE, so deleting the `users`
+ * row alone *should* be sufficient — but SQLite only enforces foreign keys when
+ * `PRAGMA foreign_keys = ON`, and D1's behaviour here is not something we want
+ * an erasure path to depend on. Both deletes are therefore issued explicitly,
+ * in one `batch()` so they share a transaction. This is correct whether or not
+ * the cascade fires; if it does, the second statement simply removes nothing.
+ *
+ * Returns `false` when the DB is unavailable.
+ */
+export async function deleteUser(userId: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+
+  await db.batch([
+    db.prepare('DELETE FROM connections WHERE user_id = ?1').bind(userId),
+    db.prepare('DELETE FROM users WHERE id = ?1').bind(userId),
+  ]);
+
+  return true;
+}
+
+/**
+ * Returns the handle for a user by their D1 user id.
+ * Returns `null` if not found or if the DB is unavailable.
+ */
+export async function getHandleByUserId(
+  userId: string,
+): Promise<string | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  const row = await db
+    .prepare('SELECT handle FROM users WHERE id = ?1 LIMIT 1')
+    .bind(userId)
+    .first<{ handle: string }>();
+
+  return row?.handle ?? null;
+}
+
+/**
+ * Returns the handle and visibility flag for a user by their D1 user id, for
+ * rendering the owner's own settings UI.
+ * Returns `null` if not found or if the DB is unavailable.
+ */
+export async function getProfileSummaryByUserId(
+  userId: string,
+): Promise<{ handle: string; isPublic: boolean } | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  const row = await db
+    .prepare('SELECT handle, is_public FROM users WHERE id = ?1 LIMIT 1')
+    .bind(userId)
+    .first<Pick<UserRow, 'handle' | 'is_public'>>();
+
+  if (!row) return null;
+  return { handle: row.handle, isPublic: row.is_public !== 0 };
 }
 
 /**
@@ -399,24 +537,6 @@ export async function setHandle(
     .run();
 
   return { ok: true };
-}
-
-/**
- * Returns the handle for a user by their D1 user id.
- * Returns `null` if not found or if the DB is unavailable.
- */
-export async function getHandleByUserId(
-  userId: string,
-): Promise<string | null> {
-  const db = getDb();
-  if (!db) return null;
-
-  const row = await db
-    .prepare('SELECT handle FROM users WHERE id = ?1 LIMIT 1')
-    .bind(userId)
-    .first<{ handle: string }>();
-
-  return row?.handle ?? null;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getAuthSession } from '@/lib/auth-session';
 import { getAvailableOAuthProviders } from '@/lib/oauth-providers';
-import { getHandleByUserId } from '@/lib/profiles';
+import { getProfileSummaryByUserId } from '@/lib/profiles';
 import type { Connection, ConnectionProvider } from '@/lib/types';
 import { WhoAmIClient } from './WhoAmIClient';
 
@@ -20,6 +20,8 @@ export interface ClientSession {
   availableProviders: ConnectionProvider[];
   /** Public profile handle, or null if not yet set. */
   handle: string | null;
+  /** Whether the profile is published at /u/<handle>. Defaults to false. */
+  isPublic: boolean;
   /** D1 user id, used to authorise handle changes. */
   userId: string | null;
 }
@@ -55,14 +57,20 @@ export default async function WhoAmIPage() {
     }
   }
 
-  // Attempt to load the user's profile handle from D1 (non-fatal).
+  // Attempt to load the user's profile handle and visibility from D1
+  // (non-fatal). If this fails we fall back to private — never to public.
   let handle: string | null = null;
+  let isPublic = false;
   try {
     if (session.userId) {
-      handle = await getHandleByUserId(session.userId);
+      const summary = await getProfileSummaryByUserId(session.userId);
+      if (summary) {
+        handle = summary.handle;
+        isPublic = summary.isPublic;
+      }
     }
   } catch {
-    // DB unavailable in plain next dev — handle stays null
+    // DB unavailable in plain next dev — handle stays null, isPublic stays false
   }
 
   const clientSession: ClientSession = {
@@ -70,6 +78,7 @@ export default async function WhoAmIPage() {
     connections: sanitizedConnections,
     availableProviders: getAvailableOAuthProviders(),
     handle,
+    isPublic,
     userId: session.userId ?? null,
   };
 

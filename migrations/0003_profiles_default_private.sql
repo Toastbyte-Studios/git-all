@@ -1,0 +1,22 @@
+-- Profiles are private by default.
+--
+-- 0002_add_is_public.sql added `is_public` with `DEFAULT 1`, which meant signing
+-- in with OAuth silently published a public web page about the user, with no
+-- consent step and no way to take it down. This migration reverses that for
+-- every existing row.
+--
+-- 0002 is deliberately left untouched. `wrangler d1 migrations apply` records
+-- applied migrations by filename, so editing or renaming it would either be a
+-- silent no-op (if it has already been applied) or re-run and fail on the
+-- duplicate column. Neither is safe when the remote state is unknown.
+--
+-- The column default itself stays at 1. SQLite cannot ALTER a column default
+-- without rebuilding the table, and rebuilding `users` is unsafe here:
+-- `connections.user_id` is declared ON DELETE CASCADE, so dropping the old
+-- table would take every connection row with it.
+--
+-- Do not rely on the column default. `upsertUser()` in src/lib/profiles.ts
+-- names `is_public` explicitly on every INSERT and writes 0. Any future INSERT
+-- into `users` must do the same.
+
+UPDATE users SET is_public = 0;
