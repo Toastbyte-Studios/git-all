@@ -79,10 +79,14 @@ We'll close these without much discussion, so please don't spend your time on th
 - **Automated scanner output with no demonstrated impact.** Show us an exploit path.
 - **Anything requiring physical access or an already-compromised user device.**
 - **Social engineering** of maintainers, users, or infrastructure providers.
-- Missing security headers <!-- TODO: confirm whether CSP / HSTS / Referrer-Policy /
-  X-Content-Type-Options are applied at the Cloudflare edge. If they are, keep this line
-  and add "— these are applied at the CDN edge rather than in `next.config.ts`." If they
-  aren't, delete this bullet, because then it's a real finding. -->
+- **Reports that HSTS or `X-Content-Type-Options` are missing from `next.config.ts`.**
+  Both are applied at the Cloudflare edge rather than in application code.
+
+### Known gaps
+
+We currently set no `Content-Security-Policy`, `Referrer-Policy`, or
+`Permissions-Policy`, and no frame-ancestor restrictions. These are tracked and
+already known — reports about them are welcome but won't be treated as new findings.
 
 ## Safe Harbor
 
