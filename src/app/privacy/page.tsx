@@ -16,6 +16,27 @@ import type { Metadata } from 'next';
 // If anyone changes them in GA4 Admin → Data collection and modification →
 // Data retention, they must be changed here too.
 //
+// Three further claims depend on things outside this file. Verify them when
+// reviewing this page:
+//
+//   Zaraz dashboard config           whether the GA4 tool persists a
+//                                    client-side identifier (cookie or
+//                                    localStorage). The page currently says
+//                                    Zaraz "manages the identifier" on the
+//                                    browser path without claiming the path is
+//                                    cookieless. If the config is confirmed
+//                                    cookieless, tighten that wording; if it
+//                                    sets one, the cookie list under
+//                                    "Signing in" needs an entry.
+//   trackClientEvent call sites      whether any event params echo the
+//                                    localStorage preferences (view mode, time
+//                                    range). The "Data stored locally" section
+//                                    deliberately claims only that we never
+//                                    read them server-side.
+//   dataprivacyframework.gov         Cloudflare's and Google's certifications,
+//                                    cited under "Where your data is
+//                                    processed". Verified active 2026-08-03.
+//
 // A privacy policy that has drifted from the code is worse than no policy.
 
 export const metadata: Metadata = {
@@ -106,7 +127,8 @@ export default function PrivacyPage() {
           form, we send it to the relevant platform’s public API and show you
           what comes back. We keep the result in a short-lived server-side cache
           (around 15 minutes) so repeated lookups are fast. We do not create a
-          record for you, and we do not store the usernames you look up.
+          record for you, and beyond that short-lived cache we keep no record of
+          the usernames you look up.
         </p>
       </Section>
 
@@ -228,7 +250,9 @@ export default function PrivacyPage() {
           like a lookup being run, a sign-in completing, an embed being served,
           or a profile being viewed. Events reach GA4 either from your browser
           through Cloudflare Zaraz, which serves the analytics script from our
-          own domain, or from our servers via the GA4 Measurement Protocol.
+          own domain, or from our servers via the GA4 Measurement Protocol. On
+          the browser path, Zaraz manages the Google Analytics identifier on our
+          behalf.
         </p>
         <p>
           <strong style={{ color: 'var(--text-primary)' }}>
@@ -241,11 +265,11 @@ export default function PrivacyPage() {
         <p>
           Server-sent events are attached to a pseudonymous identifier: a
           SHA-256 hash of your IP address, browser user-agent string, and
-          language preference. No analytics identifier is stored in a cookie. We
-          call this pseudonymous rather than anonymous because someone who
-          already knew a specific IP address and browser could, in principle,
-          check it against the identifier — so we treat it as personal data even
-          though it is not readable on its own.
+          language preference. We do not set an analytics cookie for these
+          server-sent events. We call the identifier pseudonymous rather than
+          anonymous because someone who already knew a specific IP address and
+          browser could, in principle, check it against the identifier — so we
+          treat it as personal data even though it is not readable on its own.
         </p>
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           How long Google keeps it
@@ -265,6 +289,19 @@ export default function PrivacyPage() {
         <p>
           Aggregated reporting totals are kept longer by Google and are not
           affected by either setting.
+        </p>
+        <p>
+          Google explains how it uses data from sites that use its services at{' '}
+          <a
+            href="https://policies.google.com/technologies/partner-sites"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            policies.google.com/technologies/partner-sites
+          </a>
+          .
         </p>
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           Embedded heatmaps
@@ -288,8 +325,19 @@ export default function PrivacyPage() {
         <p>
           GitAll keeps a few preferences in your browser’s local storage: your
           theme, your contribution view mode, your selected time range, and your
-          analytics consent choice where one applies. These stay on your device
-          and are never sent to us.
+          analytics consent choice where one applies. They are tied to no
+          account, we never read them from our servers, and clearing your
+          browser data removes them.
+        </p>
+      </Section>
+
+      <Section id="logs" title="Hosting and service logs">
+        <p>
+          Like any website, gitall.app is delivered by a host — in our case
+          Cloudflare — which processes the IP address and request metadata of
+          every request in order to serve the site and to detect and block
+          abuse. This happens for every visitor and is separate from the
+          analytics described above.
         </p>
       </Section>
 
@@ -303,6 +351,50 @@ export default function PrivacyPage() {
         <p>
           We do not sell your personal data, and we do not share it with anyone
           else for their own purposes.
+        </p>
+      </Section>
+
+      <Section id="transfers" title="Where your data is processed">
+        <p>
+          We are a United States company, and Cloudflare and Google process data
+          for us in the United States. Cloudflare also operates a global edge
+          network, so your requests may be handled at a data centre near you
+          before reaching the US.
+        </p>
+        <p>
+          If you are in the European Economic Area, the United Kingdom, or
+          Switzerland, these transfers rely on the EU–US Data Privacy Framework,
+          its UK extension, and the Swiss–US Data Privacy Framework — Cloudflare
+          and Google are both certified participants — supplemented by standard
+          contractual clauses where applicable.
+        </p>
+      </Section>
+
+      <Section id="legal-bases" title="Our legal bases">
+        <p>
+          Where the GDPR or a similar law applies, the legal bases we rely on
+          are:
+        </p>
+        <ul className="space-y-2 list-disc pl-5">
+          <li>
+            Performance of a contract — running the lookups you ask for, signing
+            you in, rendering your heatmaps, and publishing a profile you have
+            chosen to publish.
+          </li>
+          <li>
+            Legitimate interests — the analytics and the hosting and service
+            logs described above, in our interest in understanding how GitAll is
+            used and keeping it secure and reliable. Where your local law
+            requires consent for analytics, we rely on your consent instead.
+          </li>
+          <li>
+            Legal obligation — where the law requires us to process or retain
+            something.
+          </li>
+        </ul>
+        <p>
+          We do not use your data to make automated decisions that have legal or
+          similarly significant effects on you.
         </p>
       </Section>
 
@@ -325,8 +417,9 @@ export default function PrivacyPage() {
           <li>Sign out to clear your cookies without deleting anything.</li>
         </ul>
         <p>
-          To ask about the data we hold, or to request access, correction, or
-          erasure, email{' '}
+          To ask what data we hold, or to exercise your rights of access,
+          correction, erasure, restriction, or portability, or to object to
+          processing based on our legitimate interests, email{' '}
           <a
             href="mailto:support@toastbyte.studio"
             className="hover:underline"
@@ -334,22 +427,36 @@ export default function PrivacyPage() {
           >
             support@toastbyte.studio
           </a>
-          .
+          . Where we rely on your consent, you can withdraw it at any time. If
+          you are in the European Economic Area or the United Kingdom, you also
+          have the right to lodge a complaint with your data protection
+          authority, though we would welcome the chance to resolve your concern
+          first.
         </p>
         <p>
-          One honest limitation: because the analytics identifier described
-          above is a one-way hash we never link to an account, we have no way to
-          find “your” GA4 events in order to retrieve or delete them
-          individually. If you would rather not be counted at all, browser-level
-          tracking protection or an ad blocker will stop the client-side events.
+          One honest limitation: the analytics identifier described above is
+          never linked to an account, so we cannot proactively find the GA4
+          events that are yours. If you email us the IP address, browser
+          user-agent string, and language setting you were using, we can
+          recompute the identifier those details produce and ask Google to
+          delete the data held against it. Without them, we have nothing to
+          search by.
+        </p>
+        <p>
+          We also cannot honestly point you at an ad blocker as a way to opt
+          out: if one blocks the analytics script, the site currently falls back
+          to sending the same events through our own servers, and some events —
+          an embed being served, for example — originate on our servers and
+          never pass through your browser’s protections at all.
         </p>
       </Section>
 
       <Section id="children" title="Children">
         <p>
-          GitAll is not directed at children and we do not knowingly collect
-          data from them. If you believe a child has given us personal data,
-          email us and we will remove it.
+          GitAll is not directed at children under 13 — or the higher age your
+          local law sets for consenting to data processing — and we do not
+          knowingly collect data from them. If you believe a child has given us
+          personal data, email us and we will remove it.
         </p>
       </Section>
 
