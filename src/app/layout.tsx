@@ -1,4 +1,5 @@
 import { AnalyticsConsentBanner } from '@/components/AnalyticsConsentBanner';
+import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
 import { FAQ_ITEMS } from '@/lib/faq';
 import './globals.css';
@@ -124,6 +125,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-screen antialiased">
         <Header />
         {children}
+        <Footer />
         <AnalyticsConsentBanner />
       </body>
     </html>
