@@ -1,0 +1,341 @@
+import type { Metadata } from 'next';
+
+// Every factual claim on this page was written against the code as it actually
+// behaves, not from a boilerplate template. If you change any of the following,
+// re-read this page and update it in the same PR:
+//
+//   src/lib/auth-session.ts          cookie names, contents, lifetimes
+//   src/lib/auth-cookies.ts          what sign-out / deletion clears
+//   src/lib/profiles.ts              what D1 stores; the public projection
+//   src/lib/analytics-server.ts      the GA4 client_id derivation
+//   src/lib/analytics-client.ts      the Zaraz / server-fallback split
+//   src/app/embed/[slug]/route.ts    what an embed impression records
+//   migrations/                      the columns described under "On our servers"
+//
+// A privacy policy that has drifted from the code is worse than no policy.
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy — GitAll',
+  description:
+    'How GitAll handles your data: what we store, what we send to analytics, and how to delete your account.',
+  alternates: { canonical: 'https://gitall.app/privacy' },
+};
+
+const EFFECTIVE_DATE = 'TODO';
+const GA4_EVENT_RETENTION = 'TODO';
+
+function Section({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-labelledby={`${id}-heading`} className="mt-10">
+      <h2
+        id={`${id}-heading`}
+        className="text-lg font-semibold mb-3"
+        style={{ color: 'var(--text-primary)' }}
+      >
+        {title}
+      </h2>
+      <div
+        className="space-y-3 text-sm leading-relaxed"
+        style={{ color: 'var(--text-secondary)' }}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export default function PrivacyPage() {
+  return (
+    <main className="max-w-2xl mx-auto px-4 pt-8 pb-12">
+      <h1
+        className="text-2xl font-semibold"
+        style={{ color: 'var(--text-primary)' }}
+      >
+        Privacy Policy
+      </h1>
+      <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+        Effective {EFFECTIVE_DATE} · Last updated {EFFECTIVE_DATE}
+      </p>
+
+      <Section id="who" title="Who we are">
+        <p>
+          GitAll (gitall.app) is operated by Toastbyte Studios, LLC. For any
+          privacy question or request, email{' '}
+          <a
+            href="mailto:support@toastbyte.studio"
+            className="hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            support@toastbyte.studio
+          </a>
+          .
+        </p>
+      </Section>
+
+      <Section id="scope" title="What this policy covers">
+        <p>
+          This policy covers the GitAll website and the contribution heatmap
+          images we serve at gitall.app/embed. Those images are meant to be
+          embedded in READMEs and personal sites, so this policy also describes
+          what happens when you load a page elsewhere that contains one — see
+          “Embedded heatmaps” below.
+        </p>
+        <p>
+          It does not cover GitHub, GitLab, Bitbucket, Gitea, or Forgejo. When
+          you use GitAll to look up contribution data, that data comes from
+          those platforms under their own terms and privacy policies.
+        </p>
+      </Section>
+
+      <Section id="anonymous" title="Using GitAll without an account">
+        <p>
+          You do not need an account. If you type a username into the lookup
+          form, we send it to the relevant platform’s public API and show you
+          what comes back. We keep the result in a short-lived server-side cache
+          (around 15 minutes) so repeated lookups are fast. We do not create a
+          record for you, and we do not store the usernames you look up.
+        </p>
+      </Section>
+
+      <Section id="signin" title="Signing in">
+        <p>
+          Signing in with GitHub, GitLab, or Bitbucket is optional. It exists so
+          you can verify an account is yours and combine several accounts into
+          one view.
+        </p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          What we receive from the provider
+        </h3>
+        <p>
+          When you authorise GitAll, the provider gives us an access token and
+          we read your account ID, username, and avatar URL. We request minimal
+          read-only scopes. We never receive your password.
+        </p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          What we store in your browser
+        </h3>
+        <p>
+          These are all HttpOnly cookies, encrypted with AES-GCM, sent only over
+          HTTPS in production, and marked SameSite=Lax:
+        </p>
+        <ul className="space-y-2 list-disc pl-5">
+          <li>
+            <code>gitall_session</code> — your connected accounts (provider,
+            account ID, username, avatar URL, verification time) and your GitAll
+            user ID. Access tokens are deliberately excluded. Expires after 7
+            days.
+          </li>
+          <li>
+            <code>gitall_token_&lt;provider&gt;</code> — the provider access
+            token, stored separately from the session. Expires after 7 days.
+          </li>
+          <li>
+            <code>gitall_oauth_state_&lt;provider&gt;</code> — a one-time value
+            protecting the sign-in flow. Expires after 10 minutes.
+          </li>
+          <li>
+            <code>gitall_oauth_return_to_&lt;provider&gt;</code> — the page to
+            send you back to after sign-in. Cleared on completion.
+          </li>
+        </ul>
+        <p>Signing out, or deleting your account, expires all of them.</p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          What we store on our servers
+        </h3>
+        <p>We keep a profile record in Cloudflare D1, our database:</p>
+        <ul className="space-y-2 list-disc pl-5">
+          <li>
+            Your account: a GitAll user ID, your handle, a display name, which
+            provider is primary, when you last changed your handle, whether your
+            profile is public, and creation and update timestamps.
+          </li>
+          <li>
+            One record per connected account: the provider, the account ID, the
+            username, the avatar URL, and when it was verified.
+          </li>
+        </ul>
+        <p>
+          We keep this until you delete your account. Deleting removes both the
+          account record and every connected-account record.
+        </p>
+      </Section>
+
+      <Section id="profile" title="Your public profile">
+        <p>
+          <strong style={{ color: 'var(--text-primary)' }}>
+            Your profile is private by default.
+          </strong>{' '}
+          Signing in does not publish anything.
+        </p>
+        <p>
+          You can publish it from your settings, which makes
+          gitall.app/u/&lt;your-handle&gt; readable by anyone and eligible to be
+          listed in our sitemap and indexed by search engines. A published
+          profile shows your handle, your display name, and the username and
+          avatar for each connected account. It does not show your GitAll user
+          ID or your provider account IDs.
+        </p>
+        <p>
+          While your profile is private, that URL returns “not found” to
+          everyone except you. You can switch it back to private at any time;
+          the change takes effect immediately on our side, though browsers and
+          other caches may hold a copy of the page for up to a minute.
+        </p>
+      </Section>
+
+      <Section id="contributions" title="Contribution data for signed-in users">
+        <p>
+          When you are signed in, we fetch your contribution data using your own
+          access token rather than the public API. Depending on the provider and
+          the scopes you granted, this may include activity in private
+          repositories. We use it to render your heatmap and we do not store it
+          — it is fetched for the page you are looking at and discarded.
+        </p>
+      </Section>
+
+      <Section id="analytics" title="Analytics">
+        <p>
+          We use analytics to understand how the site is used. We do not use it
+          to build advertising profiles, and we have Google Analytics configured
+          to request non-personalized ads handling.
+        </p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          Cloudflare Web Analytics
+        </h3>
+        <p>
+          Every page load is counted by Cloudflare Web Analytics. It sets no
+          cookies, uses no client-side state, and does not track you across
+          sites.
+        </p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          Google Analytics 4
+        </h3>
+        <p>
+          We send a small set of product events to Google Analytics 4 — things
+          like a lookup being run, a sign-in completing, an embed being served,
+          or a profile being viewed. Events reach GA4 either from your browser
+          through Cloudflare Zaraz, which serves the analytics script from our
+          own domain, or from our servers via the GA4 Measurement Protocol.
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text-primary)' }}>
+            We do not send your handle, your username, or any provider account
+            ID to GA4.
+          </strong>{' '}
+          Events carry only non-identifying details such as which platforms were
+          involved, how many accounts are connected, and the theme of an embed.
+        </p>
+        <p>
+          Server-sent events are attached to a pseudonymous identifier: a
+          SHA-256 hash of your IP address, browser user-agent string, and
+          language preference. No analytics identifier is stored in a cookie. We
+          call this pseudonymous rather than anonymous because someone who
+          already knew a specific IP address and browser could, in principle,
+          check it against the identifier — so we treat it as personal data even
+          though it is not readable on its own.
+        </p>
+        <p>
+          Google deletes the event-level data behind these reports after{' '}
+          {GA4_EVENT_RETENTION}. Aggregated reporting totals are kept longer by
+          Google.
+        </p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          Embedded heatmaps
+        </h3>
+        <p>
+          If you load a page anywhere on the web that embeds a GitAll heatmap —
+          a GitHub README, a personal site — your browser requests that image
+          from our servers. We record that as an event containing the hostname
+          of the page you were viewing (not the full URL) and the pseudonymous
+          identifier described above.
+        </p>
+        <p>
+          This happens even if you have never visited gitall.app yourself. We
+          are describing it here because it is the honest description of what
+          the embed does. The identifier is not linked to any account, ours or
+          anyone else’s.
+        </p>
+      </Section>
+
+      <Section id="local-storage" title="Data stored locally in your browser">
+        <p>
+          GitAll keeps a few preferences in your browser’s local storage: your
+          theme, your contribution view mode, your selected time range, and your
+          analytics consent choice where one applies. These stay on your device
+          and are never sent to us.
+        </p>
+      </Section>
+
+      <Section id="processors" title="Who processes your data">
+        <ul className="space-y-2 list-disc pl-5">
+          <li>Cloudflare — hosting, our D1 database, Web Analytics, and Zaraz.</li>
+          <li>Google — Google Analytics 4.</li>
+        </ul>
+        <p>
+          We do not sell your personal data, and we do not share it with anyone
+          else for their own purposes.
+        </p>
+      </Section>
+
+      <Section id="choices" title="Your choices">
+        <ul className="space-y-2 list-disc pl-5">
+          <li>Keep your profile private, or unpublish it, from your settings.</li>
+          <li>
+            Change your handle from your settings (limited to once every 7
+            days).
+          </li>
+          <li>Disconnect a provider without deleting your account.</li>
+          <li>
+            Delete your account from your settings. This removes your profile
+            and every connected account from our database and clears your
+            session and token cookies. It cannot be undone. Signing in again
+            afterwards creates a new, empty profile.
+          </li>
+          <li>Sign out to clear your cookies without deleting anything.</li>
+        </ul>
+        <p>
+          To ask about the data we hold, or to request access, correction, or
+          erasure, email{' '}
+          <a
+            href="mailto:support@toastbyte.studio"
+            className="hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            support@toastbyte.studio
+          </a>
+          .
+        </p>
+        <p>
+          One honest limitation: because the analytics identifier described
+          above is a one-way hash we never link to an account, we have no way to
+          find “your” GA4 events in order to retrieve or delete them
+          individually. If you would rather not be counted at all, browser-level
+          tracking protection or an ad blocker will stop the client-side events.
+        </p>
+      </Section>
+
+      <Section id="children" title="Children">
+        <p>
+          GitAll is not directed at children and we do not knowingly collect
+          data from them. If you believe a child has given us personal data,
+          email us and we will remove it.
+        </p>
+      </Section>
+
+      <Section id="changes" title="Changes">
+        <p>
+          If we change this policy we will update the date at the top. Material
+          changes will be noted on the site.
+        </p>
+      </Section>
+    </main>
+  );
+}
