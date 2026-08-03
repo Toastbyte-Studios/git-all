@@ -12,6 +12,10 @@ import type { Metadata } from 'next';
 //   src/app/embed/[slug]/route.ts    what an embed impression records
 //   migrations/                      the columns described under "On our servers"
 //
+// The retention figures below are read from the GA4 property, not from code.
+// If anyone changes them in GA4 Admin → Data collection and modification →
+// Data retention, they must be changed here too.
+//
 // A privacy policy that has drifted from the code is worse than no policy.
 
 export const metadata: Metadata = {
@@ -22,7 +26,8 @@ export const metadata: Metadata = {
 };
 
 const EFFECTIVE_DATE = 'TODO';
-const GA4_EVENT_RETENTION = 'TODO';
+const GA4_EVENT_RETENTION = '2 months';
+const GA4_USER_RETENTION = '14 months';
 
 function Section({
   id,
@@ -242,10 +247,24 @@ export default function PrivacyPage() {
           check it against the identifier — so we treat it as personal data even
           though it is not readable on its own.
         </p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          How long Google keeps it
+        </h3>
         <p>
-          Google deletes the event-level data behind these reports after{' '}
-          {GA4_EVENT_RETENTION}. Aggregated reporting totals are kept longer by
-          Google.
+          Google deletes individual event records for our property after{' '}
+          {GA4_EVENT_RETENTION}. Data held against the pseudonymous identifier
+          above is kept for {GA4_USER_RETENTION}.
+        </p>
+        <p>
+          That second window restarts whenever the same identifier is seen
+          again. If you visit GitAll regularly — or regularly load a page
+          containing one of our embeds — it will keep restarting, so in practice
+          it does not expire while you are still active. It only begins counting
+          down once we stop seeing you.
+        </p>
+        <p>
+          Aggregated reporting totals are kept longer by Google and are not
+          affected by either setting.
         </p>
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           Embedded heatmaps
@@ -276,7 +295,9 @@ export default function PrivacyPage() {
 
       <Section id="processors" title="Who processes your data">
         <ul className="space-y-2 list-disc pl-5">
-          <li>Cloudflare — hosting, our D1 database, Web Analytics, and Zaraz.</li>
+          <li>
+            Cloudflare — hosting, our D1 database, Web Analytics, and Zaraz.
+          </li>
           <li>Google — Google Analytics 4.</li>
         </ul>
         <p>
@@ -287,7 +308,9 @@ export default function PrivacyPage() {
 
       <Section id="choices" title="Your choices">
         <ul className="space-y-2 list-disc pl-5">
-          <li>Keep your profile private, or unpublish it, from your settings.</li>
+          <li>
+            Keep your profile private, or unpublish it, from your settings.
+          </li>
           <li>
             Change your handle from your settings (limited to once every 7
             days).
