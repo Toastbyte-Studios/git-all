@@ -289,29 +289,6 @@ export default function Home() {
           </dl>
         </section>
       </main>
-
-      <footer className="max-w-6xl mx-auto px-4 mt-16 pb-8 text-center">
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Built by{' '}
-          <a
-            href="https://toastbyte.studio"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: 'var(--text-secondary)' }}
-            className="hover:underline"
-          >
-            Toastbyte Studios
-          </a>
-        </p>
-        {process.env.NEXT_PUBLIC_APP_VERSION && (
-          <p
-            className="text-[10px] mt-1"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            v{process.env.NEXT_PUBLIC_APP_VERSION}
-          </p>
-        )}
-      </footer>
     </>
   );
 }
