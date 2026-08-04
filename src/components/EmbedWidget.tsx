@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { trackClientEvent } from '@/lib/analytics-client';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { generatePlaceholderNames } from '@/lib/placeholder-names';
 
 // Always generate embed snippets against the canonical production domain.
 // Embed URLs get copied into READMEs permanently, so never derive this from
@@ -15,6 +16,11 @@ const SITE_URL = 'https://gitall.app';
 // lets GA4 attribute click-throughs automatically as "embed / referral" without
 // any custom configuration.
 const REFERRAL_URL = `${SITE_URL}?utm_source=embed&utm_medium=referral&utm_campaign=heatmap`;
+
+// Server-rendered placeholders. These are deliberately static so the markup is
+// deterministic; random names are swapped in after mount (see below) to avoid a
+// hydration mismatch. Order: GitHub, GitLab, Bitbucket, Gitea/Forgejo.
+const DEFAULT_PLACEHOLDERS = ['user-1', 'user-2', 'user-3', 'user-4'];
 
 function buildEmbedUrl(
   github: string,
@@ -128,12 +134,17 @@ function SnippetRow({ label, value, onCopy }: SnippetRowProps) {
 }
 
 export function EmbedWidget() {
+  const [placeholders, setPlaceholders] = useState(DEFAULT_PLACEHOLDERS);
   const [github, setGithub] = useState('');
   const [gitlab, setGitlab] = useState('');
   const [bitbucket, setBitbucket] = useState('');
   const [gitea, setGitea] = useState('');
   const [instance, setInstance] = useState('');
   const [showGitea, setShowGitea] = useState(false);
+
+  useEffect(() => {
+    setPlaceholders(generatePlaceholderNames(DEFAULT_PLACEHOLDERS.length));
+  }, []);
 
   const embedUrl = buildEmbedUrl(github, gitlab, bitbucket, gitea, instance);
 
@@ -183,7 +194,7 @@ export function EmbedWidget() {
             type="text"
             value={github}
             onChange={(e) => setGithub(e.target.value)}
-            placeholder="octocat"
+            placeholder={placeholders[0]}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
             style={inputStyle}
           />
@@ -201,7 +212,7 @@ export function EmbedWidget() {
             type="text"
             value={gitlab}
             onChange={(e) => setGitlab(e.target.value)}
-            placeholder="johndoe"
+            placeholder={placeholders[1]}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
             style={inputStyle}
           />
@@ -219,7 +230,7 @@ export function EmbedWidget() {
             type="text"
             value={bitbucket}
             onChange={(e) => setBitbucket(e.target.value)}
-            placeholder="jdoe"
+            placeholder={placeholders[2]}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
             style={inputStyle}
           />
@@ -252,7 +263,7 @@ export function EmbedWidget() {
                 type="text"
                 value={gitea}
                 onChange={(e) => setGitea(e.target.value)}
-                placeholder="myuser"
+                placeholder={placeholders[3]}
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
                 style={inputStyle}
               />
