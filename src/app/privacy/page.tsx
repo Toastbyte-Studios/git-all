@@ -19,15 +19,15 @@ import type { Metadata } from 'next';
 // Three further claims depend on things outside this file. Verify them when
 // reviewing this page:
 //
-//   Zaraz dashboard config           whether the GA4 tool persists a
-//                                    client-side identifier (cookie or
-//                                    localStorage). The page currently says
-//                                    Zaraz "manages the identifier" on the
-//                                    browser path without claiming the path is
-//                                    cookieless. If the config is confirmed
-//                                    cookieless, tighten that wording; if it
-//                                    sets one, the cookie list under
-//                                    "Signing in" needs an entry.
+//   Zaraz GA4 cookies                the names and lifetimes under "Analytics
+//                                    cookies" were read from a live browser on
+//                                    2026-08-04 (cfz_google-analytics_v4,
+//                                    ~1 year; cfzs_google-analytics_v4,
+//                                    session; both HttpOnly, Secure, Lax).
+//                                    Re-verify if the Zaraz tool config
+//                                    changes. cf_clearance, described under
+//                                    "Hosting and service logs", was observed
+//                                    in the same session.
 //   trackClientEvent call sites      whether any event params echo the
 //                                    localStorage preferences (view mode, time
 //                                    range). The "Data stored locally" section
@@ -173,7 +173,11 @@ export default function PrivacyPage() {
             send you back to after sign-in. Cleared on completion.
           </li>
         </ul>
-        <p>Signing out, or deleting your account, expires all of them.</p>
+        <p>
+          Signing out, or deleting your account, expires all of them. Separate
+          cookies used for analytics and security are described under
+          “Analytics” and “Hosting and service logs” below.
+        </p>
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           What we store on our servers
         </h3>
@@ -252,7 +256,7 @@ export default function PrivacyPage() {
           through Cloudflare Zaraz, which serves the analytics script from our
           own domain, or from our servers via the GA4 Measurement Protocol. On
           the browser path, Zaraz manages the Google Analytics identifier on our
-          behalf.
+          behalf, using the cookies listed below.
         </p>
         <p>
           <strong style={{ color: 'var(--text-primary)' }}>
@@ -270,6 +274,28 @@ export default function PrivacyPage() {
           anonymous because someone who already knew a specific IP address and
           browser could, in principle, check it against the identifier — so we
           treat it as personal data even though it is not readable on its own.
+        </p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          Analytics cookies
+        </h3>
+        <p>
+          The browser path does set cookies. Zaraz creates two first-party
+          cookies on gitall.app for Google Analytics:
+        </p>
+        <ul className="space-y-2 list-disc pl-5">
+          <li>
+            <code>cfz_google-analytics_v4</code> — the identifier and engagement
+            state Zaraz maintains for Google Analytics. Kept for up to one year.
+          </li>
+          <li>
+            <code>cfzs_google-analytics_v4</code> — state for your current
+            visit, such as a pageview count. Deleted when you close your
+            browser.
+          </li>
+        </ul>
+        <p>
+          Both are HttpOnly, sent only over HTTPS, marked SameSite=Lax, and set
+          for gitall.app alone — they do not follow you to other sites.
         </p>
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           How long Google keeps it
@@ -338,6 +364,13 @@ export default function PrivacyPage() {
           every request in order to serve the site and to detect and block
           abuse. This happens for every visitor and is separate from the
           analytics described above.
+        </p>
+        <p>
+          As part of that protection, Cloudflare may set a{' '}
+          <code>cf_clearance</code> cookie after your browser passes one of its
+          security checks, so that you are not re-challenged on every request.
+          It is a security cookie, not an analytics one, and can persist for up
+          to a year.
         </p>
       </Section>
 
@@ -447,7 +480,9 @@ export default function PrivacyPage() {
           out: if one blocks the analytics script, the site currently falls back
           to sending the same events through our own servers, and some events —
           an embed being served, for example — originate on our servers and
-          never pass through your browser’s protections at all.
+          never pass through your browser’s protections at all. Deleting the
+          analytics cookies listed above resets the browser-path identifier, but
+          does not affect the server-derived one.
         </p>
       </Section>
 
