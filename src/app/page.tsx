@@ -2,33 +2,61 @@ import { Suspense } from 'react';
 import { AuthStatus } from '@/components/AuthStatus';
 import { ContributionExplorer } from '@/components/ContributionExplorer';
 import { EmbedWidget } from '@/components/EmbedWidget';
-import { GitAllLogo } from '@/components/GitAllLogo';
 import { SignInBanner } from '@/components/SignInBanner';
 import { FAQ_ITEMS } from '@/lib/faq';
 
 export default function Home() {
   return (
     <>
+      {/* ── Hero ──────────────────────────────────────────────────
+          Headline, sign-in, and both primary tools (lookup + embed) in a
+          single tabbed panel, sized to clear the fold on mobile as well as
+          desktop. The brand mark lives in the sticky header, so the h1 here
+          is text rather than a second copy of the logo. */}
       <section
         aria-label="Hero"
-        className="max-w-6xl mx-auto px-4 pt-8 pb-0 text-center"
+        className="max-w-3xl mx-auto px-4 pt-8 sm:pt-10 pb-0 text-center"
       >
-        <h1 className="flex justify-center mb-3">
-          <GitAllLogo />
+        <h1
+          className="text-2xl sm:text-4xl font-bold tracking-tight text-balance"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          All your git contributions, in one heatmap
         </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          See GitHub, GitLab, Bitbucket, and Gitea/Forgejo contributions in one
-          place.
+        <p
+          className="mt-3 text-sm sm:text-base text-balance"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          GitAll unifies your GitHub, GitLab, Bitbucket, and Gitea/Forgejo
+          activity into a single graph — free, no login required.
         </p>
-        <div className="mt-3 flex justify-center">
+        <div className="mt-4 flex justify-center">
           <AuthStatus />
         </div>
       </section>
 
       <main className="max-w-6xl mx-auto px-4 pb-12">
-        <section aria-label="Contribution lookup tool" className="mt-10">
+        <section
+          id="embed"
+          aria-label="Contribution lookup and embed generator"
+          className="mt-6 scroll-mt-20"
+        >
           <Suspense fallback={<ContributionExplorerFallback />}>
-            <ContributionExplorer />
+            <ContributionExplorer
+              embedSlot={
+                <>
+                  <h2 className="sr-only">Embed your heatmap</h2>
+                  <p
+                    className="text-xs mb-4"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    Add your unified contribution graph to your GitHub README,
+                    portfolio site, or anywhere that supports images.
+                  </p>
+                  <EmbedWidget />
+                </>
+              }
+            />
           </Suspense>
           <SignInBanner />
         </section>
@@ -120,29 +148,6 @@ export default function Home() {
               </span>
             </li>
           </ol>
-        </section>
-
-        {/* ── Embed your heatmap ────────────────────────────────── */}
-        <section
-          id="embed"
-          aria-labelledby="embed-heading"
-          className="mt-16 max-w-2xl mx-auto"
-        >
-          <h2
-            id="embed-heading"
-            className="text-lg font-semibold mb-2 text-center"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            Embed your heatmap
-          </h2>
-          <p
-            className="text-sm text-center mb-4"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Add your unified contribution graph to your GitHub README, portfolio
-            site, or anywhere that supports images.
-          </p>
-          <EmbedWidget />
         </section>
 
         {/* ── Supported platforms ───────────────────────────────── */}
@@ -296,7 +301,7 @@ export default function Home() {
 function ContributionExplorerFallback() {
   return (
     <div
-      className="max-w-2xl mx-auto rounded-lg p-4 text-sm"
+      className="max-w-3xl mx-auto rounded-lg p-4 text-sm"
       style={{
         backgroundColor: 'var(--bg-surface)',
         color: 'var(--text-secondary)',
