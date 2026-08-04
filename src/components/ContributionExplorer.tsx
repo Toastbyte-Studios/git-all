@@ -1,8 +1,9 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ContributionsView } from '@/components/ContributionsView';
+import { HeroTabs } from '@/components/HeroTabs';
 import { MultiUserForm } from '@/components/MultiUserForm';
 import { SearchForm } from '@/components/SearchForm';
 import { TimePeriodSelector } from '@/components/TimePeriodSelector';
@@ -18,7 +19,17 @@ import {
 } from '@/lib/contribution-period';
 import type { UserEntry, ViewMode } from '@/lib/types';
 
-export function ContributionExplorer() {
+interface ContributionExplorerProps {
+  /**
+   * Optional second hero tab — the embed snippet generator. Passed in from the
+   * page rather than imported here so this component stays responsible only for
+   * lookup state. When omitted, the lookup form renders on its own without tab
+   * chrome.
+   */
+  embedSlot?: ReactNode;
+}
+
+export function ContributionExplorer({ embedSlot }: ContributionExplorerProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -284,31 +295,41 @@ export function ContributionExplorer() {
         customRange !== null &&
         customRange.from < getDefaultRange().from));
 
+  const lookupPanel = showMultiUser ? (
+    <>
+      <MultiUserForm onSearch={handleMultiUserSearch} loading={loading} />
+      <TimePeriodSelector
+        period={period}
+        customFrom={customFrom}
+        customTo={customTo}
+        loading={loading}
+        error={rangeError}
+        showGitlabLimitNote={showGitlabLimitNote}
+        onPeriodChange={handlePeriodChange}
+        onCustomFromChange={setCustomFrom}
+        onCustomToChange={setCustomTo}
+        onApplyCustomRange={handleApplyCustomRange}
+      />
+    </>
+  ) : (
+    <SearchForm onSearch={handleSimpleSearch} loading={loading} />
+  );
+
   return (
     <>
-      {showMultiUser ? (
-        <>
-          <MultiUserForm onSearch={handleMultiUserSearch} loading={loading} />
-          <TimePeriodSelector
-            period={period}
-            customFrom={customFrom}
-            customTo={customTo}
-            loading={loading}
-            error={rangeError}
-            showGitlabLimitNote={showGitlabLimitNote}
-            onPeriodChange={handlePeriodChange}
-            onCustomFromChange={setCustomFrom}
-            onCustomToChange={setCustomTo}
-            onApplyCustomRange={handleApplyCustomRange}
-          />
-        </>
-      ) : (
-        <SearchForm onSearch={handleSimpleSearch} loading={loading} />
-      )}
+      {/* The hero panel is width-capped here rather than by the parent section
+          so the results below can still use the full page width. */}
+      <div className="max-w-3xl mx-auto">
+        {embedSlot ? (
+          <HeroTabs lookup={lookupPanel} embed={embedSlot} />
+        ) : (
+          lookupPanel
+        )}
+      </div>
 
       {globalError && (
         <div
-          className="mt-6 p-4 rounded-lg border text-sm"
+          className="mt-6 p-4 rounded-lg border text-sm max-w-3xl mx-auto"
           style={{
             borderColor: '#f85149',
             color: '#f85149',

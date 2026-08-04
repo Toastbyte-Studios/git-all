@@ -171,14 +171,10 @@ export function EmbedWidget() {
     color: 'var(--text-primary)',
   } as const;
 
+  // No card chrome of its own — the surrounding HeroTabs panel provides the
+  // border and background.
   return (
-    <div
-      className="rounded-lg p-5 space-y-5"
-      style={{
-        backgroundColor: 'var(--bg-surface)',
-        border: '1px solid var(--border)',
-      }}
-    >
+    <div className="space-y-5">
       {/* Username inputs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
