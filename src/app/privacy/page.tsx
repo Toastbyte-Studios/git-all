@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type React from 'react';
 
 // Every factual claim on this page was written against the code as it actually
 // behaves, not from a boilerplate template. If you change any of the following,
