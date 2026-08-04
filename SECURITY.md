@@ -12,7 +12,7 @@ Use GitHub's private vulnerability reporting:
 [**Report a vulnerability**](https://github.com/Toastbyte-Studios/git-all/security/advisories/new)
 
 This opens a draft security advisory visible only to you and the maintainers. If you
-can't use GitHub for any reason, email <!-- TODO: confirm address --> `security@git-all.com`.
+can't use GitHub for any reason, email [support@toastbyte.studio](mailto:support@toastbyte.studio).
 
 ### What to include
 

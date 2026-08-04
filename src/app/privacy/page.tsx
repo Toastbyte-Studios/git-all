@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://gitall.app/privacy' },
 };
 
-const EFFECTIVE_DATE = 'TODO';
+const EFFECTIVE_DATE = 'August 4, 2026';
 const GA4_EVENT_RETENTION = '2 months';
 const GA4_USER_RETENTION = '14 months';
 
@@ -146,7 +146,7 @@ export default function PrivacyPage() {
           What we receive from the provider
         </h3>
         <p>
-          When you authorise GitAll, the provider gives us an access token and
+          When you authorize GitAll, the provider gives us an access token and
           we read your account ID, username, and avatar URL. We request minimal
           read-only scopes. We never receive your password.
         </p>
