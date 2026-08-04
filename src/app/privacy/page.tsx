@@ -16,23 +16,27 @@ import type { Metadata } from 'next';
 // If anyone changes them in GA4 Admin → Data collection and modification →
 // Data retention, they must be changed here too.
 //
-// Three further claims depend on things outside this file. Verify them when
-// reviewing this page:
+// Three claims were verified against things outside this file. Re-verify them
+// when reviewing this page:
 //
-//   Zaraz GA4 cookies                the names and lifetimes under "Analytics
-//                                    cookies" were read from a live browser on
-//                                    2026-08-04 (cfz_google-analytics_v4,
-//                                    ~1 year; cfzs_google-analytics_v4,
-//                                    session; both HttpOnly, Secure, Lax).
-//                                    Re-verify if the Zaraz tool config
-//                                    changes. cf_clearance, described under
-//                                    "Hosting and service logs", was observed
-//                                    in the same session.
-//   trackClientEvent call sites      whether any event params echo the
-//                                    localStorage preferences (view mode, time
-//                                    range). The "Data stored locally" section
-//                                    deliberately claims only that we never
-//                                    read them server-side.
+//   Zaraz GA4 cookies                read from a live browser 2026-08-04:
+//                                    cfz_google-analytics_v4 (~1 year) and
+//                                    cfzs_google-analytics_v4 (session), both
+//                                    HttpOnly, Secure, Lax. cf_clearance
+//                                    (under "Hosting and service logs") was
+//                                    observed in the same session. Re-verify
+//                                    if the Zaraz tool config changes.
+//   trackClientEvent call sites      audited 2026-08-04: lookupRun
+//                                    (authenticated, entry_count,
+//                                    includes_gitea), timeRangeSelected
+//                                    (period preset, mode), integratedViewUsed
+//                                    (entry_count), embedGenerated
+//                                    (snippet_type, platform_count). No
+//                                    usernames, no custom dates. The example
+//                                    list under "Analytics" and the
+//                                    local-storage section reflect this
+//                                    inventory — re-audit if events or their
+//                                    params change.
 //   dataprivacyframework.gov         Cloudflare's and Google's certifications,
 //                                    cited under "Where your data is
 //                                    processed". Verified active 2026-08-03.
@@ -263,8 +267,11 @@ export default function PrivacyPage() {
             We do not send your handle, your username, or any provider account
             ID to GA4.
           </strong>{' '}
-          Events carry only non-identifying details such as which platforms were
-          involved, how many accounts are connected, and the theme of an embed.
+          Events carry only non-identifying details: which platforms were
+          involved, how many accounts are connected, which time-range preset or
+          view you picked, and the format or theme of an embed snippet. If you
+          pick a custom date range, the event says only that a custom range was
+          used — never the dates themselves.
         </p>
         <p>
           Server-sent events are attached to a pseudonymous identifier: a
@@ -352,8 +359,13 @@ export default function PrivacyPage() {
           GitAll keeps a few preferences in your browser’s local storage: your
           theme, your contribution view mode, your selected time range, and your
           analytics consent choice where one applies. They are tied to no
-          account, we never read them from our servers, and clearing your
-          browser data removes them.
+          account, and clearing your browser data removes them.
+        </p>
+        <p>
+          Our servers never read this storage. Acting on a preference can,
+          however, fire one of the analytics events described above that names
+          the choice — selecting a time-range preset is an example — so the
+          choice itself may be counted even though the stored value is not read.
         </p>
       </Section>
 
