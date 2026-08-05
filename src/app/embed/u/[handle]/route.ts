@@ -16,8 +16,8 @@ import {
   type EmbedPlatformEntry,
 } from '@/lib/embed-render';
 import { generateHeatmapSvg } from '@/lib/embed-svg';
+import { getPublicProfileByHandle } from '@/lib/profiles';
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Handle-resolved embed: /embed/u/{handle}.svg
 //
 // Unlike /embed/[slug], which freezes a set of usernames into the URL at the
@@ -35,9 +35,8 @@ import { generateHeatmapSvg } from '@/lib/embed-svg';
 // deliberately indistinguishable to the caller. That property is what stops an
 // <img> tag from being used to probe whether an account exists. Do not add a
 // distinct message, status, or cache header for the private case, and do not
-// swap in `getProfileByHandle` to "improve" the error — that reintroduces the
+// swap in `getProfileByHandle` to "improve" the error - that reintroduces the
 // oracle. /u/[handle] draws the same line by rendering 404 rather than 403.
-// ─────────────────────────────────────────────────────────────────────────────
 
 // Deliberately shorter than the 24h used by /embed/[slug]. That route resolves
 // nothing server-side, so a cached response can only go stale on contribution
@@ -45,7 +44,7 @@ import { generateHeatmapSvg } from '@/lib/embed-svg';
 // which means an owner going private, disconnecting a provider, or deleting
 // their account keeps serving from the edge until the entry expires. One hour
 // bounds that window while still absorbing the bulk of camo traffic. A cache
-// purge on visibility change would let this go back up — see the follow-up note
+// purge on visibility change would let this go back up - see the follow-up note
 // on the PR.
 const CACHE_CONTROL = 'public, s-maxage=3600, stale-while-revalidate=600';
 
@@ -79,7 +78,7 @@ export async function GET(
     }
   }
 
-  // Null covers "no such handle" and "profile is private" — see the privacy
+  // Null covers "no such handle" and "profile is private" - see the privacy
   // contract above. Both fall through to the same response below.
   const profile = await getPublicProfileByHandle(handle);
 
