@@ -1,13 +1,21 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { NextRequest } from 'next/server';
-import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
-import { trackServerEvent } from '@/lib/analytics-server';
 import {
   DEFAULT_CONTRIBUTION_PERIOD,
   getContributionDateRange,
 } from '@/lib/contribution-period';
-import { generateHeatmapSvg, type EmbedTheme } from '@/lib/embed-svg';
-import type { ContributionData } from '@/lib/types';
+import {
+  fetchContributions,
+  getEdgeCache,
+  mergeContributions,
+  resolveTheme,
+  runAfterResponse,
+  stripSvgExtension,
+  svgError,
+  trackEmbedServed,
+  SITE_URL,
+  type EmbedPlatformEntry,
+} from '@/lib/embed-render';
+import { generateHeatmapSvg } from '@/lib/embed-svg';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OPERATIONAL CONSTRAINT (issue #96): this endpoint is consumed by GitHub's
@@ -39,39 +47,11 @@ import type { ContributionData } from '@/lib/types';
 
 // 24-hour edge cache; stale responses are served for up to 1 hour while
 // revalidating so that GitHub's camo proxy always gets a quick response.
+//
+// Safe to keep this long because nothing here is resolved server-side: the URL
+// fully determines the response. The handle route (/embed/u/[handle]) caches a
+// profile lookup and therefore uses a shorter TTL.
 const CACHE_CONTROL = 'public, s-maxage=86400, stale-while-revalidate=3600';
-
-// Approximate base URL for the "Powered by GitAll" watermark link.
-const SITE_URL = 'https://gitall.app';
-
-// Hard deadline per upstream platform fetch. GitHub's camo proxy only waits
-// a few seconds for the image before rendering a broken placeholder, so a
-// single hung platform must degrade to a partial heatmap (that platform is
-// simply omitted from the merge) rather than stall the whole response past
-// camo's timeout.
-const PLATFORM_FETCH_TIMEOUT_MS = 4000;
-
-/**
- * Returns the Workers global cache, or `null` outside a Worker runtime
- * (`next dev`, Vitest) where `caches.default` does not exist.
- */
-function getEdgeCache(): Cache | null {
-  const globalCaches = (globalThis as { caches?: { default?: Cache } }).caches;
-  return globalCaches?.default ?? null;
-}
-
-/**
- * Registers background work with the Worker execution context so it is not
- * cancelled when the response is returned. Falls back to a floating promise
- * outside a Worker, where the process is long-lived anyway.
- */
-function runAfterResponse(work: Promise<unknown>): void {
-  try {
-    getCloudflareContext().ctx.waitUntil(work);
-  } catch {
-    void work;
-  }
-}
 
 export async function GET(
   request: NextRequest,
@@ -80,7 +60,7 @@ export async function GET(
   const { slug } = await params;
 
   // Accept both /embed/octocat and /embed/octocat.svg
-  const primaryUsername = slug.endsWith('.svg') ? slug.slice(0, -4) : slug;
+  const primaryUsername = stripSvgExtension(slug);
 
   if (!primaryUsername) {
     return svgError('Missing username', 400);
@@ -111,9 +91,7 @@ export async function GET(
     ? (explicitGithub ?? null)
     : primaryUsername;
 
-  const rawTheme = searchParams.get('theme');
-  const theme: EmbedTheme =
-    rawTheme === 'light' || rawTheme === 'dark' ? rawTheme : 'dark';
+  const theme = resolveTheme(searchParams.get('theme'));
 
   const cache = getEdgeCache();
   const cacheKey = new Request(request.url, { method: 'GET' });
@@ -129,67 +107,43 @@ export async function GET(
         hit.headers.get('x-gitall-platforms'),
         theme,
         'hit',
+        'slug',
       );
       return hit;
     }
   }
 
-  // Default to last 12 months
-  const { from, to } = getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD);
-
-  const origin = request.nextUrl.origin;
-
-  // Fetch contributions from all requested platforms in parallel.
-  // NOTE: these loop back through our own public /api/* routes from the
-  // server's egress IP. Keep any Cloudflare rate limiting rule scoped to
-  // /embed/* only — a per-IP limit on /api/* would throttle this endpoint's
-  // own internal calls under load.
-  const fetchTasks: Array<Promise<ContributionData | null>> = [];
-
+  const entries: EmbedPlatformEntry[] = [];
   if (githubUsername) {
-    fetchTasks.push(
-      fetchPlatformContributions(
-        `${origin}/api/github?username=${encodeURIComponent(githubUsername)}&from=${from}&to=${to}`,
-      ),
-    );
+    entries.push({ platform: 'github', username: githubUsername });
   }
-
   if (gitlabUsername) {
-    fetchTasks.push(
-      fetchPlatformContributions(
-        `${origin}/api/gitlab?username=${encodeURIComponent(gitlabUsername)}&from=${from}&to=${to}`,
-      ),
-    );
+    entries.push({ platform: 'gitlab', username: gitlabUsername });
   }
-
   if (bitbucketUsername) {
-    fetchTasks.push(
-      fetchPlatformContributions(
-        `${origin}/api/bitbucket?username=${encodeURIComponent(bitbucketUsername)}&from=${from}&to=${to}`,
-      ),
-    );
+    entries.push({ platform: 'bitbucket', username: bitbucketUsername });
   }
-
   if (giteaUsername) {
-    const giteaParams = new URLSearchParams({
+    entries.push({
+      platform: 'gitea',
       username: giteaUsername,
-      from,
-      to,
+      instanceUrl: giteaInstance,
     });
-    if (giteaInstance) {
-      giteaParams.set('instanceUrl', giteaInstance);
-    }
-    fetchTasks.push(
-      fetchPlatformContributions(`${origin}/api/gitea?${giteaParams}`),
-    );
   }
 
-  if (fetchTasks.length === 0) {
+  if (entries.length === 0) {
     return svgError('No platform usernames provided', 400);
   }
 
-  const results = await Promise.all(fetchTasks);
-  const validResults = results.filter((r): r is ContributionData => r !== null);
+  // Default to last 12 months
+  const { from, to } = getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD);
+
+  const validResults = await fetchContributions(
+    request.nextUrl.origin,
+    entries,
+    from,
+    to,
+  );
 
   if (validResults.length === 0) {
     return svgError('No contribution data found', 404);
@@ -218,107 +172,7 @@ export async function GET(
     runAfterResponse(cache.put(cacheKey, response.clone()));
   }
 
-  trackEmbedServed(request, platforms, theme, 'miss');
+  trackEmbedServed(request, platforms, theme, 'miss', 'slug');
 
   return response;
-}
-
-function trackEmbedServed(
-  request: NextRequest,
-  platforms: string | null,
-  theme: EmbedTheme,
-  cacheStatus: 'hit' | 'miss',
-): void {
-  const refererHost = (() => {
-    try {
-      return new URL(request.headers.get('Referer') ?? '').hostname;
-    } catch {
-      return undefined;
-    }
-  })();
-
-  trackServerEvent(request, ANALYTICS_EVENTS.embedServed, {
-    platforms: platforms ?? 'unknown',
-    platform_count: platforms ? platforms.split('+').length : 0,
-    theme,
-    cache_status: cacheStatus,
-    ...(refererHost ? { referer_host: refererHost } : {}),
-  });
-}
-
-async function fetchPlatformContributions(
-  url: string,
-): Promise<ContributionData | null> {
-  try {
-    const response = await fetch(url, {
-      headers: { 'x-gitall-internal': 'embed' },
-      signal: AbortSignal.timeout(PLATFORM_FETCH_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
-    const data: ContributionData & { error?: string } = await response.json();
-    if (data.error) return null;
-    return data;
-  } catch {
-    // Covers network errors, JSON parse failures, and the AbortSignal
-    // timeout — all degrade to "this platform contributes nothing".
-    return null;
-  }
-}
-
-function mergeContributions(sources: ContributionData[]): ContributionData {
-  if (sources.length === 1) return sources[0];
-
-  const map = new Map<string, number>();
-
-  for (const data of sources) {
-    for (const entry of data.calendar) {
-      map.set(entry.date, (map.get(entry.date) ?? 0) + entry.count);
-    }
-  }
-
-  const calendar = Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, count]) => ({ date, count, level: countToLevel(count) }));
-
-  const totalContributions = calendar.reduce((sum, day) => sum + day.count, 0);
-
-  return {
-    platform: 'integrated',
-    username: sources.map((d) => d.username).join(' + '),
-    totalContributions,
-    dateRange: {
-      from: calendar[0]?.date ?? null,
-      to: calendar[calendar.length - 1]?.date ?? null,
-    },
-    calendar,
-  };
-}
-
-function countToLevel(count: number): number {
-  if (count === 0) return 0;
-  if (count <= 3) return 1;
-  if (count <= 7) return 2;
-  if (count <= 15) return 3;
-  return 4;
-}
-
-/** Return a minimal SVG carrying an error message. */
-function svgError(message: string, status: number) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="40" viewBox="0 0 200 40"><rect width="200" height="40" rx="6" fill="#161b22"/><text x="10" y="24" fill="#f85149" font-size="11" font-family="system-ui,-apple-system,sans-serif">${escapeXml(message)}</text></svg>`;
-  return new Response(svg, {
-    status,
-    headers: {
-      'Content-Type': 'image/svg+xml; charset=utf-8',
-      'Cache-Control': 'no-store',
-      'X-Robots-Tag': 'noindex',
-    },
-  });
-}
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
