@@ -96,6 +96,7 @@ const {
   getProfileByHandle,
   getProfileSummaryByUserId,
   getPublicProfileByHandle,
+  getPublicProfileWithUpdatedAtByHandle,
   isValidHandleFormat,
   normalizeHandle,
   setVisibility,
@@ -344,6 +345,42 @@ describe('getPublicProfileByHandle', () => {
 
   it('normalises the handle before looking it up', async () => {
     await expect(getPublicProfileByHandle('Jane_Doe')).resolves.not.toBeNull();
+  });
+});
+
+describe('getPublicProfileWithUpdatedAtByHandle', () => {
+  it('returns the public projection plus updatedAt for a public profile', async () => {
+    await expect(
+      getPublicProfileWithUpdatedAtByHandle('jane-doe'),
+    ).resolves.toEqual({
+      handle: 'jane-doe',
+      displayName: 'Jane Doe',
+      primaryProvider: 'github',
+      updatedAt: 1_717_777_777_000,
+      connections: [
+        {
+          provider: 'github',
+          username: 'janedoe',
+          avatarUrl: 'https://example.test/avatar.png',
+        },
+        {
+          provider: 'gitlab',
+          username: 'jane.doe',
+          avatarUrl: null,
+        },
+      ],
+    });
+  });
+
+  it('preserves the null contract for private and missing handles', async () => {
+    seed({ isPublic: false });
+
+    await expect(
+      getPublicProfileWithUpdatedAtByHandle('jane-doe'),
+    ).resolves.toBeNull();
+    await expect(
+      getPublicProfileWithUpdatedAtByHandle('nobody'),
+    ).resolves.toBeNull();
   });
 });
 

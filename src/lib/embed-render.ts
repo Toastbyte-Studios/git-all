@@ -64,6 +64,15 @@ export function resolveTheme(raw: string | null): EmbedTheme {
   return raw === 'light' || raw === 'dark' ? raw : 'dark';
 }
 
+export function buildEmbedCacheKey(
+  request: NextRequest,
+  version: number,
+): Request {
+  const url = new URL(request.url);
+  url.searchParams.set('v', String(version));
+  return new Request(url.toString(), { method: 'GET' });
+}
+
 /**
  * Fetches every entry in parallel and drops the ones that fail.
  *

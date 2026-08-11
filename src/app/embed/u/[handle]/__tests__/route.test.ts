@@ -1,14 +1,16 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ContributionData, PublicProfile } from '@/lib/types';
+import type { PublicProfileWithUpdatedAt } from '@/lib/profiles';
+import type { ContributionData } from '@/lib/types';
 
 const profiles = vi.hoisted(() => ({
-  getPublicProfileByHandle:
-    vi.fn<(handle: string) => Promise<PublicProfile | null>>(),
+  getPublicProfileWithUpdatedAtByHandle:
+    vi.fn<(handle: string) => Promise<PublicProfileWithUpdatedAt | null>>(),
 }));
 
 vi.mock('@/lib/profiles', () => ({
-  getPublicProfileByHandle: profiles.getPublicProfileByHandle,
+  getPublicProfileWithUpdatedAtByHandle:
+    profiles.getPublicProfileWithUpdatedAtByHandle,
 }));
 
 const { GET } = await import('../route');
@@ -39,14 +41,15 @@ function makeContributionResponse(data: Partial<ContributionData> = {}) {
 }
 
 function makeProfile(
-  connections: PublicProfile['connections'] = [
+  connections: PublicProfileWithUpdatedAt['connections'] = [
     { provider: 'github', username: 'octocat', avatarUrl: null },
   ],
-): PublicProfile {
+): PublicProfileWithUpdatedAt {
   return {
     handle: 'jane-doe',
     displayName: 'Jane Doe',
     primaryProvider: 'github',
+    updatedAt: 1_717_777_777_000,
     connections,
   };
 }
@@ -56,9 +59,16 @@ function stubEdgeCache(overrides?: {
   put?: (request: Request, response: Response) => Promise<void>;
 }) {
   const cache = {
-    match: vi.fn().mockResolvedValue(undefined),
-    put: vi.fn().mockResolvedValue(undefined),
-    ...overrides,
+    match: overrides?.match
+      ? vi.fn(overrides.match)
+      : vi
+          .fn<(request: Request) => Promise<Response | undefined>>()
+          .mockResolvedValue(undefined),
+    put: overrides?.put
+      ? vi.fn(overrides.put)
+      : vi
+          .fn<(request: Request, response: Response) => Promise<void>>()
+          .mockResolvedValue(undefined),
   };
   vi.stubGlobal('caches', { default: cache });
   return cache;
@@ -67,7 +77,7 @@ function stubEdgeCache(overrides?: {
 describe('handle embed route GET', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    profiles.getPublicProfileByHandle.mockReset();
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockReset();
   });
 
   afterEach(() => {
@@ -80,7 +90,7 @@ describe('handle embed route GET', () => {
     const edgeCache = stubEdgeCache();
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
-    profiles.getPublicProfileByHandle.mockResolvedValue(null);
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(null);
 
     const missing = await GET(
       createRequest('https://gitall.app/embed/u/missing.svg'),
@@ -107,7 +117,7 @@ describe('handle embed route GET', () => {
 
   it('returns cacheable SVG responses and stores platform metadata on cache misses', async () => {
     const edgeCache = stubEdgeCache();
-    profiles.getPublicProfileByHandle.mockResolvedValue(
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(
       makeProfile([
         { provider: 'github', username: 'octocat', avatarUrl: null },
         { provider: 'gitlab', username: 'jdoe', avatarUrl: null },
@@ -138,16 +148,20 @@ describe('handle embed route GET', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(edgeCache.put).toHaveBeenCalledTimes(1);
-    const [, cachedResponse] = edgeCache.put.mock.calls[0] as [
+    const [cacheRequest, cachedResponse] = edgeCache.put.mock.calls[0] as [
       Request,
       Response,
     ];
+    expect(cacheRequest.url).toContain('theme=light');
+    expect(cacheRequest.url).toContain('v=1717777777000');
+    const [, cachedBody] = cacheRequest.url.split('/embed/u/');
+    expect(cachedBody?.startsWith('jane-doe.svg')).toBe(true);
     expect(cachedResponse.headers.get('x-gitall-platforms')).toBe(
       'github+gitlab',
     );
   });
 
-  it('serves cached SVG responses without re-resolving the profile or refetching data', async () => {
+  it('re-resolves the profile before serving a cache hit so stale entries stop matching after profile updates', async () => {
     const cachedResponse = new Response('<svg>cached</svg>', {
       status: 200,
       headers: {
@@ -162,6 +176,9 @@ describe('handle embed route GET', () => {
     });
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(
+      makeProfile(),
+    );
 
     const response = await GET(
       createRequest('https://gitall.app/embed/u/jane-doe.svg'),
@@ -170,9 +187,30 @@ describe('handle embed route GET', () => {
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('<svg>cached</svg>');
+    expect(profiles.getPublicProfileWithUpdatedAtByHandle).toHaveBeenCalledWith(
+      'jane-doe',
+    );
     expect(edgeCache.match).toHaveBeenCalledTimes(1);
+    const [cacheRequest] = edgeCache.match.mock.calls[0] as [Request];
+    expect(cacheRequest.url).toContain('v=1717777777000');
     expect(edgeCache.put).not.toHaveBeenCalled();
-    expect(profiles.getPublicProfileByHandle).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('bypasses the edge cache entirely when the profile is missing or private', async () => {
+    const edgeCache = stubEdgeCache();
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetchMock);
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(null);
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/u/missing.svg'),
+      makeParams('missing.svg'),
+    );
+
+    expect(response.status).toBe(404);
+    expect(edgeCache.match).not.toHaveBeenCalled();
+    expect(edgeCache.put).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

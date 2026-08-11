@@ -368,6 +368,10 @@ export function toPublicProfile(profile: Profile): PublicProfile {
   };
 }
 
+export interface PublicProfileWithUpdatedAt extends PublicProfile {
+  updatedAt: number;
+}
+
 /**
  * Returns the public projection of `handle`, or `null` if the profile does not
  * exist **or is private**.
@@ -382,6 +386,25 @@ export async function getPublicProfileByHandle(
   const profile = await getProfileByHandle(handle);
   if (!profile || !profile.isPublic) return null;
   return toPublicProfile(profile);
+}
+
+/**
+ * Returns the public projection of `handle` plus `updatedAt`, or `null` if the
+ * profile does not exist **or is private**.
+ *
+ * This preserves the same "private and missing are indistinguishable" contract
+ * as {@link getPublicProfileByHandle}, while letting internal callers version a
+ * cache key from the profile row.
+ */
+export async function getPublicProfileWithUpdatedAtByHandle(
+  handle: string,
+): Promise<PublicProfileWithUpdatedAt | null> {
+  const profile = await getProfileByHandle(handle);
+  if (!profile || !profile.isPublic) return null;
+  return {
+    ...toPublicProfile(profile),
+    updatedAt: profile.updatedAt,
+  };
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   getContributionDateRange,
 } from '@/lib/contribution-period';
 import {
+  buildEmbedCacheKey,
   fetchContributions,
   getEdgeCache,
   mergeContributions,
@@ -16,7 +17,7 @@ import {
   type EmbedPlatformEntry,
 } from '@/lib/embed-render';
 import { generateHeatmapSvg } from '@/lib/embed-svg';
-import { getPublicProfileByHandle } from '@/lib/profiles';
+import { getPublicProfileWithUpdatedAtByHandle } from '@/lib/profiles';
 
 // Handle-resolved embed: /embed/u/{handle}.svg
 //
@@ -30,22 +31,22 @@ import { getPublicProfileByHandle } from '@/lib/profiles';
 // OFF zone-wide, and any rate limiting rule must be scoped to /embed/*.
 //
 // PRIVACY CONTRACT
-// `getPublicProfileByHandle` returns null both for a handle that does not exist
-// and for one whose owner has visibility switched off, and the two cases are
-// deliberately indistinguishable to the caller. That property is what stops an
-// <img> tag from being used to probe whether an account exists. Do not add a
-// distinct message, status, or cache header for the private case, and do not
-// swap in `getProfileByHandle` to "improve" the error - that reintroduces the
-// oracle. /u/[handle] draws the same line by rendering 404 rather than 403.
+// `getPublicProfileWithUpdatedAtByHandle` returns null both for a handle that
+// does not exist and for one whose owner has visibility switched off, and the
+// two cases are deliberately indistinguishable to the caller. That property is
+// what stops an <img> tag from being used to probe whether an account exists.
+// Do not add a distinct message, status, or cache header for the private case,
+// and do not swap in `getProfileByHandle` to "improve" the error - that
+// reintroduces the oracle. /u/[handle] draws the same line by rendering 404
+// rather than 403.
 
 // Deliberately shorter than the 24h used by /embed/[slug]. That route resolves
 // nothing server-side, so a cached response can only go stale on contribution
 // data. This one caches a snapshot of the profile's visibility and connections,
-// which means an owner going private, disconnecting a provider, or deleting
-// their account keeps serving from the edge until the entry expires. One hour
-// bounds that window while still absorbing the bulk of camo traffic. A cache
-// purge on visibility change would let this go back up - see the follow-up note
-// on the PR.
+// which means the cache key is versioned by `users.updated_at` so visibility
+// flips, connection changes, and handle renames stop hitting stale entries
+// immediately. One hour still bounds freshness for contribution data while
+// absorbing the bulk of camo traffic.
 const CACHE_CONTROL = 'public, s-maxage=3600, stale-while-revalidate=600';
 
 export async function GET(
@@ -60,9 +61,17 @@ export async function GET(
   }
 
   const theme = resolveTheme(request.nextUrl.searchParams.get('theme'));
-
   const cache = getEdgeCache();
-  const cacheKey = new Request(request.url, { method: 'GET' });
+
+  // Null covers "no such handle" and "profile is private" - see the privacy
+  // contract above. Both fall through to the same response below.
+  const profile = await getPublicProfileWithUpdatedAtByHandle(handle);
+
+  if (!profile || profile.connections.length === 0) {
+    return svgError('Profile not found', 404);
+  }
+
+  const cacheKey = buildEmbedCacheKey(request, profile.updatedAt);
 
   if (cache) {
     const hit = await cache.match(cacheKey);
@@ -76,14 +85,6 @@ export async function GET(
       );
       return hit;
     }
-  }
-
-  // Null covers "no such handle" and "profile is private" - see the privacy
-  // contract above. Both fall through to the same response below.
-  const profile = await getPublicProfileByHandle(handle);
-
-  if (!profile || profile.connections.length === 0) {
-    return svgError('Profile not found', 404);
   }
 
   const entries: EmbedPlatformEntry[] = profile.connections.map(
