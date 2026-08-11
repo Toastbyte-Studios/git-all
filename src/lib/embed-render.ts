@@ -74,6 +74,32 @@ export function buildEmbedCacheKey(
 }
 
 /**
+ * Discriminated result from a single upstream platform fetch.
+ *
+ * - `ok: true`  — data was returned successfully.
+ * - `not_found` — the upstream gave a definitive 404 (user does not exist).
+ * - `transient`  — upstream returned 5xx, timed out, rate-limited, or we
+ *   couldn't parse the response. Never cache a 404 derived from a transient
+ *   failure; that would serve broken embeds to real users during outages.
+ */
+export type PlatformResult =
+  | { ok: true; data: ContributionData }
+  | { ok: false; reason: 'not_found' | 'transient' };
+
+/**
+ * Result from `fetchContributions`.
+ *
+ * `hasTransient` is `true` when at least one platform returned a transient
+ * (non-definitive) failure. The caller uses this to decide whether a 404
+ * response is safe to cache: it is only safe when every platform that failed
+ * did so definitively.
+ */
+export interface FetchContributionsResult {
+  data: ContributionData[];
+  hasTransient: boolean;
+}
+
+/**
  * Fetches every entry in parallel and drops the ones that fail.
  *
  * NOTE: these loop back through our own public /api/* routes from the server's
@@ -86,13 +112,17 @@ export async function fetchContributions(
   entries: EmbedPlatformEntry[],
   from: string,
   to: string,
-): Promise<ContributionData[]> {
+): Promise<FetchContributionsResult> {
   const results = await Promise.all(
     entries.map((entry) =>
       fetchPlatformContributions(buildPlatformUrl(origin, entry, from, to)),
     ),
   );
-  return results.filter((r): r is ContributionData => r !== null);
+  const data = results
+    .filter((r): r is { ok: true; data: ContributionData } => r.ok)
+    .map((r) => r.data);
+  const hasTransient = results.some((r) => !r.ok && r.reason === 'transient');
+  return { data, hasTransient };
 }
 
 function buildPlatformUrl(
@@ -110,20 +140,52 @@ function buildPlatformUrl(
 
 async function fetchPlatformContributions(
   url: string,
-): Promise<ContributionData | null> {
+): Promise<PlatformResult> {
   try {
     const response = await fetch(url, {
       headers: { 'x-gitall-internal': 'embed' },
       signal: AbortSignal.timeout(PLATFORM_FETCH_TIMEOUT_MS),
     });
-    if (!response.ok) return null;
+
+    // Definitive user-not-found from upstream.
+    if (response.status === 404) return { ok: false, reason: 'not_found' };
+
+    // Rate limiting is transient: a 429, or a GitHub 403 with
+    // x-ratelimit-remaining: 0. Misclassifying this as not_found would cache
+    // mass 404s for real users at exactly the moment the system is under load.
+    if (response.status === 429) return { ok: false, reason: 'transient' };
+    if (
+      response.status === 403 &&
+      response.headers.get('x-ratelimit-remaining') === '0'
+    ) {
+      return { ok: false, reason: 'transient' };
+    }
+
+    // Any other non-2xx (e.g. 5xx server error) is transient.
+    if (!response.ok) return { ok: false, reason: 'transient' };
+
     const data: ContributionData & { error?: string } = await response.json();
-    if (data.error) return null;
-    return data;
+
+    if (data.error) {
+      // A "user not found" style error body from the API is definitive.
+      // Anything else (quota exhausted, internal error, etc.) is transient.
+      const lower = data.error.toLowerCase();
+      const definitive =
+        lower.includes('not found') ||
+        lower.includes('does not exist') ||
+        lower.includes('no such user');
+      return {
+        ok: false,
+        reason: definitive ? 'not_found' : 'transient',
+      };
+    }
+
+    return { ok: true, data };
   } catch {
     // Covers network errors, JSON parse failures, and the AbortSignal
-    // timeout — all degrade to "this platform contributes nothing".
-    return null;
+    // timeout — all degrade to a transient failure rather than a definitive
+    // not_found, because we cannot tell whether the user exists.
+    return { ok: false, reason: 'transient' };
   }
 }
 
@@ -198,15 +260,25 @@ export function trackEmbedServed(
  * profile and a nonexistent one have to produce identical responses, or the
  * endpoint becomes an existence oracle for any guessable handle — see the
  * contract on `getPublicProfileByHandle`.
+ *
+ * `cacheDirective` overrides the default `no-store`. Keep the default for any
+ * call site that has not been explicitly audited for cacheability. Pass a
+ * `public, s-maxage=…` directive only for responses whose content is fully
+ * determined by the request URL with no transient upstream dependency.
  */
-export function svgError(message: string, status: number): Response {
+export function svgError(
+  message: string,
+  status: number,
+  cacheDirective = 'no-store',
+): Response {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="40" viewBox="0 0 200 40"><rect width="200" height="40" rx="6" fill="#161b22"/><text x="10" y="24" fill="#f85149" font-size="11" font-family="system-ui,-apple-system,sans-serif">${escapeXml(message)}</text></svg>`;
   return new Response(svg, {
     status,
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',
-      'Cache-Control': 'no-store',
+      'Cache-Control': cacheDirective,
       'X-Robots-Tag': 'noindex',
+      Vary: 'Accept-Encoding',
     },
   });
 }
