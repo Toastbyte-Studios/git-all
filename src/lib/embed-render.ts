@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 import { trackServerEvent } from '@/lib/analytics-server';
 import type { EmbedTheme } from '@/lib/embed-svg';
-import type { ContributionData } from '@/lib/types';
+import type { ContributionData, Platform } from '@/lib/types';
 
 // Shared pipeline behind both embed routes:
 //
@@ -28,7 +28,7 @@ export const PLATFORM_FETCH_TIMEOUT_MS = 4000;
 export type EmbedSource = 'slug' | 'handle';
 
 export interface EmbedPlatformEntry {
-  platform: 'github' | 'gitlab' | 'bitbucket' | 'gitea';
+  platform: Platform;
   username: string;
   instanceUrl?: string | null;
 }
