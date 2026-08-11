@@ -278,6 +278,7 @@ export function svgError(
       'Content-Type': 'image/svg+xml; charset=utf-8',
       'Cache-Control': cacheDirective,
       'X-Robots-Tag': 'noindex',
+      Vary: 'Accept-Encoding',
     },
   });
 }

@@ -211,8 +211,9 @@ describe('handle embed route GET', () => {
     );
 
     expect(response.status).toBe(404);
-    expect(edgeCache.match).not.toHaveBeenCalled();
-    // Cacheable profile-not-found is now stored in the edge cache.
+    // Checks the profile-not-found sentinel key before storing it.
+    expect(edgeCache.match).toHaveBeenCalledTimes(1);
+    // Cacheable profile-not-found is stored in the edge cache on a miss.
     expect(edgeCache.put).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });

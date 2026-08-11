@@ -73,6 +73,10 @@ export async function GET(
     // cached entry. The body and headers are identical whether the profile is
     // absent or private — do not introduce a difference here.
     const profileNotFoundKey = buildEmbedCacheKey(request, 0);
+    if (cache) {
+      const cachedNotFound = await cache.match(profileNotFoundKey);
+      if (cachedNotFound) return cachedNotFound;
+    }
     const profileNotFoundResponse = svgError(
       'Profile not found',
       404,
