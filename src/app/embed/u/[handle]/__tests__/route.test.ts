@@ -112,7 +112,9 @@ describe('handle embed route GET', () => {
     );
     expect(privateProfile.headers.get('X-Robots-Tag')).toBe('noindex');
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(edgeCache.put).not.toHaveBeenCalled();
+    // Both responses are now cached (cacheable 404), and they produce the same
+    // Cache-Control so no oracle exists distinguishing private from nonexistent.
+    expect(edgeCache.put).toHaveBeenCalledTimes(2);
   });
 
   it('returns cacheable SVG responses and stores platform metadata on cache misses', async () => {
@@ -210,7 +212,8 @@ describe('handle embed route GET', () => {
 
     expect(response.status).toBe(404);
     expect(edgeCache.match).not.toHaveBeenCalled();
-    expect(edgeCache.put).not.toHaveBeenCalled();
+    // Cacheable profile-not-found is now stored in the edge cache.
+    expect(edgeCache.put).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

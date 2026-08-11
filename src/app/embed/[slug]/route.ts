@@ -63,7 +63,7 @@ export async function GET(
   const primaryUsername = stripSvgExtension(slug);
 
   if (!primaryUsername) {
-    return svgError('Missing username', 400);
+    return svgError('Missing username', 400, 'public, s-maxage=86400');
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -132,13 +132,17 @@ export async function GET(
   }
 
   if (entries.length === 0) {
-    return svgError('No platform usernames provided', 400);
+    return svgError(
+      'No platform usernames provided',
+      400,
+      'public, s-maxage=86400',
+    );
   }
 
   // Default to last 12 months
   const { from, to } = getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD);
 
-  const validResults = await fetchContributions(
+  const { data: validResults, hasTransient } = await fetchContributions(
     request.nextUrl.origin,
     entries,
     from,
@@ -146,7 +150,22 @@ export async function GET(
   );
 
   if (validResults.length === 0) {
-    return svgError('No contribution data found', 404);
+    // Only cache the 404 when every failure was definitive (user not found).
+    // If any platform timed out, returned 5xx, or was rate-limited the cause
+    // is transient and we must not cache — doing so would serve broken embeds
+    // to real users during an upstream blip.
+    const errorCacheDirective = hasTransient
+      ? 'no-store'
+      : 'public, s-maxage=3600';
+    const errorResponse = svgError(
+      'No contribution data found',
+      404,
+      errorCacheDirective,
+    );
+    if (cache && !hasTransient) {
+      runAfterResponse(cache.put(cacheKey, errorResponse.clone()));
+    }
+    return errorResponse;
   }
 
   const merged = mergeContributions(validResults);

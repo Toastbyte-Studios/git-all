@@ -57,7 +57,7 @@ export async function GET(
   const handle = stripSvgExtension(rawHandle);
 
   if (!handle) {
-    return svgError('Missing handle', 400);
+    return svgError('Missing handle', 400, 'public, s-maxage=86400');
   }
 
   const theme = resolveTheme(request.nextUrl.searchParams.get('theme'));
@@ -68,7 +68,22 @@ export async function GET(
   const profile = await getPublicProfileWithUpdatedAtByHandle(handle);
 
   if (!profile || profile.connections.length === 0) {
-    return svgError('Profile not found', 404);
+    // Sentinel version 0: a real profile.updatedAt is a Unix timestamp in
+    // seconds and is always > 0, so this key cannot collide with a valid
+    // cached entry. The body and headers are identical whether the profile is
+    // absent or private — do not introduce a difference here.
+    const profileNotFoundKey = buildEmbedCacheKey(request, 0);
+    const profileNotFoundResponse = svgError(
+      'Profile not found',
+      404,
+      'public, s-maxage=3600',
+    );
+    if (cache) {
+      runAfterResponse(
+        cache.put(profileNotFoundKey, profileNotFoundResponse.clone()),
+      );
+    }
+    return profileNotFoundResponse;
   }
 
   const cacheKey = buildEmbedCacheKey(request, profile.updatedAt);
@@ -97,7 +112,7 @@ export async function GET(
   // Default to last 12 months.
   const { from, to } = getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD);
 
-  const validResults = await fetchContributions(
+  const { data: validResults, hasTransient } = await fetchContributions(
     request.nextUrl.origin,
     entries,
     from,
@@ -105,7 +120,21 @@ export async function GET(
   );
 
   if (validResults.length === 0) {
-    return svgError('No contribution data found', 404);
+    // Only cache when all failures were definitive. A transient failure
+    // (timeout, 5xx, rate limit) must stay no-store so a real user's embed
+    // recovers as soon as the upstream does.
+    const errorCacheDirective = hasTransient
+      ? 'no-store'
+      : 'public, s-maxage=3600';
+    const errorResponse = svgError(
+      'No contribution data found',
+      404,
+      errorCacheDirective,
+    );
+    if (cache && !hasTransient) {
+      runAfterResponse(cache.put(cacheKey, errorResponse.clone()));
+    }
+    return errorResponse;
   }
 
   const merged = mergeContributions(validResults);
