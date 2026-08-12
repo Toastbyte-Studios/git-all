@@ -1,7 +1,7 @@
 name: Require version bump
 
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - main
 
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
 
       - name: Ensure package version changed from main
         env:
