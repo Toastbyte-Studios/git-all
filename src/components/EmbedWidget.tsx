@@ -17,6 +17,8 @@ const SITE_URL = 'https://gitall.app';
 // any custom configuration.
 const REFERRAL_URL = `${SITE_URL}?utm_source=embed&utm_medium=referral&utm_campaign=heatmap`;
 
+const UTM_SUFFIX = '?utm_source=embed&utm_medium=referral&utm_campaign=heatmap';
+
 // Server-rendered placeholders. These are deliberately static so the markup is
 // deterministic; random names are swapped in after mount (see below) to avoid a
 // hydration mismatch. Order: GitHub, GitLab, Bitbucket, Gitea/Forgejo.
@@ -133,7 +135,18 @@ function SnippetRow({ label, value, onCopy }: SnippetRowProps) {
   );
 }
 
-export function EmbedWidget() {
+interface EmbedWidgetProps {
+  /** Handle of the signed-in user's public profile, if available. */
+  handle?: string | null;
+  /** Whether the signed-in user's profile is public. */
+  isPublic?: boolean;
+}
+
+export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
+  const eligibleForHandleEmbed = Boolean(handle && isPublic);
+  const [mode, setMode] = useState<'handle' | 'custom'>(
+    eligibleForHandleEmbed ? 'handle' : 'custom',
+  );
   const [placeholders, setPlaceholders] = useState(DEFAULT_PLACEHOLDERS);
   const [github, setGithub] = useState('');
   const [gitlab, setGitlab] = useState('');
@@ -146,19 +159,39 @@ export function EmbedWidget() {
     setPlaceholders(generatePlaceholderNames(DEFAULT_PLACEHOLDERS.length));
   }, []);
 
-  const embedUrl = buildEmbedUrl(github, gitlab, bitbucket, gitea, instance);
+  // Handle-keyed embed URL — resolves live from the user's public profile.
+  // The link target points at the profile page rather than the site home.
+  const handleEmbedUrl =
+    eligibleForHandleEmbed && handle
+      ? `${SITE_URL}/embed/u/${encodeURIComponent(handle)}.svg`
+      : null;
+  const handleReferralUrl = handle
+    ? `${SITE_URL}/u/${encodeURIComponent(handle)}${UTM_SUFFIX}`
+    : null;
+
+  const customEmbedUrl = buildEmbedUrl(
+    github,
+    gitlab,
+    bitbucket,
+    gitea,
+    instance,
+  );
 
   // Wrap the image in a link back to the site. Links *inside* the SVG are
   // not clickable on GitHub — camo-proxied images are sandboxed — so the
   // click-through has to live in the snippet, making the whole heatmap a
   // link to GitAll. UTM params let GA4 attribute click-throughs automatically
   // as "embed / referral" without any custom configuration.
-  const markdownSnippet = embedUrl
-    ? `[![GitAll contributions](${embedUrl})](${REFERRAL_URL})`
+  const activeEmbedUrl = mode === 'handle' ? handleEmbedUrl : customEmbedUrl;
+  const activeReferralUrl =
+    mode === 'handle' && handleReferralUrl ? handleReferralUrl : REFERRAL_URL;
+
+  const markdownSnippet = activeEmbedUrl
+    ? `[![GitAll contributions](${activeEmbedUrl})](${activeReferralUrl})`
     : null;
 
-  const htmlSnippet = embedUrl
-    ? `<a href="${REFERRAL_URL}"><img src="${embedUrl}" alt="Contribution heatmap" /></a>`
+  const htmlSnippet = activeEmbedUrl
+    ? `<a href="${activeReferralUrl}"><img src="${activeEmbedUrl}" alt="Contribution heatmap" /></a>`
     : null;
 
   const platformCount = [github, gitlab, bitbucket, gitea].filter((v) =>
@@ -175,121 +208,51 @@ export function EmbedWidget() {
   // border and background.
   return (
     <div className="space-y-5">
-      {/* Username inputs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label
-            htmlFor="embed-github"
-            className="block text-xs font-medium mb-1.5"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            GitHub username
-          </label>
-          <input
-            id="embed-github"
-            type="text"
-            value={github}
-            onChange={(e) => setGithub(e.target.value)}
-            placeholder={placeholders[0]}
-            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
-            style={inputStyle}
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="embed-gitlab"
-            className="block text-xs font-medium mb-1.5"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            GitLab username
-          </label>
-          <input
-            id="embed-gitlab"
-            type="text"
-            value={gitlab}
-            onChange={(e) => setGitlab(e.target.value)}
-            placeholder={placeholders[1]}
-            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
-            style={inputStyle}
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="embed-bitbucket"
-            className="block text-xs font-medium mb-1.5"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Bitbucket workspace
-          </label>
-          <input
-            id="embed-bitbucket"
-            type="text"
-            value={bitbucket}
-            onChange={(e) => setBitbucket(e.target.value)}
-            placeholder={placeholders[2]}
-            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
-            style={inputStyle}
-          />
-        </div>
-      </div>
-
-      {/* Gitea toggle */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowGitea((v) => !v)}
-          className="text-xs transition-colors cursor-pointer"
-          style={{ color: 'var(--accent)' }}
+      {/* Mode toggle — only visible to users eligible for a handle embed */}
+      {eligibleForHandleEmbed && (
+        <div
+          className="flex rounded-lg overflow-hidden text-xs"
+          style={{ border: '1px solid var(--border)' }}
         >
-          {showGitea ? '− Hide Gitea/Forgejo' : '+ Add Gitea/Forgejo'}
-        </button>
+          <button
+            type="button"
+            onClick={() => setMode('handle')}
+            className="flex-1 px-3 py-1.5 font-medium transition-colors cursor-pointer"
+            style={{
+              background:
+                mode === 'handle' ? 'var(--accent)' : 'var(--bg-surface)',
+              color: mode === 'handle' ? '#0d1117' : 'var(--text-secondary)',
+            }}
+          >
+            My handle
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('custom')}
+            className="flex-1 px-3 py-1.5 font-medium transition-colors cursor-pointer"
+            style={{
+              background:
+                mode === 'custom' ? 'var(--accent)' : 'var(--bg-surface)',
+              color: mode === 'custom' ? '#0d1117' : 'var(--text-secondary)',
+            }}
+          >
+            Custom usernames
+          </button>
+        </div>
+      )}
 
-        {showGitea && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-            <div>
-              <label
-                htmlFor="embed-gitea"
-                className="block text-xs font-medium mb-1.5"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Gitea/Forgejo username
-              </label>
-              <input
-                id="embed-gitea"
-                type="text"
-                value={gitea}
-                onChange={(e) => setGitea(e.target.value)}
-                placeholder={placeholders[3]}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
-                style={inputStyle}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="embed-instance"
-                className="block text-xs font-medium mb-1.5"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Instance URL{' '}
-                <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
-              </label>
-              <input
-                id="embed-instance"
-                type="url"
-                value={instance}
-                onChange={(e) => setInstance(e.target.value)}
-                placeholder="https://codeberg.org"
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
-                style={inputStyle}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Handle-keyed form — shown to signed-in users with a public profile */}
+      {mode === 'handle' && eligibleForHandleEmbed && handle ? (
+        <div className="space-y-4">
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            Your snippet is keyed to your profile handle{' '}
+            <strong style={{ color: 'var(--accent)' }}>
+              {SITE_URL}/u/{handle}
+            </strong>
+            . It automatically picks up newly connected providers and survives
+            username changes on any platform.
+          </p>
 
-      {/* Snippets */}
-      {embedUrl && markdownSnippet && htmlSnippet ? (
-        <div className="space-y-4 pt-1">
           <div
             className="h-px"
             style={{ backgroundColor: 'var(--border)' }}
@@ -298,35 +261,189 @@ export function EmbedWidget() {
 
           <SnippetRow
             label="Markdown (GitHub README)"
-            value={markdownSnippet}
+            value={markdownSnippet ?? ''}
             onCopy={() =>
               trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
                 snippet_type: 'markdown',
-                platform_count: platformCount,
+                platform_count: 0,
               })
             }
           />
           <SnippetRow
             label="HTML"
-            value={htmlSnippet}
+            value={htmlSnippet ?? ''}
             onCopy={() =>
               trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
                 snippet_type: 'html',
-                platform_count: platformCount,
+                platform_count: 0,
               })
             }
           />
 
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and the
-            heatmap links back to gitall.app. Refreshes daily via Cloudflare
-            edge cache.
+            heatmap links to your profile. Refreshes hourly via Cloudflare edge
+            cache.
           </p>
         </div>
       ) : (
-        <p className="text-xs pt-1" style={{ color: 'var(--text-muted)' }}>
-          Enter at least one username above to generate your embed snippet.
-        </p>
+        /* Custom username inputs */
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label
+                htmlFor="embed-github"
+                className="block text-xs font-medium mb-1.5"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                GitHub username
+              </label>
+              <input
+                id="embed-github"
+                type="text"
+                value={github}
+                onChange={(e) => setGithub(e.target.value)}
+                placeholder={placeholders[0]}
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="embed-gitlab"
+                className="block text-xs font-medium mb-1.5"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                GitLab username
+              </label>
+              <input
+                id="embed-gitlab"
+                type="text"
+                value={gitlab}
+                onChange={(e) => setGitlab(e.target.value)}
+                placeholder={placeholders[1]}
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="embed-bitbucket"
+                className="block text-xs font-medium mb-1.5"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Bitbucket workspace
+              </label>
+              <input
+                id="embed-bitbucket"
+                type="text"
+                value={bitbucket}
+                onChange={(e) => setBitbucket(e.target.value)}
+                placeholder={placeholders[2]}
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Gitea toggle */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowGitea((v) => !v)}
+              className="text-xs transition-colors cursor-pointer"
+              style={{ color: 'var(--accent)' }}
+            >
+              {showGitea ? '− Hide Gitea/Forgejo' : '+ Add Gitea/Forgejo'}
+            </button>
+
+            {showGitea && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label
+                    htmlFor="embed-gitea"
+                    className="block text-xs font-medium mb-1.5"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    Gitea/Forgejo username
+                  </label>
+                  <input
+                    id="embed-gitea"
+                    type="text"
+                    value={gitea}
+                    onChange={(e) => setGitea(e.target.value)}
+                    placeholder={placeholders[3]}
+                    className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="embed-instance"
+                    className="block text-xs font-medium mb-1.5"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    Instance URL{' '}
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      (optional)
+                    </span>
+                  </label>
+                  <input
+                    id="embed-instance"
+                    type="url"
+                    value={instance}
+                    onChange={(e) => setInstance(e.target.value)}
+                    placeholder="https://codeberg.org"
+                    className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Snippets */}
+          {activeEmbedUrl && markdownSnippet && htmlSnippet ? (
+            <div className="space-y-4 pt-1">
+              <div
+                className="h-px"
+                style={{ backgroundColor: 'var(--border)' }}
+                aria-hidden="true"
+              />
+
+              <SnippetRow
+                label="Markdown (GitHub README)"
+                value={markdownSnippet}
+                onCopy={() =>
+                  trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
+                    snippet_type: 'markdown',
+                    platform_count: platformCount,
+                  })
+                }
+              />
+              <SnippetRow
+                label="HTML"
+                value={htmlSnippet}
+                onCopy={() =>
+                  trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
+                    snippet_type: 'html',
+                    platform_count: platformCount,
+                  })
+                }
+              />
+
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and
+                the heatmap links back to gitall.app. Refreshes daily via
+                Cloudflare edge cache.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs pt-1" style={{ color: 'var(--text-muted)' }}>
+              Enter at least one username above to generate your embed snippet.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
