@@ -635,10 +635,15 @@ export async function setHandle(
   // A handle somebody else released is not free. Reported as 'taken' on
   // purpose — distinguishing "reserved by a previous owner" would tell a
   // stranger that some account once used it.
-  const retired = await db
-    .prepare('SELECT user_id FROM handle_history WHERE handle = ?1 LIMIT 1')
-    .bind(newHandle)
-    .first<{ user_id: string }>();
+  let retired: { user_id: string } | null;
+  try {
+    retired = await db
+      .prepare('SELECT user_id FROM handle_history WHERE handle = ?1 LIMIT 1')
+      .bind(newHandle)
+      .first<{ user_id: string }>();
+  } catch {
+    return { ok: false, reason: 'no_db' };
+  }
 
   if (retired !== null && retired.user_id !== userId) {
     return { ok: false, reason: 'taken' };
@@ -682,7 +687,11 @@ export async function setHandle(
 
   // One batch, one transaction. A partial apply here would either strand the
   // old handle unreserved or reserve it without performing the rename.
-  await db.batch(statements);
+  try {
+    await db.batch(statements);
+  } catch {
+    return { ok: false, reason: 'no_db' };
+  }
 
   return { ok: true };
 }
