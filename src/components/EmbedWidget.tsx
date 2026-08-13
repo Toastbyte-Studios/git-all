@@ -226,6 +226,11 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
   // click-through has to live in the snippet, making the whole heatmap a
   // link to GitAll. UTM params let GA4 attribute click-throughs automatically
   // as "embed / referral" without any custom configuration.
+  //
+  // `embed_generated` carries a `source` param using the same 'handle' | 'slug'
+  // vocabulary as `embed_served` (see trackEmbedServed in lib/embed-render.ts),
+  // so copies and renders can be compared on one axis in GA4 rather than
+  // needing two different breakdowns to answer the same question.
   const activeEmbedUrl = mode === 'handle' ? handleEmbedUrl : customEmbedUrl;
   const activeReferralUrl =
     mode === 'handle' && handleReferralUrl ? handleReferralUrl : REFERRAL_URL;
@@ -318,6 +323,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
               trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
                 snippet_type: 'markdown',
                 platform_count: 0,
+                source: 'handle',
               })
             }
           />
@@ -328,6 +334,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
               trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
                 snippet_type: 'html',
                 platform_count: 0,
+                source: 'handle',
               })
             }
           />
@@ -470,6 +477,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
                   trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
                     snippet_type: 'markdown',
                     platform_count: platformCount,
+                    source: 'slug',
                   })
                 }
               />
@@ -480,6 +488,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
                   trackClientEvent(ANALYTICS_EVENTS.embedGenerated, {
                     snippet_type: 'html',
                     platform_count: platformCount,
+                    source: 'slug',
                   })
                 }
               />
