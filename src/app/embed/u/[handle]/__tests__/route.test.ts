@@ -6,11 +6,14 @@ import type { ContributionData } from '@/lib/types';
 const profiles = vi.hoisted(() => ({
   getPublicProfileWithUpdatedAtByHandle:
     vi.fn<(handle: string) => Promise<PublicProfileWithUpdatedAt | null>>(),
+  resolvePublicHandleRedirect:
+    vi.fn<(handle: string) => Promise<string | null>>(),
 }));
 
 vi.mock('@/lib/profiles', () => ({
   getPublicProfileWithUpdatedAtByHandle:
     profiles.getPublicProfileWithUpdatedAtByHandle,
+  resolvePublicHandleRedirect: profiles.resolvePublicHandleRedirect,
 }));
 
 const { GET } = await import('../route');
@@ -78,6 +81,10 @@ describe('handle embed route GET', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     profiles.getPublicProfileWithUpdatedAtByHandle.mockReset();
+    // Default: the handle was never retired, so every pre-existing case still
+    // exercises the plain not-found path rather than the redirect.
+    profiles.resolvePublicHandleRedirect.mockReset();
+    profiles.resolvePublicHandleRedirect.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -115,6 +122,48 @@ describe('handle embed route GET', () => {
     // Both responses are now cached (cacheable 404), and they produce the same
     // Cache-Control so no oracle exists distinguishing private from nonexistent.
     expect(edgeCache.put).toHaveBeenCalledTimes(2);
+  });
+
+  it('redirects a retired handle to the owner’s current one, preserving the theme', async () => {
+    const edgeCache = stubEdgeCache();
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetchMock);
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(null);
+    profiles.resolvePublicHandleRedirect.mockResolvedValue('jane-smith');
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/u/jane-doe.svg?theme=light'),
+      makeParams('jane-doe.svg'),
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe(
+      'https://gitall.app/embed/u/jane-smith.svg?theme=light',
+    );
+    // 302, not 301/308: renames are reversible and camo caches hard enough
+    // that a permanent redirect would be unfixable from our side.
+    expect(response.headers.get('Cache-Control')).toBe('public, s-maxage=300');
+    expect(response.headers.get('X-Robots-Tag')).toBe('noindex');
+    // No upstream work, and nothing written to the edge cache under the old key.
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(edgeCache.put).not.toHaveBeenCalled();
+  });
+
+  it('does not redirect when the retired handle’s owner is private', async () => {
+    stubEdgeCache();
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>());
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(null);
+    // resolvePublicHandleRedirect returns null for a private owner, so the
+    // retired handle stays as dead-looking as an unregistered one.
+    profiles.resolvePublicHandleRedirect.mockResolvedValue(null);
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/u/jane-doe.svg'),
+      makeParams('jane-doe.svg'),
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('Location')).toBeNull();
   });
 
   it('returns cacheable SVG responses and stores platform metadata on cache misses', async () => {
