@@ -17,7 +17,10 @@ import {
   type EmbedPlatformEntry,
 } from '@/lib/embed-render';
 import { generateHeatmapSvg } from '@/lib/embed-svg';
-import { getPublicProfileWithUpdatedAtByHandle } from '@/lib/profiles';
+import {
+  getPublicProfileWithUpdatedAtByHandle,
+  resolvePublicHandleRedirect,
+} from '@/lib/profiles';
 
 // Handle-resolved embed: /embed/u/{handle}.svg
 //
@@ -49,6 +52,13 @@ import { getPublicProfileWithUpdatedAtByHandle } from '@/lib/profiles';
 // absorbing the bulk of camo traffic.
 const CACHE_CONTROL = 'public, s-maxage=3600, stale-while-revalidate=600';
 
+// Retired-handle redirects get a much shorter TTL than the images themselves.
+// The redirect encodes a mapping that a second rename or a visibility change
+// invalidates, and unlike the image responses there is no `updated_at` in the
+// cache key to version it. Five minutes bounds how long a stale hop can
+// survive while still absorbing a burst.
+const REDIRECT_CACHE_CONTROL = 'public, s-maxage=300';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
@@ -66,6 +76,37 @@ export async function GET(
   // Null covers "no such handle" and "profile is private" - see the privacy
   // contract above. Both fall through to the same response below.
   const profile = await getPublicProfileWithUpdatedAtByHandle(handle);
+
+  // An embed pasted into a README before a rename would otherwise start
+  // rendering the 404 image, on a page we do not control and get no signal
+  // from. Redirect it to the owner's current handle instead.
+  //
+  // Only reachable when the handle resolves to nothing at all: a profile that
+  // exists but has no connections is a *current* handle and belongs in the
+  // shared not-found path below, not here.
+  //
+  // `resolvePublicHandleRedirect` returns null for a private owner, so this
+  // does not become the existence oracle the privacy contract above rules out.
+  if (!profile) {
+    const currentHandle = await resolvePublicHandleRedirect(handle);
+    if (currentHandle) {
+      // Rebuilt from the request URL so `?theme=` survives the hop.
+      const target = new URL(request.url);
+      target.pathname = `/embed/u/${encodeURIComponent(currentHandle)}.svg`;
+
+      // 302 and a short TTL, for the same reason /u/[handle] avoids a 308:
+      // renames are reversible, and camo caches aggressively enough that a
+      // permanent redirect baked into its cache would be unfixable from here.
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: target.toString(),
+          'Cache-Control': REDIRECT_CACHE_CONTROL,
+          'X-Robots-Tag': 'noindex',
+        },
+      });
+    }
+  }
 
   if (!profile || profile.connections.length === 0) {
     // Sentinel version 0: a real profile.updatedAt is a Unix timestamp in

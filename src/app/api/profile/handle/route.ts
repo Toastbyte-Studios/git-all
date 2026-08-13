@@ -10,6 +10,13 @@ import {
 /**
  * GET /api/profile/handle?candidate=<handle>
  * Returns `{ available: boolean, valid: boolean }`.
+ *
+ * The session is read so the caller's own retired handles report as available,
+ * matching what `setHandle()` will actually allow. Without it the editor would
+ * show "already taken" for a handle the user is entitled to reclaim, and the
+ * Save button stays disabled on that state.
+ *
+ * Unauthenticated callers still get a useful answer, just the stricter one.
  */
 export async function GET(request: NextRequest) {
   const candidate = request.nextUrl.searchParams.get('candidate') ?? '';
@@ -19,7 +26,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ available: false, valid: false });
   }
 
-  const available = await isHandleAvailable(candidate);
+  const session = await getAuthSession();
+  const available = await isHandleAvailable(candidate, session?.userId);
   return NextResponse.json({ available, valid: true });
 }
 

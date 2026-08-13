@@ -264,7 +264,7 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
         <div className="space-y-2">
           {handle && (
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              ⚠ Changing your handle will break any{' '}
+              Links and embeds already using{' '}
               <code
                 className="rounded px-1"
                 style={{
@@ -272,9 +272,19 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
                   fontFamily: 'monospace',
                 }}
               >
-                /embed/u/{handle}.svg
+                {handle}
               </code>{' '}
-              URLs already pasted into READMEs or other pages.
+              will redirect to your new handle, and nobody else can claim{' '}
+              <code
+                className="rounded px-1"
+                style={{
+                  backgroundColor: 'var(--bg)',
+                  fontFamily: 'monospace',
+                }}
+              >
+                {handle}
+              </code>{' '}
+              afterwards. You can change your handle once every 7 days.
             </p>
           )}
           <div className="flex items-center gap-1.5">

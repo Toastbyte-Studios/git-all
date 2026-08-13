@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { notFound, permanentRedirect } from 'next/navigation';
+import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 import { trackServerEvent } from '@/lib/analytics-server';
@@ -7,6 +7,7 @@ import { getAuthSession } from '@/lib/auth-session';
 import {
   getProfileByHandle,
   getPublicProfileByHandle,
+  resolvePublicHandleRedirect,
   toPublicProfile,
 } from '@/lib/profiles';
 import { PublicProfileClient } from './PublicProfileClient';
@@ -73,6 +74,19 @@ export default async function PublicProfilePage({ params }: PageProps) {
   // `toPublicProfile()` at the bottom of this function.
   const profile = await getProfileByHandle(handle);
   if (!profile) {
+    // The handle may have been renamed away from. Links shared before the
+    // rename should keep working rather than dead-ending on a 404 the owner
+    // never sees.
+    //
+    // 307, not 308. A user is allowed to rename back to an old handle, and a
+    // permanent redirect cached in a browser would then send `old → new` from
+    // cache while the server sends `new → old`, leaving that browser bouncing
+    // between the two with no way to clear it from our side. The canonical tag
+    // on the target already consolidates these for search engines.
+    const currentHandle = await resolvePublicHandleRedirect(handle);
+    if (currentHandle) {
+      redirect(`/u/${currentHandle}`);
+    }
     notFound();
   }
 
