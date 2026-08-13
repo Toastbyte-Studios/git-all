@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthSessionFromRequest } from '@/lib/auth-session';
 import { getAvailableOAuthProviders } from '@/lib/oauth-providers';
+import { getProfileSummaryByUserId } from '@/lib/profiles';
 
 export async function GET(request: NextRequest) {
   const session = await getAuthSessionFromRequest(request);
@@ -28,12 +29,22 @@ export async function GET(request: NextRequest) {
       ]),
   );
 
+  let profile = null;
+  if (session.userId) {
+    try {
+      profile = await getProfileSummaryByUserId(session.userId);
+    } catch {
+      profile = null;
+    }
+  }
+
   return NextResponse.json(
     {
       authenticated: true,
       availableProviders,
       primary: session.primary,
       connections,
+      profile,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
