@@ -13,7 +13,7 @@ const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION;
  */
 export function Footer() {
   return (
-    <footer className="max-w-6xl mx-auto px-4 mt-16 pb-8 text-center">
+    <footer className="max-w-6xl mx-auto px-4 mt-auto pt-16 pb-8 text-center">
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
         <Link
           href="/privacy"
