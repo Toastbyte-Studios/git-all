@@ -15,9 +15,8 @@ const SITE_URL = 'https://gitall.app';
 // UTM params appended to the link wrapping the heatmap image. Standard UTM
 // lets GA4 attribute click-throughs automatically as "embed / referral" without
 // any custom configuration.
-const REFERRAL_URL = `${SITE_URL}?utm_source=embed&utm_medium=referral&utm_campaign=heatmap`;
-
 const UTM_SUFFIX = '?utm_source=embed&utm_medium=referral&utm_campaign=heatmap';
+const REFERRAL_URL = `${SITE_URL}${UTM_SUFFIX}`;
 
 // Server-rendered placeholders. These are deliberately static so the markup is
 // deterministic; random names are swapped in after mount (see below) to avoid a
@@ -142,8 +141,19 @@ interface EmbedWidgetProps {
   isPublic?: boolean;
 }
 
+interface AuthSessionResponse {
+  authenticated: boolean;
+  profile?: {
+    handle: string;
+    isPublic: boolean;
+  } | null;
+}
+
 export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
-  const eligibleForHandleEmbed = Boolean(handle && isPublic);
+  const [profileHandle, setProfileHandle] = useState(handle ?? null);
+  const [profileIsPublic, setProfileIsPublic] = useState(isPublic ?? false);
+  const [hasSelectedMode, setHasSelectedMode] = useState(false);
+  const eligibleForHandleEmbed = Boolean(profileHandle && profileIsPublic);
   const [mode, setMode] = useState<'handle' | 'custom'>(
     eligibleForHandleEmbed ? 'handle' : 'custom',
   );
@@ -159,14 +169,48 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
     setPlaceholders(generatePlaceholderNames(DEFAULT_PLACEHOLDERS.length));
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: AuthSessionResponse | null) => {
+        if (!isMounted || !data?.authenticated) {
+          return;
+        }
+        setProfileHandle(data.profile?.handle ?? null);
+        setProfileIsPublic(data.profile?.isPublic === true);
+      })
+      .catch(() => {
+        // Session lookup failed — leave the widget in custom mode.
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (eligibleForHandleEmbed) {
+      if (!hasSelectedMode) {
+        setMode('handle');
+      }
+      return;
+    }
+
+    if (mode === 'handle') {
+      setMode('custom');
+    }
+  }, [eligibleForHandleEmbed, hasSelectedMode, mode]);
+
   // Handle-keyed embed URL — resolves live from the user's public profile.
   // The link target points at the profile page rather than the site home.
   const handleEmbedUrl =
-    eligibleForHandleEmbed && handle
-      ? `${SITE_URL}/embed/u/${encodeURIComponent(handle)}.svg`
+    eligibleForHandleEmbed && profileHandle
+      ? `${SITE_URL}/embed/u/${encodeURIComponent(profileHandle)}.svg`
       : null;
-  const handleReferralUrl = handle
-    ? `${SITE_URL}/u/${encodeURIComponent(handle)}${UTM_SUFFIX}`
+  const handleReferralUrl = profileHandle
+    ? `${SITE_URL}/u/${encodeURIComponent(profileHandle)}${UTM_SUFFIX}`
     : null;
 
   const customEmbedUrl = buildEmbedUrl(
@@ -216,7 +260,11 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
         >
           <button
             type="button"
-            onClick={() => setMode('handle')}
+            onClick={() => {
+              setHasSelectedMode(true);
+              setMode('handle');
+            }}
+            aria-pressed={mode === 'handle'}
             className="flex-1 px-3 py-1.5 font-medium transition-colors cursor-pointer"
             style={{
               background:
@@ -228,7 +276,11 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
           </button>
           <button
             type="button"
-            onClick={() => setMode('custom')}
+            onClick={() => {
+              setHasSelectedMode(true);
+              setMode('custom');
+            }}
+            aria-pressed={mode === 'custom'}
             className="flex-1 px-3 py-1.5 font-medium transition-colors cursor-pointer"
             style={{
               background:
@@ -242,12 +294,12 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
       )}
 
       {/* Handle-keyed form — shown to signed-in users with a public profile */}
-      {mode === 'handle' && eligibleForHandleEmbed && handle ? (
+      {mode === 'handle' && eligibleForHandleEmbed && profileHandle ? (
         <div className="space-y-4">
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             Your snippet is keyed to your profile handle{' '}
             <strong style={{ color: 'var(--accent)' }}>
-              {SITE_URL}/u/{handle}
+              {SITE_URL}/u/{profileHandle}
             </strong>
             . It automatically picks up newly connected providers and survives
             username changes on any platform.

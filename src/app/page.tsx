@@ -3,29 +3,9 @@ import { AuthStatus } from '@/components/AuthStatus';
 import { ContributionExplorer } from '@/components/ContributionExplorer';
 import { EmbedWidget } from '@/components/EmbedWidget';
 import { SignInBanner } from '@/components/SignInBanner';
-import { getAuthSession } from '@/lib/auth-session';
 import { FAQ_ITEMS } from '@/lib/faq';
-import { getProfileSummaryByUserId } from '@/lib/profiles';
 
-export default async function Home() {
-  // Fetch profile summary for the signed-in user so the EmbedWidget can
-  // show the handle-keyed form when the user has a public profile. Non-fatal
-  // — falls back to the anonymous username-keyed form on any error.
-  let handle: string | null = null;
-  let isPublic = false;
-  try {
-    const session = await getAuthSession();
-    if (session?.userId) {
-      const summary = await getProfileSummaryByUserId(session.userId);
-      if (summary) {
-        handle = summary.handle;
-        isPublic = summary.isPublic;
-      }
-    }
-  } catch {
-    // DB unavailable in plain next dev — degrade silently.
-  }
-
+export default function Home() {
   return (
     <>
       {/* ── Hero ──────────────────────────────────────────────────
@@ -73,7 +53,7 @@ export default async function Home() {
                     Add your unified contribution graph to your GitHub README,
                     portfolio site, or anywhere that supports images.
                   </p>
-                  <EmbedWidget handle={handle} isPublic={isPublic} />
+                  <EmbedWidget />
                 </>
               }
             />
