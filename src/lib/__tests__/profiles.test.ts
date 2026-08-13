@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const store = vi.hoisted(() => ({
   users: [] as Array<Record<string, unknown>>,
   connections: [] as Array<Record<string, unknown>>,
+  handleHistory: [] as Array<Record<string, unknown>>,
   available: true,
 }));
 
@@ -19,6 +20,73 @@ vi.mock('@/lib/db', () => {
 
     if (q.startsWith('SELECT * FROM users WHERE handle')) {
       return store.users.filter((u) => u.handle === params[0]);
+    }
+    if (q.startsWith('SELECT 1 FROM users WHERE handle')) {
+      return store.users
+        .filter((u) => u.handle === params[0])
+        .map(() => ({
+          '1': 1,
+        }));
+    }
+    if (q.startsWith('SELECT id FROM users WHERE handle')) {
+      return store.users
+        .filter((u) => u.handle === params[0] && u.id !== params[1])
+        .map((u) => ({ id: u.id }));
+    }
+    if (q.startsWith('SELECT handle, handle_changed_at FROM users WHERE id')) {
+      return store.users
+        .filter((u) => u.id === params[0])
+        .map((u) => ({
+          handle: u.handle,
+          handle_changed_at: u.handle_changed_at,
+        }));
+    }
+    if (q.startsWith('SELECT user_id FROM handle_history WHERE handle')) {
+      return store.handleHistory
+        .filter((h) => h.handle === params[0])
+        .map((h) => ({ user_id: h.user_id }));
+    }
+    if (q.startsWith('SELECT u.handle AS handle')) {
+      return store.handleHistory
+        .filter((h) => h.handle === params[0])
+        .flatMap((h) =>
+          store.users
+            .filter((u) => u.id === h.user_id)
+            .map((u) => ({ handle: u.handle, is_public: u.is_public })),
+        );
+    }
+    if (q.startsWith('INSERT INTO handle_history')) {
+      store.handleHistory = store.handleHistory.filter(
+        (h) => h.handle !== params[0],
+      );
+      store.handleHistory.push({
+        handle: params[0],
+        user_id: params[1],
+        released_at: params[2],
+      });
+      return [];
+    }
+    if (q.startsWith('DELETE FROM handle_history WHERE handle')) {
+      store.handleHistory = store.handleHistory.filter(
+        (h) => !(h.handle === params[0] && h.user_id === params[1]),
+      );
+      return [];
+    }
+    if (q.startsWith('DELETE FROM handle_history WHERE user_id')) {
+      store.handleHistory = store.handleHistory.filter(
+        (h) => h.user_id !== params[0],
+      );
+      return [];
+    }
+    if (q.startsWith('UPDATE users SET handle')) {
+      for (const u of store.users) {
+        if (u.id === params[3]) {
+          u.handle = params[0];
+          u.handle_changed_at = params[1];
+          u.updated_at = params[2];
+        }
+      }
+      return [];
     }
     if (q.startsWith('SELECT * FROM connections WHERE user_id')) {
       return store.connections.filter((c) => c.user_id === params[0]);
@@ -97,14 +165,21 @@ const {
   getProfileSummaryByUserId,
   getPublicProfileByHandle,
   getPublicProfileWithUpdatedAtByHandle,
+  isHandleAvailable,
   isValidHandleFormat,
   normalizeHandle,
+  resolvePublicHandleRedirect,
+  setHandle,
   setVisibility,
   toPublicProfile,
 } = await import('../profiles');
 
+const USER_ID = '01J0000000000000000000USER';
+const OTHER_USER_ID = '01J0000000000000000000OTHR';
+
 function seed({ isPublic }: { isPublic: boolean }) {
   store.available = true;
+  store.handleHistory = [];
   store.users = [
     {
       id: '01J0000000000000000000USER',
@@ -423,12 +498,192 @@ describe('setVisibility', () => {
   });
 });
 
+describe('isHandleAvailable', () => {
+  it('returns false for a handle already in use', async () => {
+    await expect(isHandleAvailable('jane-doe')).resolves.toBe(false);
+  });
+
+  it('returns true for an unused, valid handle', async () => {
+    await expect(isHandleAvailable('brand-new')).resolves.toBe(true);
+  });
+
+  it('returns false for an invalid handle without touching the DB', async () => {
+    await expect(isHandleAvailable('Jane_Doe')).resolves.toBe(false);
+  });
+
+  it('returns false for a handle another user retired', async () => {
+    store.handleHistory.push({
+      handle: 'old-name',
+      user_id: OTHER_USER_ID,
+      released_at: 1_717_000_000_000,
+    });
+
+    await expect(isHandleAvailable('old-name')).resolves.toBe(false);
+    await expect(isHandleAvailable('old-name', USER_ID)).resolves.toBe(false);
+  });
+
+  it('lets a user reclaim a handle they retired themselves', async () => {
+    store.handleHistory.push({
+      handle: 'old-name',
+      user_id: USER_ID,
+      released_at: 1_717_000_000_000,
+    });
+
+    await expect(isHandleAvailable('old-name')).resolves.toBe(false);
+    await expect(isHandleAvailable('old-name', USER_ID)).resolves.toBe(true);
+  });
+});
+
+describe('setHandle', () => {
+  it('renames the user', async () => {
+    await expect(setHandle(USER_ID, 'jane-smith')).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(store.users[0].handle).toBe('jane-smith');
+  });
+
+  it('records the outgoing handle in history', async () => {
+    await setHandle(USER_ID, 'jane-smith');
+
+    expect(store.handleHistory).toHaveLength(1);
+    expect(store.handleHistory[0].handle).toBe('jane-doe');
+    expect(store.handleHistory[0].user_id).toBe(USER_ID);
+  });
+
+  it('keeps the retired handle out of the pool for everyone else', async () => {
+    await setHandle(USER_ID, 'jane-smith');
+
+    await expect(isHandleAvailable('jane-doe')).resolves.toBe(false);
+    await expect(isHandleAvailable('jane-doe', OTHER_USER_ID)).resolves.toBe(
+      false,
+    );
+  });
+
+  it('reports another user’s retired handle as taken, not as reserved', async () => {
+    store.handleHistory.push({
+      handle: 'old-name',
+      user_id: OTHER_USER_ID,
+      released_at: 1_717_000_000_000,
+    });
+
+    // 'taken' rather than a distinct reason: telling a stranger a handle is
+    // "reserved" confirms some account once used it.
+    await expect(setHandle(USER_ID, 'old-name')).resolves.toEqual({
+      ok: false,
+      reason: 'taken',
+    });
+  });
+
+  it('lets a user rename back to their own retired handle', async () => {
+    await setHandle(USER_ID, 'jane-smith');
+    // Bypass the 7-day cooldown, which is not what this test is about.
+    store.users[0].handle_changed_at = null;
+
+    await expect(setHandle(USER_ID, 'jane-doe')).resolves.toEqual({ ok: true });
+
+    expect(store.users[0].handle).toBe('jane-doe');
+    // The reclaimed handle must not be both current and retired.
+    expect(store.handleHistory.some((h) => h.handle === 'jane-doe')).toBe(
+      false,
+    );
+    expect(store.handleHistory.some((h) => h.handle === 'jane-smith')).toBe(
+      true,
+    );
+  });
+
+  it('is a no-op when the handle is unchanged', async () => {
+    await expect(setHandle(USER_ID, 'jane-doe')).resolves.toEqual({ ok: true });
+
+    expect(store.handleHistory).toHaveLength(0);
+  });
+
+  it('rejects an invalid handle', async () => {
+    await expect(setHandle(USER_ID, 'Jane_Doe')).resolves.toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+  });
+
+  it('enforces the 7-day cooldown and writes nothing', async () => {
+    store.users[0].handle_changed_at = Date.now() - 1000;
+
+    const result = await setHandle(USER_ID, 'jane-smith');
+
+    expect(result.ok).toBe(false);
+    expect(store.users[0].handle).toBe('jane-doe');
+    expect(store.handleHistory).toHaveLength(0);
+  });
+
+  it('returns no_db when the database is unavailable', async () => {
+    store.available = false;
+
+    await expect(setHandle(USER_ID, 'jane-smith')).resolves.toEqual({
+      ok: false,
+      reason: 'no_db',
+    });
+  });
+});
+
+describe('resolvePublicHandleRedirect', () => {
+  it('maps a retired handle to the owner’s current one', async () => {
+    await setHandle(USER_ID, 'jane-smith');
+
+    await expect(resolvePublicHandleRedirect('jane-doe')).resolves.toBe(
+      'jane-smith',
+    );
+  });
+
+  it('normalises the incoming handle', async () => {
+    await setHandle(USER_ID, 'jane-smith');
+
+    await expect(resolvePublicHandleRedirect('Jane_Doe')).resolves.toBe(
+      'jane-smith',
+    );
+  });
+
+  it('returns null for a handle that was never retired', async () => {
+    await expect(resolvePublicHandleRedirect('nobody')).resolves.toBeNull();
+  });
+
+  it('returns null when the owner’s profile is private', async () => {
+    seed({ isPublic: false });
+    await setHandle(USER_ID, 'jane-smith');
+
+    // A redirect here would confirm the account exists, which is the oracle
+    // getPublicProfileByHandle is written to avoid.
+    await expect(resolvePublicHandleRedirect('jane-doe')).resolves.toBeNull();
+  });
+
+  it('returns null once the owner has renamed back, so it cannot self-redirect', async () => {
+    await setHandle(USER_ID, 'jane-smith');
+    store.users[0].handle_changed_at = null;
+    await setHandle(USER_ID, 'jane-doe');
+
+    await expect(resolvePublicHandleRedirect('jane-doe')).resolves.toBeNull();
+    await expect(resolvePublicHandleRedirect('jane-smith')).resolves.toBe(
+      'jane-doe',
+    );
+  });
+});
+
 describe('deleteUser', () => {
   it('removes the user row and every connection row', async () => {
     await expect(deleteUser('01J0000000000000000000USER')).resolves.toBe(true);
 
     expect(store.users).toHaveLength(0);
     expect(store.connections).toHaveLength(0);
+  });
+
+  it('releases every handle the user had retired', async () => {
+    await setHandle(USER_ID, 'jane-smith');
+    expect(store.handleHistory).toHaveLength(1);
+
+    await deleteUser(USER_ID);
+
+    // Reservation protects a live account's embeds. There is no account left.
+    expect(store.handleHistory).toHaveLength(0);
+    await expect(isHandleAvailable('jane-doe')).resolves.toBe(true);
   });
 
   it('leaves other users untouched', async () => {
