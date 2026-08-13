@@ -142,11 +142,19 @@ interface ConnectionRow {
 // ── Exported helpers ────────────────────────────────────────────
 
 /**
- * Checks whether `handle` is available (syntactically valid, not reserved,
- * and not already taken in D1).  If the DB is unavailable the check is skipped
- * and `true` is returned so the rest of the auth flow is not blocked.
+ * Checks whether `handle` is available: syntactically valid, not reserved, not
+ * already taken in D1, and not a handle somebody else previously released.
+ *
+ * Pass `forUserId` to let a user reclaim a handle they retired themselves —
+ * without it, renaming away from a handle would lock you out of renaming back.
+ *
+ * If the DB is unavailable the check is skipped and `true` is returned so the
+ * rest of the auth flow is not blocked.
  */
-export async function isHandleAvailable(handle: string): Promise<boolean> {
+export async function isHandleAvailable(
+  handle: string,
+  forUserId?: string,
+): Promise<boolean> {
   if (!isValidHandleFormat(handle)) return false;
 
   const db = getDb();
@@ -156,7 +164,18 @@ export async function isHandleAvailable(handle: string): Promise<boolean> {
     .prepare('SELECT 1 FROM users WHERE handle = ?1 LIMIT 1')
     .bind(handle)
     .first();
-  return row === null;
+  if (row !== null) return false;
+
+  // Retired handles stay reserved to whoever released them. See
+  // migrations/0004_handle_history.sql — recycling a handle that is already
+  // embedded in somebody's README hands the new owner that embed.
+  const retired = await db
+    .prepare('SELECT user_id FROM handle_history WHERE handle = ?1 LIMIT 1')
+    .bind(handle)
+    .first<{ user_id: string }>();
+
+  if (retired === null) return true;
+  return forUserId !== undefined && retired.user_id === forUserId;
 }
 
 /**
@@ -301,7 +320,10 @@ export async function findUserByProviderAccount(
  * ever shared between visitors or between handles; outside a request scope
  * (route handlers, tests) it degrades to a plain call.
  *
- * Returns `null` if no user with that handle exists.
+ * Returns `null` if no user with that handle exists. A handle the owner has
+ * since renamed away from is *not* resolved here — see
+ * {@link resolvePublicHandleRedirect}, which is deliberately a separate lookup
+ * so this function never silently returns a profile under a stale name.
  */
 export const getProfileByHandle = cache(async function getProfileByHandle(
   handle: string,
@@ -346,6 +368,52 @@ export const getProfileByHandle = cache(async function getProfileByHandle(
     connections,
   };
 });
+
+/**
+ * Resolves a retired handle to its owner's **current** handle, so links and
+ * embeds shared before a rename keep working.
+ *
+ * Returns `null` — meaning "no redirect, render the normal not-found" — when:
+ *
+ * - the handle was never released, or
+ * - the owner's profile is private. A redirect that fired for a private
+ *   profile would confirm the account exists, which is exactly the oracle that
+ *   {@link getPublicProfileByHandle} is written to avoid. The old handle has
+ *   to look as dead as any handle nobody ever registered.
+ * - the owner has since renamed *back* to this handle. That case is already
+ *   handled by the normal lookup, and redirecting would bounce a request to
+ *   the handle it started from.
+ *
+ * This does leak that a public account once used this handle. The target is
+ * public and already enumerated in the sitemap, so there is nothing here that
+ * a visitor could not find by other means.
+ */
+export async function resolvePublicHandleRedirect(
+  handle: string,
+): Promise<string | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  const normalizedHandle = normalizeHandle(handle);
+  if (!normalizedHandle) return null;
+
+  const row = await db
+    .prepare(
+      `SELECT u.handle AS handle, u.is_public AS is_public
+         FROM handle_history h
+         JOIN users u ON u.id = h.user_id
+        WHERE h.handle = ?1
+        LIMIT 1`,
+    )
+    .bind(normalizedHandle)
+    .first<{ handle: string; is_public: number }>();
+
+  if (!row) return null;
+  if (row.is_public === 0) return null;
+  if (row.handle === normalizedHandle) return null;
+
+  return row.handle;
+}
 
 /**
  * Narrows a stored `Profile` to the fields that are safe to serialise into a
@@ -427,14 +495,20 @@ export async function setVisibility(
 }
 
 /**
- * Deletes a user and every connection belonging to them.
+ * Deletes a user, every connection belonging to them, and every handle they
+ * have released.
  *
- * `connections.user_id` is declared ON DELETE CASCADE, so deleting the `users`
- * row alone *should* be sufficient — but SQLite only enforces foreign keys when
- * `PRAGMA foreign_keys = ON`, and D1's behaviour here is not something we want
- * an erasure path to depend on. Both deletes are therefore issued explicitly,
- * in one `batch()` so they share a transaction. This is correct whether or not
- * the cascade fires; if it does, the second statement simply removes nothing.
+ * `connections.user_id` and `handle_history.user_id` are both declared
+ * ON DELETE CASCADE, so deleting the `users` row alone *should* be sufficient —
+ * but SQLite only enforces foreign keys when `PRAGMA foreign_keys = ON`, and
+ * D1's behaviour here is not something we want an erasure path to depend on.
+ * All three deletes are therefore issued explicitly, in one `batch()` so they
+ * share a transaction. This is correct whether or not the cascade fires; if it
+ * does, the later statements simply remove nothing.
+ *
+ * Deleting the history rows also releases those handles back into the pool,
+ * which is the right outcome: reservation exists to protect a live account's
+ * embeds, and there is no longer an account to protect.
  *
  * Returns `false` when the DB is unavailable.
  */
@@ -444,6 +518,7 @@ export async function deleteUser(userId: string): Promise<boolean> {
 
   await db.batch([
     db.prepare('DELETE FROM connections WHERE user_id = ?1').bind(userId),
+    db.prepare('DELETE FROM handle_history WHERE user_id = ?1').bind(userId),
     db.prepare('DELETE FROM users WHERE id = ?1').bind(userId),
   ]);
 
@@ -491,10 +566,16 @@ export async function getProfileSummaryByUserId(
 /**
  * Changes the handle for `userId`.
  *
+ * The outgoing handle is recorded in `handle_history` in the same batch as the
+ * rename, which is what keeps already-shared `/u/<old>` links and
+ * `/embed/u/<old>.svg` URLs resolving, and stops anybody else registering it.
+ * If the incoming handle is one this same user previously released, its history
+ * row is dropped — you can always rename back to your own old handle.
+ *
  * Returns:
  * - `{ ok: true }` on success
  * - `{ ok: false, reason: 'invalid' }` — handle doesn't pass syntax rules
- * - `{ ok: false, reason: 'taken' }` — handle already in use
+ * - `{ ok: false, reason: 'taken' }` — handle in use, or reserved to another user
  * - `{ ok: false, reason: 'cooldown', nextAllowedAt: number }` — changed too recently
  * - `{ ok: false, reason: 'no_db' }` — DB unavailable
  */
@@ -551,13 +632,57 @@ export async function setHandle(
     return { ok: false, reason: 'taken' };
   }
 
+  // A handle somebody else released is not free. Reported as 'taken' on
+  // purpose — distinguishing "reserved by a previous owner" would tell a
+  // stranger that some account once used it.
+  const retired = await db
+    .prepare('SELECT user_id FROM handle_history WHERE handle = ?1 LIMIT 1')
+    .bind(newHandle)
+    .first<{ user_id: string }>();
+
+  if (retired !== null && retired.user_id !== userId) {
+    return { ok: false, reason: 'taken' };
+  }
+
   const now = Date.now();
-  await db
-    .prepare(
-      'UPDATE users SET handle = ?1, handle_changed_at = ?2, updated_at = ?3 WHERE id = ?4',
-    )
-    .bind(newHandle, now, now, userId)
-    .run();
+  const statements = [];
+
+  // Record the outgoing handle first. `userRow` is null only when the user row
+  // has vanished mid-request, in which case there is no old handle to retire
+  // and the UPDATE below is a no-op anyway.
+  if (userRow?.handle) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO handle_history (handle, user_id, released_at)
+           VALUES (?1, ?2, ?3)
+           ON CONFLICT(handle) DO UPDATE SET
+             user_id = excluded.user_id,
+             released_at = excluded.released_at`,
+        )
+        .bind(userRow.handle, userId, now),
+    );
+  }
+
+  // Reclaiming one of your own retired handles: drop the history row so the
+  // handle is not simultaneously current and released.
+  statements.push(
+    db
+      .prepare('DELETE FROM handle_history WHERE handle = ?1 AND user_id = ?2')
+      .bind(newHandle, userId),
+  );
+
+  statements.push(
+    db
+      .prepare(
+        'UPDATE users SET handle = ?1, handle_changed_at = ?2, updated_at = ?3 WHERE id = ?4',
+      )
+      .bind(newHandle, now, now, userId),
+  );
+
+  // One batch, one transaction. A partial apply here would either strand the
+  // old handle unreserved or reserve it without performing the rename.
+  await db.batch(statements);
 
   return { ok: true };
 }
@@ -565,6 +690,10 @@ export async function setHandle(
 /**
  * Returns all public handles with their `updated_at` timestamps for sitemap
  * generation.
+ *
+ * Only current handles are listed. Retired handles resolve via a temporary
+ * redirect and must stay out of the sitemap — submitting a URL that 302s is
+ * the kind of thing that quietly costs crawl budget.
  *
  * Note: this enumerates directly from D1 and is fine at current volume.
  * Past a few thousand public handles this should use `generateSitemaps()`
