@@ -180,7 +180,16 @@ const nextConfig: NextConfig = {
         // restores the bfcache. Left `private` off deliberately: neither
         // response varies by viewer, so there is nothing to keep out of a
         // shared cache, and `max-age=0` means nothing is served stale anyway.
-        source: '/(|privacy)',
+        source: '/',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      {
+        source: '/privacy',
         headers: [
           {
             key: 'Cache-Control',
