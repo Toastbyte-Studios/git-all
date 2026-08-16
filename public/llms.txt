@@ -1,11 +1,38 @@
 # GitAll
-> Unified contribution heatmap viewer for GitHub, GitLab, Bitbucket, and Gitea/Forgejo
 
-GitAll (gitall.app) lets developers see their contribution squares
-across all major git platforms in one place. Enter usernames to view
-side-by-side or integrated heatmaps. Free, no login required.
+> Unified contribution heatmap viewer for GitHub, GitLab, Bitbucket, and Gitea/Forgejo.
 
-Supports: GitHub, GitLab, Bitbucket, Gitea, Forgejo, and Codeberg.
-Sign in with GitHub to display your GitHub identity and include your private GitHub contributions.
+GitAll (gitall.app) lets developers see their contribution squares across all major
+git platforms in one place. Enter usernames to view side-by-side or integrated
+heatmaps. Free, no login required.
 
-Built by Toastbyte Studios (https://toastbyte.studio)
+Supported platforms: GitHub, GitLab, Bitbucket, Gitea, Forgejo, and Codeberg.
+Signing in with GitHub additionally surfaces private GitHub contributions and lets a
+user claim a public profile handle.
+
+## Docs
+
+- [Full reference](https://gitall.app/llms-full.txt): complete feature list, supported
+  platforms, embed formats, and privacy behaviour in one file.
+- [README](https://github.com/Toastbyte-Studios/git-all/blob/main/README.md): setup,
+  architecture, and local development.
+- [Privacy policy](https://gitall.app/privacy): what is stored, for how long, and what
+  is sent to each platform's API.
+- [Security policy](https://github.com/Toastbyte-Studios/git-all/blob/main/SECURITY.md):
+  how to report a vulnerability.
+
+## Pages
+
+- [Home](https://gitall.app/): username lookup and the embed snippet generator.
+- [Public profile](https://gitall.app/u/): a claimed handle's verified heatmap, at
+  `/u/{handle}`.
+
+## Source
+
+- [Repository](https://github.com/Toastbyte-Studios/git-all): AGPL-3.0-only.
+- [Contributing guide](https://github.com/Toastbyte-Studios/git-all/blob/main/CONTRIBUTING.md)
+
+## Optional
+
+- [Sitemap](https://gitall.app/sitemap.xml)
+- [robots.txt](https://gitall.app/robots.txt)

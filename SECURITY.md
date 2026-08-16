@@ -79,14 +79,17 @@ We'll close these without much discussion, so please don't spend your time on th
 - **Automated scanner output with no demonstrated impact.** Show us an exploit path.
 - **Anything requiring physical access or an already-compromised user device.**
 - **Social engineering** of maintainers, users, or infrastructure providers.
-- **Reports that HSTS or `X-Content-Type-Options` are missing from `next.config.ts`.**
-  Both are applied at the Cloudflare edge rather than in application code.
+- **Reports that HSTS or `X-Content-Type-Options` are missing.**
+  Both are already applied: in `next.config.ts` for app responses and at the Cloudflare
+  edge as a deployment backstop.
 
 ### Known gaps
 
-We currently set no `Content-Security-Policy`, `Referrer-Policy`, or
-`Permissions-Policy`, and no frame-ancestor restrictions. These are tracked and
-already known — reports about them are welcome but won't be treated as new findings.
+We currently ship a report-only `Content-Security-Policy` plus `Referrer-Policy`,
+`Permissions-Policy`, and clickjacking restrictions (`X-Frame-Options: DENY` and
+`frame-ancestors 'none'` inside the CSP). The enforcing CSP is still a known gap:
+reports that show a realistic bypass or a missing restriction are welcome, but the
+absence of an enforcing `Content-Security-Policy` is not a new finding by itself.
 
 ## Safe Harbor
 
