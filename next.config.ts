@@ -130,7 +130,6 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               "img-src 'self' data: blob: https://avatars.githubusercontent.com https://gitlab.com https://secure.gravatar.com https://*.atl-paas.net",
               "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com",
-              'upgrade-insecure-requests',
             ].join('; '),
           },
         ],
