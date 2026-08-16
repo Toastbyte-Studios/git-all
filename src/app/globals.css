@@ -13,6 +13,19 @@
  * Error:           --error         #f85149
  * Success:         --success       #3fb950
  *
+ * Text tokens carry a WCAG AA floor (4.5:1 against their own --bg), because
+ * every one of them is used at 10-14px somewhere and none of that qualifies as
+ * large text. --text-muted used to sit at #484f58 on dark (2.28:1) and #8b949e
+ * on light (3.08:1); both failed, and both are now the values below:
+ *
+ *   --text-muted   dark  #7d8590 on #0d1117 → 5.07:1
+ *                  light #6e7681 on #ffffff → 4.59:1
+ *   --text-secondary  dark 6.15:1 · light 5.25:1
+ *
+ * Muted stays a step below secondary in both themes, so the visual hierarchy
+ * survives. If you darken these again, check the ratio first — the footer
+ * (text-xs and text-[10px]) is what fails the audit.
+ *
  * Typography:
  *   Primary:    Inter — listed first in the font-family stack; loaded from the
  *               system if available (common on macOS/Windows 11) or falls back
@@ -29,7 +42,7 @@
   --border: #30363d;
   --text-primary: #f0f6fc;
   --text-secondary: #8b949e;
-  --text-muted: #484f58;
+  --text-muted: #7d8590;
 
   /* Brand accent — cyan */
   --accent: #2dd4bf;
@@ -101,7 +114,7 @@
   --border: #d0d7de;
   --text-primary: #1f2328;
   --text-secondary: #656d76;
-  --text-muted: #8b949e;
+  --text-muted: #6e7681;
 
   /* Brand accent — cyan (slightly deeper for contrast on white) */
   --accent: #0d9488;
@@ -168,7 +181,7 @@
   --border: #30363d;
   --text-primary: #f0f6fc;
   --text-secondary: #8b949e;
-  --text-muted: #484f58;
+  --text-muted: #7d8590;
 
   /* Brand accent — cyan */
   --accent: #2dd4bf;
@@ -236,7 +249,7 @@
     --border: #d0d7de;
     --text-primary: #1f2328;
     --text-secondary: #656d76;
-    --text-muted: #8b949e;
+    --text-muted: #6e7681;
 
     /* Brand accent — cyan (slightly deeper for contrast on white) */
     --accent: #0d9488;
