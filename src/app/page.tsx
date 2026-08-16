@@ -30,7 +30,17 @@ export default function Home() {
           GitAll unifies your GitHub, GitLab, Bitbucket, and Gitea/Forgejo
           activity into a single graph — free, no login required.
         </p>
-        <div className="mt-4 flex justify-center">
+        {/* min-h reserves the height of the sign-in row before it exists.
+            AuthStatus renders nothing until `/api/auth/session` resolves, and
+            because this section sits above <main>, the buttons appearing were
+            shoving the entire page down mid-load — the whole of the 0.156 CLS,
+            attributed to <main> as a single shift.
+
+            32px is the rendered height of one button row: 18px icon + 6px
+            padding top and bottom + 1px border top and bottom. Signed-in
+            visitors, for whom AuthStatus stays empty, see 32px of blank hero
+            instead; that is the cheaper side of the trade. */}
+        <div className="mt-4 flex justify-center min-h-8">
           <AuthStatus />
         </div>
       </section>
