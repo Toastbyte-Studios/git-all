@@ -210,6 +210,7 @@ function resolveLevel(level: number): number {
 }
 
 export interface EmbedSvgOptions {
+  /** Defaults to `auto`, which follows the reader's OS color scheme. */
   theme?: EmbedTheme;
   /** Base URL for the "Powered by GitAll" watermark link, e.g. "https://gitall.app" */
   siteUrl?: string;
@@ -223,10 +224,13 @@ export function generateHeatmapSvg(
   data: ContributionData,
   options: EmbedSvgOptions = {},
 ): string {
+  // Unrecognised values fall through to `auto` rather than erroring: this is
+  // reached from a URL query param, and a broken heatmap is a worse answer to
+  // a typo than a readable one.
   const theme: EmbedTheme =
-    options.theme === 'light' || options.theme === 'auto'
+    options.theme === 'light' || options.theme === 'dark'
       ? options.theme
-      : 'dark';
+      : 'auto';
   const fallback = FALLBACK_COLORS[theme];
   const siteUrl = options.siteUrl ?? 'https://gitall.app';
 
