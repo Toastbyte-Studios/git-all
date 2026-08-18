@@ -96,6 +96,34 @@ describe('generateHeatmapSvg', () => {
     expect(svg).not.toContain('#161b22');
   });
 
+  it('scopes its stylesheet under a root class', () => {
+    // Unscoped rules would leak if the SVG is pasted inline into a page.
+    const svg = generateHeatmapSvg(SAMPLE_DATA);
+    expect(svg).toContain('class="gitall-heatmap"');
+    expect(svg).toContain('.gitall-heatmap .bg{');
+  });
+
+  it('carries both palettes when the theme is auto', () => {
+    const svg = generateHeatmapSvg(SAMPLE_DATA, { theme: 'auto' });
+    expect(svg).toContain('#f6f8fa');
+    expect(svg).toContain('#161b22');
+    expect(svg).toContain('@media (prefers-color-scheme:dark)');
+  });
+
+  it('falls back to the light palette in auto fill attributes', () => {
+    // Renderers that ignore CSS entirely get the same palette as renderers
+    // that honour CSS but not media queries.
+    const svg = generateHeatmapSvg(SAMPLE_DATA, { theme: 'auto' });
+    expect(svg).toContain('class="bg" fill="#f6f8fa"');
+  });
+
+  it('emits no media query for a single-palette theme', () => {
+    const dark = generateHeatmapSvg(SAMPLE_DATA, { theme: 'dark' });
+    const light = generateHeatmapSvg(SAMPLE_DATA, { theme: 'light' });
+    expect(dark).not.toContain('@media');
+    expect(light).not.toContain('@media');
+  });
+
   it('escapes XML special characters in the siteUrl watermark link', () => {
     const svg = generateHeatmapSvg(SAMPLE_DATA, {
       siteUrl: 'https://example.com/?a=1&b=2&q=<script>',

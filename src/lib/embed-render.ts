@@ -60,8 +60,13 @@ export function stripSvgExtension(slug: string): string {
   return slug.endsWith('.svg') ? slug.slice(0, -4) : slug;
 }
 
+/**
+ * `auto` ships both palettes in one SVG and switches on the reader's OS
+ * color-scheme preference. Anything unrecognised still falls back to `dark`,
+ * which is what every embed URL already in the wild resolves to.
+ */
 export function resolveTheme(raw: string | null): EmbedTheme {
-  return raw === 'light' || raw === 'dark' ? raw : 'dark';
+  return raw === 'light' || raw === 'dark' || raw === 'auto' ? raw : 'dark';
 }
 
 export function buildEmbedCacheKey(
