@@ -61,12 +61,14 @@ export function stripSvgExtension(slug: string): string {
 }
 
 /**
- * `auto` ships both palettes in one SVG and switches on the reader's OS
- * color-scheme preference. Anything unrecognised still falls back to `dark`,
- * which is what every embed URL already in the wild resolves to.
+ * `auto` is the default: it ships both palettes in one SVG and switches on the
+ * reader's OS color-scheme preference. Every embed URL already in the wild
+ * omits this param, so they all resolve here — which is deliberate. `light`
+ * and `dark` pin a single palette for readers who need it, most often on
+ * GitHub, whose theme is an account setting rather than an OS one.
  */
 export function resolveTheme(raw: string | null): EmbedTheme {
-  return raw === 'light' || raw === 'dark' || raw === 'auto' ? raw : 'dark';
+  return raw === 'light' || raw === 'dark' ? raw : 'auto';
 }
 
 export function buildEmbedCacheKey(
