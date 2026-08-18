@@ -111,10 +111,20 @@ describe('generateHeatmapSvg', () => {
     expect(svg).toContain('https://example.com');
   });
 
-  it('uses dark theme colors by default', () => {
+  it('defaults to the auto theme', () => {
+    // Every embed URL already pasted into a README omits the theme param and
+    // therefore lands here.
     const svg = generateHeatmapSvg(SAMPLE_DATA);
+    expect(svg).toBe(generateHeatmapSvg(SAMPLE_DATA, { theme: 'auto' }));
+    expect(svg).toContain('@media (prefers-color-scheme:dark)');
+  });
+
+  it('uses dark theme colors when requested', () => {
+    const svg = generateHeatmapSvg(SAMPLE_DATA, { theme: 'dark' });
     // Dark background
     expect(svg).toContain('#161b22');
+    // Should NOT contain light background
+    expect(svg).not.toContain('#f6f8fa');
   });
 
   it('uses light theme colors when requested', () => {

@@ -271,7 +271,7 @@ describe('embed route GET', () => {
     expect(calledUrl).toContain('username=octocat');
   });
 
-  it('applies the dark theme by default', async () => {
+  it('serves the auto theme when no theme param is given', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(makeContributionResponse());
@@ -283,8 +283,25 @@ describe('embed route GET', () => {
     );
 
     const body = await response.text();
+    // Both palettes ship in one file, switched by prefers-color-scheme.
+    expect(body).toContain('@media (prefers-color-scheme:dark)');
+  });
+
+  it('applies the dark theme when ?theme=dark is set', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(makeContributionResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/octocat.svg?theme=dark'),
+      makeParams('octocat.svg'),
+    );
+
+    const body = await response.text();
     // Dark background color
     expect(body).toContain('#161b22');
+    expect(body).not.toContain('#f6f8fa');
   });
 
   it('applies the light theme when ?theme=light is set', async () => {
