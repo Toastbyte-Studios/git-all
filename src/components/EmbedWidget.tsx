@@ -24,6 +24,10 @@ const REFERRAL_URL = `${SITE_URL}${UTM_SUFFIX}`;
 // hydration mismatch. Order: GitHub, GitLab, Bitbucket, Gitea/Forgejo.
 const DEFAULT_PLACEHOLDERS = ['user-1', 'user-2', 'user-3', 'user-4'];
 
+// Long enough that typing a username is one request rather than one per
+// keystroke. Each distinct URL is a real fetch of the embed endpoint.
+const PREVIEW_DEBOUNCE_MS = 600;
+
 const THEME_OPTIONS: { value: EmbedTheme; label: string; hint: string }[] = [
   { value: 'auto', label: 'Auto', hint: "Follows the reader's system theme" },
   { value: 'light', label: 'Light', hint: 'Always the light palette' },
@@ -155,6 +159,70 @@ function ThemeSelect({ value, onChange }: ThemeSelectProps) {
             {label}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+interface EmbedPreviewProps {
+  url: string;
+}
+
+/**
+ * Renders the real endpoint rather than a local reconstruction, so what the
+ * user sees is exactly what a README will get — including the auto theme
+ * following their own OS preference, which is the whole point of showing it.
+ *
+ * These requests land on /embed/* like any other impression. `trackEmbedServed`
+ * drops same-host referers so the generator does not inflate `embed_served`.
+ */
+function EmbedPreview({ url }: EmbedPreviewProps) {
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
+    'loading',
+  );
+
+  useEffect(() => {
+    setStatus('loading');
+    const timer = setTimeout(() => setLoadedUrl(url), PREVIEW_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [url]);
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+        Preview
+      </p>
+      <div
+        className="flex items-center justify-center rounded px-3 py-4 overflow-x-auto"
+        style={{
+          backgroundColor: 'var(--bg)',
+          border: '1px solid var(--border)',
+          minHeight: '6rem',
+        }}
+      >
+        {loadedUrl && (
+          // Deliberately a plain img: this is an external SVG endpoint, and
+          // next/image would proxy and rewrite a URL whose whole purpose is to
+          // be reproduced verbatim in a README.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={loadedUrl}
+            src={loadedUrl}
+            alt="Preview of your contribution heatmap"
+            className="max-w-full h-auto rounded"
+            style={{ display: status === 'ready' ? 'block' : 'none' }}
+            onLoad={() => setStatus('ready')}
+            onError={() => setStatus('error')}
+          />
+        )}
+        {status !== 'ready' && (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {status === 'error'
+              ? 'No heatmap for those usernames — check the spelling.'
+              : 'Rendering preview…'}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -386,6 +454,8 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
 
           <ThemeSelect value={theme} onChange={setTheme} />
 
+          {activeEmbedUrl && <EmbedPreview url={activeEmbedUrl} />}
+
           <SnippetRow
             label="Markdown (GitHub README)"
             value={markdownSnippet ?? ''}
@@ -543,6 +613,8 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
               />
 
               <ThemeSelect value={theme} onChange={setTheme} />
+
+              <EmbedPreview url={activeEmbedUrl} />
 
               <SnippetRow
                 label="Markdown (GitHub README)"

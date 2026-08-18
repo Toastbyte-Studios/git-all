@@ -250,6 +250,15 @@ export function trackEmbedServed(
     }
   })();
 
+  // The embed generator previews the live endpoint, so without this every
+  // keystroke in that form would land in `embed_served` as an impression.
+  // Nothing on our own origin renders /embed/* except that preview — the
+  // profile and lookup pages draw their heatmaps client-side — so a same-host
+  // referer is never a real embed.
+  if (refererHost && refererHost === request.nextUrl.hostname) {
+    return;
+  }
+
   trackServerEvent(request, ANALYTICS_EVENTS.embedServed, {
     platforms: platforms ?? 'unknown',
     platform_count: platforms ? platforms.split('+').length : 0,
