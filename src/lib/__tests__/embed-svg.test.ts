@@ -29,7 +29,9 @@ const LEVELS = [0, 1, 2, 3, 4];
 
 /** Read the fill a class resolves to in the SVG's own stylesheet. */
 function fillFor(svg: string, className: string): string {
-  const rule = svg.match(new RegExp(`\\.${className}\\{fill:(#[0-9a-f]{6})\\}`));
+  const rule = svg.match(
+    new RegExp(`\\.${className}\\{fill:(#[0-9a-f]{6})\\}`),
+  );
   if (!rule) throw new Error(`no rule found for .${className}`);
   return rule[1];
 }
@@ -172,19 +174,16 @@ describe('generateHeatmapSvg', () => {
     },
   );
 
-  it.each(PALETTE_THEMES)(
-    'clears WCAG AA for every %s text color',
-    (theme) => {
-      const svg = generateHeatmapSvg(SAMPLE_DATA, { theme });
-      const background = fillFor(svg, 'bg');
-      // Month/day labels render at 9-10px, so AA normal text (4.5:1) applies
-      // rather than the 3:1 large-text allowance.
-      for (const className of ['mut', 'wm', 'wl']) {
-        const ratio = contrastRatio(fillFor(svg, className), background);
-        expect(ratio).toBeGreaterThanOrEqual(4.5);
-      }
-    },
-  );
+  it.each(PALETTE_THEMES)('clears WCAG AA for every %s text color', (theme) => {
+    const svg = generateHeatmapSvg(SAMPLE_DATA, { theme });
+    const background = fillFor(svg, 'bg');
+    // Month/day labels render at 9-10px, so AA normal text (4.5:1) applies
+    // rather than the 3:1 large-text allowance.
+    for (const className of ['mut', 'wm', 'wl']) {
+      const ratio = contrastRatio(fillFor(svg, className), background);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 
   it('escapes XML special characters in the siteUrl watermark link', () => {
     const svg = generateHeatmapSvg(SAMPLE_DATA, {
