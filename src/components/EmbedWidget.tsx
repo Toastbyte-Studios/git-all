@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { trackClientEvent } from '@/lib/analytics-client';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import type { EmbedTheme } from '@/lib/embed-svg';
 import { generatePlaceholderNames } from '@/lib/placeholder-names';
 
 // Always generate embed snippets against the canonical production domain.
@@ -23,12 +24,29 @@ const REFERRAL_URL = `${SITE_URL}${UTM_SUFFIX}`;
 // hydration mismatch. Order: GitHub, GitLab, Bitbucket, Gitea/Forgejo.
 const DEFAULT_PLACEHOLDERS = ['user-1', 'user-2', 'user-3', 'user-4'];
 
+const THEME_OPTIONS: { value: EmbedTheme; label: string; hint: string }[] = [
+  { value: 'auto', label: 'Auto', hint: "Follows the reader's system theme" },
+  { value: 'light', label: 'Light', hint: 'Always the light palette' },
+  { value: 'dark', label: 'Dark', hint: 'Always the dark palette' },
+];
+
+/**
+ * `auto` is the server-side default, so it is deliberately left out of the URL:
+ * the shortest snippet is the one most people should copy. Pinning is for
+ * readers whose host page does not follow the OS — GitHub most of all, where
+ * the theme is an account setting.
+ */
+function themeParam(theme: EmbedTheme): string {
+  return theme === 'auto' ? '' : `theme=${theme}`;
+}
+
 function buildEmbedUrl(
   github: string,
   gitlab: string,
   bitbucket: string,
   gitea: string,
   instance: string,
+  theme: EmbedTheme,
 ): string | null {
   const gh = github.trim();
   const gl = gitlab.trim();
@@ -49,6 +67,7 @@ function buildEmbedUrl(
     params.set('gitea', gt);
     if (instance.trim()) params.set('instance', instance.trim());
   }
+  if (theme !== 'auto') params.set('theme', theme);
 
   const qs = params.toString();
   return qs ? `${base}?${qs}` : base;
@@ -99,6 +118,45 @@ function CopyButton({ text, onCopy }: CopyButtonProps) {
     >
       {copied ? 'Copied!' : 'Copy'}
     </button>
+  );
+}
+
+interface ThemeSelectProps {
+  value: EmbedTheme;
+  onChange: (theme: EmbedTheme) => void;
+}
+
+function ThemeSelect({ value, onChange }: ThemeSelectProps) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+        Theme
+      </p>
+      <div
+        className="flex rounded-lg overflow-hidden text-xs"
+        style={{ border: '1px solid var(--border)' }}
+        role="group"
+        aria-label="Embed theme"
+      >
+        {THEME_OPTIONS.map(({ value: option, label, hint }) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onChange(option)}
+            title={hint}
+            aria-pressed={value === option}
+            className="flex-1 px-3 py-1.5 font-medium transition-colors cursor-pointer"
+            style={{
+              background:
+                value === option ? 'var(--accent)' : 'var(--bg-surface)',
+              color: value === option ? '#0d1117' : 'var(--text-secondary)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -164,6 +222,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
   const [gitea, setGitea] = useState('');
   const [instance, setInstance] = useState('');
   const [showGitea, setShowGitea] = useState(false);
+  const [theme, setTheme] = useState<EmbedTheme>('auto');
 
   useEffect(() => {
     setPlaceholders(generatePlaceholderNames(DEFAULT_PLACEHOLDERS.length));
@@ -205,9 +264,11 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
 
   // Handle-keyed embed URL — resolves live from the user's public profile.
   // The link target points at the profile page rather than the site home.
+  const handleQuery = themeParam(theme);
   const handleEmbedUrl =
     eligibleForHandleEmbed && profileHandle
-      ? `${SITE_URL}/embed/u/${encodeURIComponent(profileHandle)}.svg`
+      ? `${SITE_URL}/embed/u/${encodeURIComponent(profileHandle)}.svg` +
+        (handleQuery ? `?${handleQuery}` : '')
       : null;
   const handleReferralUrl = profileHandle
     ? `${SITE_URL}/u/${encodeURIComponent(profileHandle)}${UTM_SUFFIX}`
@@ -219,6 +280,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
     bitbucket,
     gitea,
     instance,
+    theme,
   );
 
   // Wrap the image in a link back to the site. Links *inside* the SVG are
@@ -230,7 +292,8 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
   // `embed_generated` carries a `source` param using the same 'handle' | 'slug'
   // vocabulary as `embed_served` (see trackEmbedServed in lib/embed-render.ts),
   // so copies and renders can be compared on one axis in GA4 rather than
-  // needing two different breakdowns to answer the same question.
+  // needing two different breakdowns to answer the same question. `theme` is
+  // reported on the same vocabulary for the same reason.
   const activeEmbedUrl = mode === 'handle' ? handleEmbedUrl : customEmbedUrl;
   const activeReferralUrl =
     mode === 'handle' && handleReferralUrl ? handleReferralUrl : REFERRAL_URL;
@@ -246,6 +309,11 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
   const platformCount = [github, gitlab, bitbucket, gitea].filter((v) =>
     v.trim(),
   ).length;
+
+  const themeNote =
+    theme === 'auto'
+      ? "Colors follow each reader's light or dark mode."
+      : `Colors are pinned to the ${theme} palette.`;
 
   const inputStyle = {
     backgroundColor: 'var(--bg-surface)',
@@ -316,6 +384,8 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
             aria-hidden="true"
           />
 
+          <ThemeSelect value={theme} onChange={setTheme} />
+
           <SnippetRow
             label="Markdown (GitHub README)"
             value={markdownSnippet ?? ''}
@@ -324,6 +394,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
                 snippet_type: 'markdown',
                 platform_count: 0,
                 source: 'handle',
+                theme,
               })
             }
           />
@@ -335,14 +406,15 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
                 snippet_type: 'html',
                 platform_count: 0,
                 source: 'handle',
+                theme,
               })
             }
           />
 
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and the
-            heatmap links to your profile. Refreshes hourly via Cloudflare edge
-            cache.
+            heatmap links to your profile. {themeNote} Refreshes hourly via
+            Cloudflare edge cache.
           </p>
         </div>
       ) : (
@@ -470,6 +542,8 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
                 aria-hidden="true"
               />
 
+              <ThemeSelect value={theme} onChange={setTheme} />
+
               <SnippetRow
                 label="Markdown (GitHub README)"
                 value={markdownSnippet}
@@ -478,6 +552,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
                     snippet_type: 'markdown',
                     platform_count: platformCount,
                     source: 'slug',
+                    theme,
                   })
                 }
               />
@@ -489,14 +564,15 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
                     snippet_type: 'html',
                     platform_count: platformCount,
                     source: 'slug',
+                    theme,
                   })
                 }
               />
 
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Includes a subtle &ldquo;Powered by GitAll&rdquo; watermark, and
-                the heatmap links back to gitall.app. Refreshes daily via
-                Cloudflare edge cache.
+                the heatmap links back to gitall.app. {themeNote} Refreshes
+                daily via Cloudflare edge cache.
               </p>
             </div>
           ) : (
