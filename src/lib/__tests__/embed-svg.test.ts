@@ -24,6 +24,35 @@ const SAMPLE_DATA: ContributionData = {
   calendar: makeCalendar('2025-01-01', 7),
 };
 
+const PALETTE_THEMES = ['light', 'dark'] as const;
+const LEVELS = [0, 1, 2, 3, 4];
+
+/** Read the fill a class resolves to in the SVG's own stylesheet. */
+function fillFor(svg: string, className: string): string {
+  const rule = svg.match(
+    new RegExp(`\\.${className}\\{fill:(#[0-9a-f]{6})\\}`),
+  );
+  if (!rule) throw new Error(`no rule found for .${className}`);
+  return rule[1];
+}
+
+function relativeLuminance(hex: string): number {
+  const channel = (value: number) => {
+    const c = value / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
 describe('generateHeatmapSvg', () => {
   it('returns a well-formed SVG string', () => {
     const svg = generateHeatmapSvg(SAMPLE_DATA);
@@ -82,10 +111,20 @@ describe('generateHeatmapSvg', () => {
     expect(svg).toContain('https://example.com');
   });
 
-  it('uses dark theme colors by default', () => {
+  it('defaults to the auto theme', () => {
+    // Every embed URL already pasted into a README omits the theme param and
+    // therefore lands here.
     const svg = generateHeatmapSvg(SAMPLE_DATA);
+    expect(svg).toBe(generateHeatmapSvg(SAMPLE_DATA, { theme: 'auto' }));
+    expect(svg).toContain('@media (prefers-color-scheme:dark)');
+  });
+
+  it('uses dark theme colors when requested', () => {
+    const svg = generateHeatmapSvg(SAMPLE_DATA, { theme: 'dark' });
     // Dark background
     expect(svg).toContain('#161b22');
+    // Should NOT contain light background
+    expect(svg).not.toContain('#f6f8fa');
   });
 
   it('uses light theme colors when requested', () => {
@@ -94,6 +133,66 @@ describe('generateHeatmapSvg', () => {
     expect(svg).toContain('#f6f8fa');
     // Should NOT contain dark background
     expect(svg).not.toContain('#161b22');
+  });
+
+  it('scopes its stylesheet under a root class', () => {
+    // Unscoped rules would leak if the SVG is pasted inline into a page.
+    const svg = generateHeatmapSvg(SAMPLE_DATA);
+    expect(svg).toContain('class="gitall-heatmap"');
+    expect(svg).toContain('.gitall-heatmap .bg{');
+  });
+
+  it('carries both palettes when the theme is auto', () => {
+    const svg = generateHeatmapSvg(SAMPLE_DATA, { theme: 'auto' });
+    expect(svg).toContain('#f6f8fa');
+    expect(svg).toContain('#161b22');
+    expect(svg).toContain('@media (prefers-color-scheme:dark)');
+  });
+
+  it('falls back to the light palette in auto fill attributes', () => {
+    // Renderers that ignore CSS entirely get the same palette as renderers
+    // that honour CSS but not media queries.
+    const svg = generateHeatmapSvg(SAMPLE_DATA, { theme: 'auto' });
+    expect(svg).toContain('class="bg" fill="#f6f8fa"');
+  });
+
+  it('emits no media query for a single-palette theme', () => {
+    const dark = generateHeatmapSvg(SAMPLE_DATA, { theme: 'dark' });
+    const light = generateHeatmapSvg(SAMPLE_DATA, { theme: 'light' });
+    expect(dark).not.toContain('@media');
+    expect(light).not.toContain('@media');
+  });
+
+  it.each(PALETTE_THEMES)(
+    'gives the %s ramp five distinct, monotonic levels',
+    (theme) => {
+      const svg = generateHeatmapSvg(SAMPLE_DATA, { theme });
+      const levels = LEVELS.map((level) => fillFor(svg, `l${level}`));
+      expect(new Set(levels).size).toBe(5);
+
+      // Light ramps darken as activity rises; dark ramps brighten. Either way
+      // no two adjacent steps may sit at the same luminance, or the busiest
+      // and quietest days become indistinguishable.
+      const luminances = levels.map(relativeLuminance);
+      for (let i = 1; i < luminances.length; i++) {
+        if (theme === 'light') {
+          expect(luminances[i]).toBeLessThan(luminances[i - 1]);
+        } else {
+          expect(luminances[i]).toBeGreaterThan(luminances[i - 1]);
+        }
+      }
+    },
+  );
+
+  it.each(PALETTE_THEMES)('clears WCAG AA for every %s text color', (theme) => {
+    const svg = generateHeatmapSvg(SAMPLE_DATA, { theme });
+    const background = fillFor(svg, 'bg');
+    // Month/day labels render at 9-10px, so AA normal text (4.5:1) applies
+    // rather than the 3:1 large-text allowance.
+    for (const className of ['mut', 'wm', 'wl']) {
+      const ratio = contrastRatio(fillFor(svg, className), background);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it('escapes XML special characters in the siteUrl watermark link', () => {

@@ -83,7 +83,13 @@ With no query parameters, the path segment is treated as a **GitHub** username. 
 | `bitbucket` | Bitbucket username |
 | `gitea` | Gitea/Forgejo username |
 | `instance` | Gitea/Forgejo instance URL (defaults to `https://codeberg.org`) |
-| `theme` | `dark` (default) or `light` |
+| `theme` | `auto` (default), `light`, or `dark` |
+
+### Theming
+
+`auto` ships both palettes inside one SVG and switches between them with a `prefers-color-scheme` media query, so the same URL reads correctly on a white page and a dark one. Leaving the parameter off is the same as `auto`.
+
+One caveat worth knowing before you pin anything: this follows the reader's **operating system**, not the theme of the page doing the embedding. GitHub's theme is an account setting, so somebody browsing GitHub in light mode on a dark-mode machine will still get the dark palette. `theme=light` and `theme=dark` exist for exactly that case.
 
 The `.svg` extension is optional. The image covers the last 12 months, is cached at the edge for 24 hours, and serves stale content for up to an hour while revalidating. If one platform is slow or unreachable it is dropped from the merge rather than holding up the response &mdash; GitHub's image proxy gives up quickly.
 
@@ -163,6 +169,8 @@ npm run db:reset:local                 # wipe and re-apply locally
 ### Analytics
 
 All optional, and the app runs fine with none of it configured. Cloudflare Web Analytics provides a cookieless baseline. Product events go through Zaraz when available and fall back to a first-party `POST /api/analytics/event` when it is blocked; a few high-value events are sent server-side via the GA4 Measurement Protocol, with the client ID derived from a hash of IP, user agent, and language rather than a cookie.
+
+Embed impressions with a same-host referer are not counted &mdash; those come from the preview in the embed generator rather than a real embed.
 
 If you set `NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN`, allow `https://static.cloudflareinsights.com` in your `script-src` CSP directive.
 

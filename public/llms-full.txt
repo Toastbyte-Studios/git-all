@@ -75,7 +75,10 @@ GET /embed/<github_username>.svg?github=<user>&gitlab=<user>&bitbucket=<user>&gi
 - `bitbucket` — Bitbucket workspace slug
 - `gitea` — Gitea/Forgejo username
 - `instance` — Gitea/Forgejo instance URL (default: codeberg.org)
-- `theme` — `dark` (default) or `light`
+- `theme` — `auto` (default), `light`, or `dark`
+
+**Theme behaviour:**
+`auto` carries both palettes in one SVG and switches between them with a `prefers-color-scheme` media query, so a single URL suits a light page and a dark one. It follows the reader's operating system rather than the host page's own theme setting; on GitHub, where the theme is an account preference, pin `theme=light` or `theme=dark` if the two disagree.
 
 **Markdown snippet (GitHub README):**
 ```markdown
@@ -107,6 +110,7 @@ The embed is cached at the Cloudflare edge for 24 hours and includes a subtle "P
 - Contribution data is fetched directly from platform APIs; no data is stored server-side
 - Response caching via in-memory cache with 15-minute TTL and stale-while-revalidate
 - Theme: supports light/dark mode via CSS custom properties and `data-theme` attribute
+- Embedded SVGs are self-contained: colors ship as an inline stylesheet plus `fill` attribute fallbacks, so they render correctly through image proxies such as GitHub's camo
 
 ---
 
@@ -126,6 +130,9 @@ A: No. Public contribution data is fetched anonymously — no sign-up, no OAuth 
 
 **Q: How many platforms does GitAll support?**
 A: GitAll supports 4 major platforms: GitHub, GitLab, Bitbucket, and Gitea/Forgejo (including Codeberg).
+
+**Q: Does the embedded heatmap work in dark mode?**
+A: Yes. By default an embedded heatmap follows the reader's light or dark system preference, so the same URL looks right on a white page and a dark one. Add `?theme=light` or `?theme=dark` to pin one palette instead.
 
 ---
 

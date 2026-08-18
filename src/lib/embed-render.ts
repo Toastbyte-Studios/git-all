@@ -60,8 +60,15 @@ export function stripSvgExtension(slug: string): string {
   return slug.endsWith('.svg') ? slug.slice(0, -4) : slug;
 }
 
+/**
+ * `auto` is the default: it ships both palettes in one SVG and switches on the
+ * reader's OS color-scheme preference. Every embed URL already in the wild
+ * omits this param, so they all resolve here — which is deliberate. `light`
+ * and `dark` pin a single palette for readers who need it, most often on
+ * GitHub, whose theme is an account setting rather than an OS one.
+ */
 export function resolveTheme(raw: string | null): EmbedTheme {
-  return raw === 'light' || raw === 'dark' ? raw : 'dark';
+  return raw === 'light' || raw === 'dark' ? raw : 'auto';
 }
 
 export function buildEmbedCacheKey(
@@ -242,6 +249,15 @@ export function trackEmbedServed(
       return undefined;
     }
   })();
+
+  // The embed generator previews the live endpoint, so without this every
+  // keystroke in that form would land in `embed_served` as an impression.
+  // Nothing on our own origin renders /embed/* except that preview — the
+  // profile and lookup pages draw their heatmaps client-side — so a same-host
+  // referer is never a real embed.
+  if (refererHost && refererHost === request.nextUrl.hostname) {
+    return;
+  }
 
   trackServerEvent(request, ANALYTICS_EVENTS.embedServed, {
     platforms: platforms ?? 'unknown',
