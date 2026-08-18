@@ -35,10 +35,16 @@ interface ThemeColors {
   border: string;
 }
 
+// Both palettes are held to two invariants, enforced by tests: every text
+// color clears WCAG AA (4.5:1) against its own background, and the five cell
+// levels are distinct and ordered monotonically by relative luminance. The
+// labels previously sat at 2.09:1 (dark) and 2.89:1 (light), and the light
+// ramp's first two steps were 1.08:1 apart — near-invisible at 9px.
+
 const DARK_THEME: ThemeColors = {
   bg: '#161b22',
   levels: ['#21262d', '#064e3b', '#0d9488', '#2dd4bf', '#5eead4'],
-  textMuted: '#484f58',
+  textMuted: '#7d8590',
   watermarkText: '#8b949e',
   watermarkLink: '#2dd4bf',
   border: '#30363d',
@@ -46,10 +52,10 @@ const DARK_THEME: ThemeColors = {
 
 const LIGHT_THEME: ThemeColors = {
   bg: '#f6f8fa',
-  levels: ['#ebedf0', '#b2f0e8', '#2dd4bf', '#0d9488', '#0f766e'],
-  textMuted: '#8b949e',
+  levels: ['#ebedf0', '#5eead4', '#14b8a6', '#0f766e', '#134e4a'],
+  textMuted: '#57606a',
   watermarkText: '#656d76',
-  watermarkLink: '#0d9488',
+  watermarkLink: '#0f766e',
   border: '#d0d7de',
 };
 
