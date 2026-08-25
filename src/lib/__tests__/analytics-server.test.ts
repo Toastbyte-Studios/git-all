@@ -96,7 +96,7 @@ describe('sendServerAnalyticsEvent', () => {
     expect(body.events[0]?.params).not.toHaveProperty('ignored');
   });
 
-  it('uses only the first forwarded IP for client_id stability', async () => {
+  it('derives a stable client_id from the trusted IP, ignoring a spoofed leftmost XFF segment', async () => {
     process.env.ANALYTICS_GA4_MEASUREMENT_ID = 'G-TEST123';
     process.env.ANALYTICS_GA4_API_SECRET = 'secret-123';
 
@@ -108,7 +108,7 @@ describe('sendServerAnalyticsEvent', () => {
     await sendServerAnalyticsEvent(
       new NextRequest('https://gitall.app/api/github?username=octocat', {
         headers: {
-          'x-forwarded-for': '203.0.113.10, 10.0.0.1',
+          'x-forwarded-for': 'attacker-chosen, 203.0.113.10',
           'user-agent': 'vitest',
           'accept-language': 'en-US',
         },
