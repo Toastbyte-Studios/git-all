@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
+import { getClientIp } from '@/lib/client-ip';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
@@ -8,17 +9,6 @@ const MAX_RATE_LIMIT_ENTRIES = 10_000;
 // Per-process/per-instance map — not shared across Worker instances and resets on cold starts.
 // This provides best-effort throttling only; a global limit would require Workers KV or a Durable Object.
 const rateLimitMap = new Map<string, number[]>();
-
-function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for') ?? '';
-  // Use the last non-empty segment: in common proxy setups the rightmost entry is
-  // appended by the closest trusted proxy and cannot be spoofed by the client.
-  const segments = forwarded
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return segments[segments.length - 1] ?? 'unknown';
-}
 
 function pruneStaleEntries(windowStart: number) {
   for (const [key, timestamps] of rateLimitMap.entries()) {
@@ -44,6 +34,8 @@ function evictOldestEntries(maxEntries: number) {
 }
 
 export function checkRateLimit(request: NextRequest): boolean {
+  // Shared with analytics-server.ts so the two cannot disagree about which
+  // header to trust. This module previously carried its own copy.
   const ip = getClientIp(request);
   const key = createHash('sha256').update(ip).digest('hex').slice(0, 16);
   const now = Date.now();

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import type { AnalyticsEventName } from '@/lib/analytics-events';
+import { getClientIp } from '@/lib/client-ip';
 import type { NextRequest } from 'next/server';
 
 type AnalyticsParams = Record<
@@ -19,9 +20,16 @@ function getGa4Config() {
   return { measurementId, apiSecret };
 }
 
+/**
+ * A stable pseudonymous identifier for GA4.
+ *
+ * The IP comes from `getClientIp`, which trusts `cf-connecting-ip` first. This
+ * previously read the leftmost `x-forwarded-for` segment, which the caller
+ * controls — meaning a visitor could supply their own header and mint as many
+ * distinct client IDs as they liked. See src/lib/client-ip.ts.
+ */
 function toClientId(request: NextRequest) {
-  const forwardedFor = request.headers.get('x-forwarded-for') ?? '';
-  const clientIp = forwardedFor.split(',')[0]?.trim() ?? '';
+  const clientIp = getClientIp(request);
   const userAgent = request.headers.get('user-agent') ?? '';
   const acceptLanguage = request.headers.get('accept-language') ?? '';
   const seed = `${clientIp}|${userAgent}|${acceptLanguage}`;
