@@ -7,10 +7,10 @@ import type { NextRequest } from 'next/server';
  * Worker and cannot be influenced by the caller, so it wins outright.
  *
  * The `x-forwarded-for` fallback exists for `next dev` and Vitest, where no
- * Cloudflare header is present. It deliberately takes the RIGHTMOST segment:
- * the closest trusted proxy appends its own view of the peer, while every
- * segment to the left was supplied by the caller and is forgeable.
- *
+ * Cloudflare header is present. It takes the RIGHTMOST non-empty segment,
+ * which is typically appended by the closest trusted proxy in real deployments.
+ * In environments without a trusted proxy, XFF is caller-controlled and should
+ * be treated as best-effort only.
  * Reading XFF[0] — as `analytics-server.ts` previously did — let any visitor
  * mint arbitrary GA4 client IDs by sending their own X-Forwarded-For header.
  * Keep both call sites on this helper so they cannot drift apart again.
