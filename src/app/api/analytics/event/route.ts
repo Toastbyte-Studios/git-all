@@ -3,7 +3,10 @@ import {
   ANALYTICS_EVENTS,
   type AnalyticsEventName,
 } from '@/lib/analytics-events';
-import { trackServerEvent } from '@/lib/analytics-server';
+import {
+  readConsentFromRequest,
+  trackServerEvent,
+} from '@/lib/analytics-server';
 import { checkRateLimit } from './rate-limit';
 
 const ALLOWED_EVENTS = new Set<AnalyticsEventName>(
@@ -22,6 +25,17 @@ export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin');
   if (!origin || origin !== request.nextUrl.origin) {
     return NextResponse.json({ error: 'Origin not allowed.' }, { status: 403 });
+  }
+
+  // Rejected before the rate-limit budget is spent, so a visitor who declined
+  // is not also throttled. sendServerAnalyticsEvent applies the same gate
+  // independently — this is the early exit, not the enforcement point.
+  const consent = readConsentFromRequest(request);
+  if (consent !== 'not-required' && consent !== 'granted') {
+    return NextResponse.json(
+      { error: 'Analytics consent not granted.' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 
   if (!checkRateLimit(request)) {

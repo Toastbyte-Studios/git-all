@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import {
+  ANALYTICS_CONSENT_COOKIE,
+  CONSENT_EXEMPT_EVENTS,
+  isAnalyticsConsentRequired,
+  parseConsentValue,
+  type ConsentState,
+} from '@/lib/analytics-consent';
 import type { AnalyticsEventName } from '@/lib/analytics-events';
 import { getClientIp } from '@/lib/client-ip';
 import type { NextRequest } from 'next/server';
@@ -18,6 +25,43 @@ function getGa4Config() {
     return null;
   }
   return { measurementId, apiSecret };
+}
+
+/**
+ * The visitor's recorded consent choice, or null if they have not chosen.
+ *
+ * Reads the cookie written by `setAnalyticsConsent` in analytics-client.ts.
+ * Exported so the /api/analytics/event route can reject a declined POST
+ * before doing any work.
+ */
+export function readConsentFromRequest(request: NextRequest): ConsentState {
+  if (!isAnalyticsConsentRequired()) {
+    return 'not-required';
+  }
+  return parseConsentValue(request.cookies.get(ANALYTICS_CONSENT_COOKIE)?.value);
+}
+
+/**
+ * Whether this specific event may be delivered for this specific request.
+ *
+ * Absent consent is treated as denied, not as permission. That costs us the
+ * first lookup of every new session once the banner is live, which is the
+ * correct trade: tracking before the visitor answers is exactly what the
+ * banner exists to prevent.
+ *
+ * See CONSENT_EXEMPT_EVENTS for the one event that bypasses this and why.
+ */
+export function mayTrackServerEvent(
+  request: NextRequest,
+  eventName: AnalyticsEventName,
+): boolean {
+  if (!isAnalyticsConsentRequired()) {
+    return true;
+  }
+  if (CONSENT_EXEMPT_EVENTS.has(eventName)) {
+    return true;
+  }
+  return readConsentFromRequest(request) === 'granted';
 }
 
 /**
@@ -81,6 +125,13 @@ export async function sendServerAnalyticsEvent(
   eventName: AnalyticsEventName,
   params: AnalyticsParams = {},
 ) {
+  // Single choke point for the consent gate. Every server-side delivery path
+  // runs through here, so putting the check anywhere else would risk a caller
+  // reaching GA4 around it.
+  if (!mayTrackServerEvent(request, eventName)) {
+    return false;
+  }
+
   const config = getGa4Config();
   if (!config) {
     return false;
