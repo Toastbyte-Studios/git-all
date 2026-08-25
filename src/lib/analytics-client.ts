@@ -51,7 +51,11 @@ function readConsentCookie(): ConsentValue | null {
     return null;
   }
 
-  return parseConsentValue(decodeURIComponent(entry.slice(prefix.length)));
+  try {
+    return parseConsentValue(decodeURIComponent(entry.slice(prefix.length)));
+  } catch {
+    return null;
+  }
 }
 
 function writeConsentCookie(value: ConsentValue) {
