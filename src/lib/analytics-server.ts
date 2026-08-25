@@ -28,7 +28,12 @@ function getGa4Config() {
 }
 
 /**
- * The visitor's recorded consent choice, or null if they have not chosen.
+ * The visitor's recorded consent choice for this request.
+ *
+ * Returns:
+ * - 'not-required' when analytics consent gating is disabled
+ * - 'granted' | 'denied' when the cookie is present and valid
+ * - null when the visitor has not chosen (or the cookie is malformed)
  *
  * Reads the cookie written by `setAnalyticsConsent` in analytics-client.ts.
  * Exported so the /api/analytics/event route can reject a declined POST
