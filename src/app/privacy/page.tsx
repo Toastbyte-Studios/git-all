@@ -8,8 +8,10 @@ import type React from 'react';
 //   src/lib/auth-session.ts          cookie names, contents, lifetimes
 //   src/lib/auth-cookies.ts          what sign-out / deletion clears
 //   src/lib/profiles.ts              what D1 stores; the public projection
-//   src/lib/analytics-server.ts      the GA4 client_id derivation
+//   src/lib/analytics-server.ts      the GA4 client_id derivation; the gate
 //   src/lib/analytics-client.ts      the Zaraz / server-fallback split
+//   src/lib/analytics-consent.ts     the consent cookie and the exempt event
+//   src/lib/client-ip.ts             which header the client_id IP comes from
 //   src/app/embed/[slug]/route.ts    what an embed impression records
 //   migrations/                      the columns described under "On our servers"
 //
@@ -52,6 +54,7 @@ export const metadata: Metadata = {
 };
 
 const EFFECTIVE_DATE = 'August 4, 2026';
+const LAST_UPDATED_DATE = 'August 25, 2026';
 const GA4_EVENT_RETENTION = '2 months';
 const GA4_USER_RETENTION = '14 months';
 
@@ -93,7 +96,7 @@ export default function PrivacyPage() {
         Privacy Policy
       </h1>
       <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-        Effective {EFFECTIVE_DATE} · Last updated {EFFECTIVE_DATE}
+        Effective {EFFECTIVE_DATE} · Last updated {LAST_UPDATED_DATE}
       </p>
 
       <Section id="who" title="Who we are">
@@ -284,6 +287,28 @@ export default function PrivacyPage() {
           treat it as personal data even though it is not readable on its own.
         </p>
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          If we ask you for an analytics choice
+        </h3>
+        <p>
+          Where your local law requires consent before analytics, we show a
+          banner asking you to accept or decline, and we record your answer in
+          the <code>analytics-consent</code> cookie described below.
+        </p>
+        <p>
+          Declining stops <em>both</em> paths described above — the browser one
+          and the server one. It is not merely a request to the analytics
+          script; our own servers check the same recorded answer before sending
+          anything to Google, so events like a lookup, a sign-in, or a profile
+          view are not sent at all. Until you answer, we treat the absence of an
+          answer as a decline rather than as permission.
+        </p>
+        <p>
+          There is one exception, and it is a technical one rather than a
+          convenience: heatmap images embedded on other people’s sites. It is
+          described under “Embedded heatmaps” below, and it is the only
+          exception.
+        </p>
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           Analytics cookies
         </h3>
         <p>
@@ -304,6 +329,25 @@ export default function PrivacyPage() {
         <p>
           Both are HttpOnly, sent only over HTTPS, marked SameSite=Lax, and set
           for gitall.app alone — they do not follow you to other sites.
+        </p>
+        <p>
+          Where we ask for an analytics choice, a third cookie records it:
+        </p>
+        <ul className="space-y-2 list-disc pl-5">
+          <li>
+            <code>analytics-consent</code> — the single word{' '}
+            <code>granted</code> or <code>denied</code>, and nothing else. No
+            identifier, no timestamp, nothing that distinguishes you from anyone
+            else who answered the same way. Kept for up to one year, set for
+            gitall.app alone, and sent only over HTTPS in production.
+          </li>
+        </ul>
+        <p>
+          Unlike every other cookie on this page, this one is deliberately not
+          HttpOnly: the banner itself has to be able to read your answer, so
+          that it stops asking, and write it when you click. Our servers read it
+          too, which is the point — it is what makes a decline binding on the
+          server path rather than a request the browser makes on your behalf.
         </p>
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           How long Google keeps it
@@ -353,14 +397,33 @@ export default function PrivacyPage() {
           the embed does. The identifier is not linked to any account, ours or
           anyone else’s.
         </p>
+        <p>
+          <strong style={{ color: 'var(--text-primary)' }}>
+            We do not ask for your consent before recording this, and we cannot.
+          </strong>{' '}
+          The image is requested by a page on someone else’s site, and on GitHub
+          it is fetched through an image proxy that sends no cookies at all — so
+          there is no answer of yours available to us at that moment, whether or
+          not you have given one on gitall.app. We record the impression
+          regardless, and this is the only analytics event for which that is
+          true.
+        </p>
+        <p>
+          What we can tell you is that the identifier here is worse at
+          identifying you than the one described above, not better. Because the
+          proxy fetches the image on your behalf, the IP address that reaches us
+          is the proxy’s rather than yours, so readers of the same embed are
+          largely counted together rather than told apart.
+        </p>
       </Section>
 
       <Section id="local-storage" title="Data stored locally in your browser">
         <p>
           GitAll keeps a few preferences in your browser’s local storage: your
-          theme, your contribution view mode, your selected time range, and your
-          analytics consent choice where one applies. They are tied to no
-          account, and clearing your browser data removes them.
+          theme, your contribution view mode, and your selected time range. They
+          are tied to no account, and clearing your browser data removes them.
+          Your analytics choice is not among them — it is a cookie, for the
+          reason given under “Analytics cookies” above.
         </p>
         <p>
           Our servers never read this storage. Acting on a preference can,
@@ -490,10 +553,12 @@ export default function PrivacyPage() {
         </p>
         <p>
           We also cannot honestly point you at an ad blocker as a way to opt
-          out: if one blocks the analytics script, the site currently falls back
-          to sending the same events through our own servers, and some events —
-          an embed being served, for example — originate on our servers and
-          never pass through your browser’s protections at all. Deleting the
+          out. Where we ask for an analytics choice, declining is the effective
+          route and it binds our servers as well as your browser — but blocking
+          the analytics script by itself is not the same thing, and some events
+          originate on our servers and never pass through your browser’s
+          protections at all. An embed being served is the clearest example: as
+          described above, that one is recorded regardless. Deleting the
           analytics cookies listed above resets the browser-path identifier, but
           does not affect the server-derived one.
         </p>
