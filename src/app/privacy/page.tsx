@@ -8,8 +8,14 @@ import type React from 'react';
 //   src/lib/auth-session.ts          cookie names, contents, lifetimes
 //   src/lib/auth-cookies.ts          what sign-out / deletion clears
 //   src/lib/profiles.ts              what D1 stores; the public projection
-//   src/lib/analytics-server.ts      the GA4 client_id derivation
-//   src/lib/analytics-client.ts      the Zaraz / server-fallback split
+//   src/lib/analytics-server.ts      the GA4 client_id derivation; the
+//                                    server-side consent gate
+//   src/lib/analytics-client.ts      the Zaraz / server-fallback split; the
+//                                    Zaraz consent bridge
+//   src/lib/analytics-consent.ts     cookie name, lifetime, SameSite, and the
+//                                    CONSENT_EXEMPT_EVENTS set that decides
+//                                    which events ignore the banner
+//   src/components/AnalyticsConsentBanner.tsx   what the banner actually says
 //   src/app/embed/[slug]/route.ts    what an embed impression records
 //   migrations/                      the columns described under "On our servers"
 //
@@ -17,16 +23,23 @@ import type React from 'react';
 // If anyone changes them in GA4 Admin → Data collection and modification →
 // Data retention, they must be changed here too.
 //
-// Three claims were verified against things outside this file. Re-verify them
+// Four claims were verified against things outside this file. Re-verify them
 // when reviewing this page:
 //
-//   Zaraz GA4 cookies                read from a live browser 2026-08-04:
-//                                    cfz_google-analytics_v4 (~1 year) and
-//                                    cfzs_google-analytics_v4 (session), both
-//                                    HttpOnly, Secure, Lax. cf_clearance
+//   Zaraz GA4 cookies                re-read from a live browser 2026-09-01:
+//                                    cfz_google-analytics_v4 (expiry ~1 year)
+//                                    and cfzs_google-analytics_v4 (session),
+//                                    both HttpOnly, Secure, Lax. cf_clearance
 //                                    (under "Hosting and service logs") was
-//                                    observed in the same session. Re-verify
-//                                    if the Zaraz tool config changes.
+//                                    observed in the same session, expiry
+//                                    ~1 year. Re-verify if the Zaraz tool
+//                                    config changes.
+//   zaraz-consent cookie             read 2026-09-01: name is `zaraz-consent`,
+//                                    NOT the `cf_consent` in Cloudflare's
+//                                    docs. Not HttpOnly, SameSite=Strict,
+//                                    expiry ~1 year. The name is configurable
+//                                    per zone — re-check it rather than
+//                                    trusting the documentation.
 //   trackClientEvent call sites      audited 2026-08-04: lookupRun
 //                                    (authenticated, entry_count,
 //                                    includes_gitea), timeRangeSelected
@@ -34,13 +47,19 @@ import type React from 'react';
 //                                    (entry_count), embedGenerated
 //                                    (snippet_type, platform_count). No
 //                                    usernames, no custom dates. The example
-//                                    list under "Analytics" and the
-//                                    local-storage section reflect this
+//                                    list under "Analytics" reflects this
 //                                    inventory — re-audit if events or their
-//                                    params change.
+//                                    params change. NOTE: this audit predates
+//                                    the consent work and is due a re-run.
 //   dataprivacyframework.gov         Cloudflare's and Google's certifications,
 //                                    cited under "Where your data is
 //                                    processed". Verified active 2026-08-03.
+//
+// One asymmetry is deliberate and must not be quietly smoothed over: the
+// embed impression is in CONSENT_EXEMPT_EVENTS, so declining on gitall.app
+// does NOT stop it. That is stated outright under "Embedded heatmaps" and in
+// "Our legal bases". If the exemption is ever removed, remove those
+// paragraphs too — an over-cautious policy is still a wrong one.
 //
 // A privacy policy that has drifted from the code is worse than no policy.
 
@@ -51,7 +70,11 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://gitall.app/privacy' },
 };
 
-const EFFECTIVE_DATE = 'August 4, 2026';
+// Bumped from August 4, 2026 because the legal basis for Google Analytics
+// changed from legitimate interests to consent. That is a material change, not
+// a wording fix, so the effective date moves rather than only the update date.
+const EFFECTIVE_DATE = 'September 1, 2026';
+const LAST_UPDATED = 'September 1, 2026';
 const GA4_EVENT_RETENTION = '2 months';
 const GA4_USER_RETENTION = '14 months';
 
@@ -93,7 +116,7 @@ export default function PrivacyPage() {
         Privacy Policy
       </h1>
       <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-        Effective {EFFECTIVE_DATE} · Last updated {EFFECTIVE_DATE}
+        Effective {EFFECTIVE_DATE} · Last updated {LAST_UPDATED}
       </p>
 
       <Section id="who" title="Who we are">
@@ -180,8 +203,9 @@ export default function PrivacyPage() {
         </ul>
         <p>
           Signing out, or deleting your account, expires all of them. Separate
-          cookies used for analytics and security are described under
-          “Analytics” and “Hosting and service logs” below.
+          cookies used for analytics, for recording your consent choice, and for
+          security are described under “Analytics” and “Hosting and service
+          logs” below.
         </p>
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           What we store on our servers
@@ -243,25 +267,56 @@ export default function PrivacyPage() {
           to build advertising profiles, and we have Google Analytics configured
           to request non-personalized ads handling.
         </p>
+
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          Your choice
+        </h3>
+        <p>
+          <strong style={{ color: 'var(--text-primary)' }}>
+            Google Analytics does not run until you allow it.
+          </strong>{' '}
+          The first time you visit, a banner asks. Until you accept, no Google
+          Analytics cookie is set and nothing is sent to Google. Declining is
+          recorded and respected, and the site works exactly the same either
+          way.
+        </p>
+        <p>
+          You can change your mind at any time from the “Cookie preferences”
+          link in the footer of any page. Withdrawing consent stops any further
+          events; it does not by itself delete what was already collected — see
+          “Your choices” below for what we can and cannot do about that.
+        </p>
+        <p>
+          Your choice applies to both of the delivery paths described below, the
+          one that runs in your browser and the one that runs on our servers.
+          There is one exception, and it is a real one rather than a
+          technicality: the embedded-heatmap impression described at the end of
+          this section. That request reaches us from a page on someone else’s
+          site, where your choice is not readable. It is spelled out there.
+        </p>
+
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           Cloudflare Web Analytics
         </h3>
         <p>
           Every page load is counted by Cloudflare Web Analytics. It sets no
           cookies, uses no client-side state, and does not track you across
-          sites.
+          sites. Because it stores nothing on your device and cannot single you
+          out, it is not covered by the consent banner and continues whichever
+          way you answer.
         </p>
+
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           Google Analytics 4
         </h3>
         <p>
-          We send a small set of product events to Google Analytics 4 — things
-          like a lookup being run, a sign-in completing, an embed being served,
-          or a profile being viewed. Events reach GA4 either from your browser
-          through Cloudflare Zaraz, which serves the analytics script from our
-          own domain, or from our servers via the GA4 Measurement Protocol. On
-          the browser path, Zaraz manages the Google Analytics identifier on our
-          behalf, using the cookies listed below.
+          Once you have accepted, we send a small set of product events to
+          Google Analytics 4 — things like a lookup being run, a sign-in
+          completing, or a profile being viewed. Events reach GA4 either from
+          your browser through Cloudflare Zaraz, which serves the analytics
+          script from our own domain, or from our servers via the GA4
+          Measurement Protocol. On the browser path, Zaraz manages the Google
+          Analytics identifier on our behalf, using the cookies listed below.
         </p>
         <p>
           <strong style={{ color: 'var(--text-primary)' }}>
@@ -283,12 +338,13 @@ export default function PrivacyPage() {
           browser could, in principle, check it against the identifier — so we
           treat it as personal data even though it is not readable on its own.
         </p>
+
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           Analytics cookies
         </h3>
         <p>
-          The browser path does set cookies. Zaraz creates two first-party
-          cookies on gitall.app for Google Analytics:
+          If you accept, the browser path sets cookies. Zaraz creates two
+          first-party cookies on gitall.app for Google Analytics:
         </p>
         <ul className="space-y-2 list-disc pl-5">
           <li>
@@ -303,8 +359,38 @@ export default function PrivacyPage() {
         </ul>
         <p>
           Both are HttpOnly, sent only over HTTPS, marked SameSite=Lax, and set
-          for gitall.app alone — they do not follow you to other sites.
+          for gitall.app alone — they do not follow you to other sites. Neither
+          exists before you accept, and declining prevents both.
         </p>
+
+        <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          Consent cookies
+        </h3>
+        <p>
+          Remembering your answer requires storing it. Two cookies do that, and
+          they are set whichever way you answer:
+        </p>
+        <ul className="space-y-2 list-disc pl-5">
+          <li>
+            <code>analytics-consent</code> — the word “granted” or the word
+            “denied”, and nothing else. No identifier. Our own code reads it,
+            including on our servers, which is why it is a cookie rather than
+            browser storage. Kept for one year, sent only over HTTPS, marked
+            SameSite=Lax, and readable by scripts on gitall.app so that the
+            banner can tell whether to appear.
+          </li>
+          <li>
+            <code>zaraz-consent</code> — Cloudflare Zaraz’s own record of the
+            same decision. This is the one that actually stops the Google
+            Analytics tag from loading. Kept for about a year and marked
+            SameSite=Strict.
+          </li>
+        </ul>
+        <p>
+          Both are strictly necessary: without them we could not remember that
+          you said no, and would have to ask again on every page.
+        </p>
+
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           How long Google keeps it
         </h3>
@@ -337,6 +423,7 @@ export default function PrivacyPage() {
           </a>
           .
         </p>
+
         <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>
           Embedded heatmaps
         </h3>
@@ -348,25 +435,44 @@ export default function PrivacyPage() {
           identifier described above.
         </p>
         <p>
-          This happens even if you have never visited gitall.app yourself. We
-          are describing it here because it is the honest description of what
-          the embed does. The identifier is not linked to any account, ours or
-          anyone else’s.
+          <strong style={{ color: 'var(--text-primary)' }}>
+            This is the one thing your consent choice does not reach.
+          </strong>{' '}
+          The request arrives from a page on someone else’s site, so there is no
+          gitall.app cookie for us to read — we cannot tell whether the person
+          loading the image has ever answered our banner, or ever visited us at
+          all. Declining analytics on gitall.app therefore does not stop these
+          impressions being counted.
+        </p>
+        <p>
+          On GitHub specifically, the image is fetched by GitHub’s own proxy
+          rather than by your browser, so the address we see and hash is
+          GitHub’s, not yours. On a personal site with a direct image tag, it is
+          your browser and your address. The identifier is not linked to any
+          account, ours or anyone else’s. If this matters to you, the only
+          reliable avoidance is not to load pages that contain our embeds.
         </p>
       </Section>
 
       <Section id="local-storage" title="Data stored locally in your browser">
         <p>
           GitAll keeps a few preferences in your browser’s local storage: your
-          theme, your contribution view mode, your selected time range, and your
-          analytics consent choice where one applies. They are tied to no
-          account, and clearing your browser data removes them.
+          theme, your contribution view mode, and your selected time range. They
+          are tied to no account, and clearing your browser data removes them.
+        </p>
+        <p>
+          Your analytics consent choice is deliberately <em>not</em> kept here.
+          It lives in the <code>analytics-consent</code> cookie described above,
+          because our servers have to be able to read it — local storage is
+          visible only to your browser, so a choice recorded there could not
+          stop the events our servers send.
         </p>
         <p>
           Our servers never read this storage. Acting on a preference can,
           however, fire one of the analytics events described above that names
           the choice — selecting a time-range preset is an example — so the
-          choice itself may be counted even though the stored value is not read.
+          choice itself may be counted, if you have accepted analytics, even
+          though the stored value is not read.
         </p>
       </Section>
 
@@ -428,16 +534,33 @@ export default function PrivacyPage() {
             chosen to publish.
           </li>
           <li>
-            Legitimate interests — the analytics and the hosting and service
-            logs described above, in our interest in understanding how GitAll is
-            used and keeping it secure and reliable. Where your local law
-            requires consent for analytics, we rely on your consent instead.
+            Consent — Google Analytics. Nothing reaches Google, from your
+            browser or from our servers, unless you have accepted, and you can
+            withdraw at any time from the footer of any page. We ask everyone
+            rather than only visitors in places whose law requires it.
+          </li>
+          <li>
+            Legitimate interests — Cloudflare Web Analytics, the hosting and
+            service logs described above, and the embedded-heatmap impression,
+            in our interest in understanding how GitAll is used and keeping it
+            secure and reliable. The first two store nothing on your device. The
+            third is the exception described under “Embedded heatmaps”: it
+            reaches us from a third-party page where no choice of yours is
+            readable, so there is no consent for us to act on and we rely on our
+            interest in knowing whether the embed feature is used at all.
           </li>
           <li>
             Legal obligation — where the law requires us to process or retain
             something.
           </li>
         </ul>
+        <p>
+          Strictly-necessary cookies — the sign-in cookies, the two consent
+          cookies, and Cloudflare’s security cookie — are not gated behind the
+          banner. Asking permission to remember that you refused permission
+          would be circular, and gating sign-in would break a feature you
+          explicitly asked for.
+        </p>
         <p>
           We do not use your data to make automated decisions that have legal or
           similarly significant effects on you.
@@ -446,6 +569,10 @@ export default function PrivacyPage() {
 
       <Section id="choices" title="Your choices">
         <ul className="space-y-2 list-disc pl-5">
+          <li>
+            Accept or decline analytics when the banner appears, and change your
+            answer at any time from the “Cookie preferences” link in the footer.
+          </li>
           <li>
             Keep your profile private, or unpublish it, from your settings.
           </li>
@@ -473,9 +600,10 @@ export default function PrivacyPage() {
           >
             support@toastbyte.studio
           </a>
-          . Where we rely on your consent, you can withdraw it at any time. If
-          you are in the European Economic Area or the United Kingdom, you also
-          have the right to lodge a complaint with your data protection
+          . Where we rely on your consent, you can withdraw it at any time, and
+          withdrawing does not affect the lawfulness of what we did while it was
+          given. If you are in the European Economic Area or the United Kingdom,
+          you also have the right to lodge a complaint with your data protection
           authority, though we would welcome the chance to resolve your concern
           first.
         </p>
@@ -489,13 +617,14 @@ export default function PrivacyPage() {
           search by.
         </p>
         <p>
-          We also cannot honestly point you at an ad blocker as a way to opt
-          out: if one blocks the analytics script, the site currently falls back
-          to sending the same events through our own servers, and some events —
-          an embed being served, for example — originate on our servers and
-          never pass through your browser’s protections at all. Deleting the
-          analytics cookies listed above resets the browser-path identifier, but
-          does not affect the server-derived one.
+          An ad blocker is not a reliable way to opt out, and blocking the
+          analytics script in particular achieves nothing either way: both the
+          browser path and our server-side path check the same recorded choice,
+          so declining is the route that actually works. Deleting the analytics
+          cookies listed above resets the browser-path identifier but does not
+          affect the server-derived one, and it will also clear your recorded
+          choice, so the banner will ask again. The embedded-heatmap impression
+          remains outside all of this, as described above.
         </p>
       </Section>
 
@@ -512,6 +641,12 @@ export default function PrivacyPage() {
         <p>
           If we change this policy we will update the date at the top. Material
           changes will be noted on the site.
+        </p>
+        <p>
+          The change on {EFFECTIVE_DATE} was one: Google Analytics now runs only
+          with your consent, asked for through a banner, where previously we
+          relied on our legitimate interests except where local law required
+          otherwise.
         </p>
       </Section>
     </main>
