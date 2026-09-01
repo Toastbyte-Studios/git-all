@@ -39,6 +39,23 @@ export const ANALYTICS_EVENTS = {
   profileUnpublished: 'profile_unpublished',
 
   // Embed
+  //
+  // NAMING WART, READ BEFORE ADDING AN `embedCopied` HERE.
+  //
+  // `embed_generated` does NOT fire when a snippet is generated. Every call
+  // site is the `onCopy` callback of `<SnippetRow>` in EmbedWidget.tsx, which
+  // runs only after `navigator.clipboard.writeText` resolves. It is already
+  // the copy event, under a misleading name.
+  //
+  // Adding a separate `embed_copied` would double-count every copy. The two
+  // honest options are to rename this to `embed_copied` — accurate, but it
+  // splits the GA4 series, since events cannot be renamed retroactively — or
+  // to leave the name and rely on this comment. Left alone for now; see the
+  // discussion on PR #184.
+  //
+  // If you ever do want a true generation event, note it would fire on the
+  // debounced preview render, which is high-volume and much less interesting
+  // than a copy.
   embedGenerated: 'embed_generated',
   embedServed: 'embed_served',
 } as const;
