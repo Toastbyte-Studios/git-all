@@ -2,11 +2,8 @@
  * The analytics event catalog.
  *
  * ONE RULE: every name in here has a call site. A declared-but-unfired event
- * is not harmless documentation of intent — `ALLOWED_EVENTS` in
- * `src/app/api/analytics/event/route.ts` accepts anything in this object, so
- * an unused name is an open endpoint that any caller can POST to. It also
- * misleads the privacy policy, which describes what we send to GA4 by reading
- * this list.
+ * is not harmless documentation of intent. It misleads the privacy policy,
+ * which describes what we send to GA4 by reading this list.
  *
  * Four names were removed on 2026-09-01 — pro_page_view, pro_checkout_started,
  * pro_checkout_completed and teams_waitlist_signup. There is no /pro route, no
@@ -62,3 +59,13 @@ export const ANALYTICS_EVENTS = {
 
 export type AnalyticsEventName =
   (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
+
+export const CLIENT_ANALYTICS_EVENTS = {
+  lookupRun: ANALYTICS_EVENTS.lookupRun,
+  timeRangeSelected: ANALYTICS_EVENTS.timeRangeSelected,
+  integratedViewUsed: ANALYTICS_EVENTS.integratedViewUsed,
+  embedGenerated: ANALYTICS_EVENTS.embedGenerated,
+} as const;
+
+export type ClientAnalyticsEventName =
+  (typeof CLIENT_ANALYTICS_EVENTS)[keyof typeof CLIENT_ANALYTICS_EVENTS];

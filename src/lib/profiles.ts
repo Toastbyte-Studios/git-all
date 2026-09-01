@@ -573,7 +573,7 @@ export async function getProfileSummaryByUserId(
  * row is dropped — you can always rename back to your own old handle.
  *
  * Returns:
- * - `{ ok: true }` on success
+ * - `{ ok: true, changed: boolean }` on success
  * - `{ ok: false, reason: 'invalid' }` — handle doesn't pass syntax rules
  * - `{ ok: false, reason: 'taken' }` — handle in use, or reserved to another user
  * - `{ ok: false, reason: 'cooldown', nextAllowedAt: number }` — changed too recently
@@ -583,7 +583,7 @@ export async function setHandle(
   userId: string,
   newHandle: string,
 ): Promise<
-  | { ok: true }
+  | { ok: true; changed: boolean }
   | { ok: false; reason: 'invalid' }
   | { ok: false; reason: 'taken' }
   | { ok: false; reason: 'cooldown'; nextAllowedAt: number }
@@ -605,7 +605,7 @@ export async function setHandle(
     .first<Pick<UserRow, 'handle' | 'handle_changed_at'>>();
 
   if (userRow?.handle === newHandle) {
-    return { ok: true };
+    return { ok: true, changed: false };
   }
 
   if (
@@ -693,7 +693,7 @@ export async function setHandle(
     return { ok: false, reason: 'no_db' };
   }
 
-  return { ok: true };
+  return { ok: true, changed: true };
 }
 
 /**

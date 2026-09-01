@@ -75,13 +75,16 @@ export async function POST(request: NextRequest) {
   const newHandle = ((body as Record<string, unknown>).handle as string).trim();
   const result = await setHandle(session.userId, newHandle);
 
-  if (result.ok) {
+  if (result.ok && result.changed) {
     // Only the successful change is recorded, and without the handle itself —
     // neither the old nor the new one. The rejection reasons below are
     // deliberately not instrumented: 'taken' and 'cooldown' are ordinary UI
     // states the user resolves themselves, and counting them tells us nothing
     // we could act on.
     trackServerEvent(request, ANALYTICS_EVENTS.handleChanged);
+  }
+
+  if (result.ok) {
     return NextResponse.json({ ok: true });
   }
 

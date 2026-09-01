@@ -81,6 +81,11 @@ describe('POST /api/analytics/event', () => {
     expect(response.status).toBe(400);
   });
 
+  it('returns 400 when eventName is server-only', async () => {
+    const response = await POST(makeRequest({ eventName: 'handle_changed' }));
+    expect(response.status).toBe(400);
+  });
+
   it('returns 200 and calls sendServerAnalyticsEvent for a valid event', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

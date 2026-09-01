@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  ANALYTICS_EVENTS,
-  type AnalyticsEventName,
+  CLIENT_ANALYTICS_EVENTS,
+  type ClientAnalyticsEventName,
 } from '@/lib/analytics-events';
 import { trackServerEvent } from '@/lib/analytics-server';
 import { checkRateLimit } from './rate-limit';
 
-const ALLOWED_EVENTS = new Set<AnalyticsEventName>(
-  Object.values(ANALYTICS_EVENTS),
+const ALLOWED_EVENTS = new Set<ClientAnalyticsEventName>(
+  Object.values(CLIENT_ANALYTICS_EVENTS),
 );
 
 export async function POST(request: NextRequest) {
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   if (
     !body?.eventName ||
-    !ALLOWED_EVENTS.has(body.eventName as AnalyticsEventName)
+    !ALLOWED_EVENTS.has(body.eventName as ClientAnalyticsEventName)
   ) {
     return NextResponse.json(
       { error: 'Invalid analytics event name.' },
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   trackServerEvent(
     request,
-    body.eventName as AnalyticsEventName,
+    body.eventName as ClientAnalyticsEventName,
     primitiveParams,
   );
 
