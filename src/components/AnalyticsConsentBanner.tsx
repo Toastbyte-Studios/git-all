@@ -96,6 +96,7 @@ export function AnalyticsConsentBanner() {
     <div
       role="dialog"
       aria-modal="false"
+      aria-live="polite"
       aria-labelledby="consent-banner-title"
       aria-describedby="consent-banner-body"
       className="fixed bottom-4 left-4 right-4 md:left-auto md:w-[440px] z-50 rounded-lg p-4 shadow-lg"

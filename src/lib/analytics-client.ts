@@ -198,6 +198,8 @@ function reconcileExistingConsent() {
   syncConsentFromZaraz();
 }
 
+let consentBridgeInitialized = false;
+
 /**
  * Bridges the Zaraz consent state to the server-side path.
  *
@@ -208,11 +210,15 @@ function reconcileExistingConsent() {
  *
  * Called once from AnalyticsConsentBanner, which is mounted in the root
  * layout. Safe to call before Zaraz has loaded, and a no-op if it never does.
+ *
+ * Idempotent: guarded by a module-level flag so a remount (StrictMode, hot
+ * reload, or a second banner instance) cannot register duplicate listeners.
  */
 export function initAnalyticsConsentBridge() {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || consentBridgeInitialized) {
     return;
   }
+  consentBridgeInitialized = true;
 
   // Fired every time the visitor changes their preferences.
   document.addEventListener('zarazConsentChoicesUpdated', syncConsentFromZaraz);

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ANALYTICS_CONSENT_COOKIE } from '@/lib/analytics-consent';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 import {
   sendServerAnalyticsEvent,
@@ -14,6 +15,8 @@ vi.mock('@opennextjs/cloudflare', () => ({
 const ORIGINAL_ENV = {
   ANALYTICS_GA4_MEASUREMENT_ID: process.env.ANALYTICS_GA4_MEASUREMENT_ID,
   ANALYTICS_GA4_API_SECRET: process.env.ANALYTICS_GA4_API_SECRET,
+  NEXT_PUBLIC_ANALYTICS_REQUIRE_CONSENT:
+    process.env.NEXT_PUBLIC_ANALYTICS_REQUIRE_CONSENT,
 };
 
 function restoreEnv() {
@@ -216,6 +219,107 @@ describe('trackServerEvent', () => {
 
     // Allow the floating promise to settle
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('consent gating (mayDeliver)', () => {
+  // ANALYTICS_CONSENT_REQUIRED is read once at module import time, so each
+  // scenario resets modules and re-imports with the env var already set.
+  async function loadWithConsentRequired() {
+    vi.resetModules();
+    process.env.NEXT_PUBLIC_ANALYTICS_REQUIRE_CONSENT = '1';
+    return import('@/lib/analytics-server');
+  }
+
+  function requestWithConsentCookie(value?: string) {
+    return new NextRequest('https://gitall.app/api/github?username=octocat', {
+      headers: {
+        'x-forwarded-for': '203.0.113.10',
+        'user-agent': 'vitest',
+        'accept-language': 'en-US',
+        ...(value ? { cookie: `${ANALYTICS_CONSENT_COOKIE}=${value}` } : {}),
+      },
+    });
+  }
+
+  it('denies delivery when no consent cookie is present', async () => {
+    process.env.ANALYTICS_GA4_MEASUREMENT_ID = 'G-TEST123';
+    process.env.ANALYTICS_GA4_API_SECRET = 'secret-123';
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { sendServerAnalyticsEvent: send } = await loadWithConsentRequired();
+
+    const result = await send(
+      requestWithConsentCookie(),
+      ANALYTICS_EVENTS.lookupSuccess,
+      { provider: 'github' },
+    );
+
+    expect(result).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('denies delivery when the consent cookie is denied', async () => {
+    process.env.ANALYTICS_GA4_MEASUREMENT_ID = 'G-TEST123';
+    process.env.ANALYTICS_GA4_API_SECRET = 'secret-123';
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { sendServerAnalyticsEvent: send } = await loadWithConsentRequired();
+
+    const result = await send(
+      requestWithConsentCookie('denied'),
+      ANALYTICS_EVENTS.lookupSuccess,
+      { provider: 'github' },
+    );
+
+    expect(result).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('allows delivery when the consent cookie is granted', async () => {
+    process.env.ANALYTICS_GA4_MEASUREMENT_ID = 'G-TEST123';
+    process.env.ANALYTICS_GA4_API_SECRET = 'secret-123';
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { sendServerAnalyticsEvent: send } = await loadWithConsentRequired();
+
+    const result = await send(
+      requestWithConsentCookie('granted'),
+      ANALYTICS_EVENTS.lookupSuccess,
+      { provider: 'github' },
+    );
+
+    expect(result).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows delivery of exempt events regardless of consent state', async () => {
+    process.env.ANALYTICS_GA4_MEASUREMENT_ID = 'G-TEST123';
+    process.env.ANALYTICS_GA4_API_SECRET = 'secret-123';
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { sendServerAnalyticsEvent: send } = await loadWithConsentRequired();
+
+    const result = await send(
+      requestWithConsentCookie(),
+      ANALYTICS_EVENTS.embedServed,
+      { provider: 'github' },
+    );
+
+    expect(result).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
