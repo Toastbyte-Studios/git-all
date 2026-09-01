@@ -1,4 +1,7 @@
-import { ANALYTICS_EVENTS, type AnalyticsEventName } from '@/lib/analytics-events';
+import {
+  ANALYTICS_EVENTS,
+  type AnalyticsEventName,
+} from '@/lib/analytics-events';
 
 /**
  * Shared consent vocabulary for client and server.
