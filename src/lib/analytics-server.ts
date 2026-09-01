@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import {
+  ANALYTICS_CONSENT_COOKIE,
+  ANALYTICS_CONSENT_REQUIRED,
+  CONSENT_EXEMPT_EVENTS,
+  parseConsentValue,
+} from '@/lib/analytics-consent';
 import type { AnalyticsEventName } from '@/lib/analytics-events';
 import { getClientIp } from '@/lib/client-ip';
 import type { NextRequest } from 'next/server';
@@ -18,6 +24,33 @@ function getGa4Config() {
     return null;
   }
   return { measurementId, apiSecret };
+}
+
+/**
+ * Whether this request is allowed to reach GA4.
+ *
+ * Zaraz gates only the tools it loads in the browser. Everything below this
+ * point talks to the Measurement Protocol directly, which Zaraz cannot see or
+ * stop — so the gate has to live here, reading the cookie the browser wrote.
+ *
+ * This is checked centrally rather than at each of the call sites (the four
+ * platform routes, the auth callback, the profile page, the embed renderer and
+ * the analytics event route). A call site added later inherits the gate for
+ * free instead of having to remember it.
+ *
+ * Absent consent is a decline. A visitor who has never answered has not agreed
+ * to anything, so an unanswered state and a refusal are treated identically
+ * here — the distinction between them only matters to the banner.
+ */
+function mayDeliver(request: NextRequest, eventName: AnalyticsEventName) {
+  if (!ANALYTICS_CONSENT_REQUIRED) {
+    return true;
+  }
+  if (CONSENT_EXEMPT_EVENTS.has(eventName)) {
+    return true;
+  }
+  const raw = request.cookies.get(ANALYTICS_CONSENT_COOKIE)?.value;
+  return parseConsentValue(raw) === 'granted';
 }
 
 /**
@@ -81,6 +114,10 @@ export async function sendServerAnalyticsEvent(
   eventName: AnalyticsEventName,
   params: AnalyticsParams = {},
 ) {
+  if (!mayDeliver(request, eventName)) {
+    return false;
+  }
+
   const config = getGa4Config();
   if (!config) {
     return false;
@@ -121,16 +158,23 @@ export async function sendServerAnalyticsEvent(
 /**
  * Fire an analytics event without blocking the response.
  *
- * In Workers, pending promises are cancelled when the response is returned,
- * so delivery must be registered with ctx.waitUntil(). Outside a Worker
- * (next dev, tests) getCloudflareContext() throws and we fall back to a
- * plain floating promise, which is fine in a long-lived Node process.
+ * The consent check runs synchronously here, before any promise is created, so
+ * a declined event costs nothing and never reaches waitUntil.
+ *
+ * In Workers, pending promises are cancelled when the response is returned, so
+ * delivery must be registered with ctx.waitUntil(). Outside a Worker (next
+ * dev, tests) getCloudflareContext() throws and we fall back to a plain
+ * floating promise, which is fine in a long-lived Node process.
  */
 export function trackServerEvent(
   request: NextRequest,
   eventName: AnalyticsEventName,
   params: AnalyticsParams = {},
 ): void {
+  if (!mayDeliver(request, eventName)) {
+    return;
+  }
+
   const delivery = sendServerAnalyticsEvent(request, eventName, params);
   try {
     getCloudflareContext().ctx.waitUntil(delivery);
