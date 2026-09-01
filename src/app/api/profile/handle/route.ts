@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { trackServerEvent } from '@/lib/analytics-server';
 import { getAuthSession } from '@/lib/auth-session';
 import {
   HANDLE_CHANGE_COOLDOWN_MS,
@@ -17,6 +19,10 @@ import {
  * Save button stays disabled on that state.
  *
  * Unauthenticated callers still get a useful answer, just the stricter one.
+ *
+ * Deliberately not instrumented. This fires on every keystroke in the handle
+ * editor; an event here would drown the catalog in noise and would carry the
+ * candidate handle, which we do not send.
  */
 export async function GET(request: NextRequest) {
   const candidate = request.nextUrl.searchParams.get('candidate') ?? '';
@@ -68,6 +74,15 @@ export async function POST(request: NextRequest) {
 
   const newHandle = ((body as Record<string, unknown>).handle as string).trim();
   const result = await setHandle(session.userId, newHandle);
+
+  if (result.ok && result.changed) {
+    // Only the successful change is recorded, and without the handle itself —
+    // neither the old nor the new one. The rejection reasons below are
+    // deliberately not instrumented: 'taken' and 'cooldown' are ordinary UI
+    // states the user resolves themselves, and counting them tells us nothing
+    // we could act on.
+    trackServerEvent(request, ANALYTICS_EVENTS.handleChanged);
+  }
 
   if (result.ok) {
     return NextResponse.json({ ok: true });

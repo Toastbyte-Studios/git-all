@@ -538,6 +538,7 @@ describe('setHandle', () => {
   it('renames the user', async () => {
     await expect(setHandle(USER_ID, 'jane-smith')).resolves.toEqual({
       ok: true,
+      changed: true,
     });
 
     expect(store.users[0].handle).toBe('jane-smith');
@@ -580,7 +581,10 @@ describe('setHandle', () => {
     // Bypass the 7-day cooldown, which is not what this test is about.
     store.users[0].handle_changed_at = null;
 
-    await expect(setHandle(USER_ID, 'jane-doe')).resolves.toEqual({ ok: true });
+    await expect(setHandle(USER_ID, 'jane-doe')).resolves.toEqual({
+      ok: true,
+      changed: true,
+    });
 
     expect(store.users[0].handle).toBe('jane-doe');
     // The reclaimed handle must not be both current and retired.
@@ -593,7 +597,10 @@ describe('setHandle', () => {
   });
 
   it('is a no-op when the handle is unchanged', async () => {
-    await expect(setHandle(USER_ID, 'jane-doe')).resolves.toEqual({ ok: true });
+    await expect(setHandle(USER_ID, 'jane-doe')).resolves.toEqual({
+      ok: true,
+      changed: false,
+    });
 
     expect(store.handleHistory).toHaveLength(0);
   });

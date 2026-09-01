@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { trackServerEvent } from '@/lib/analytics-server';
 import { getAuthSession } from '@/lib/auth-session';
 import { setVisibility } from '@/lib/profiles';
 
@@ -42,6 +44,19 @@ export async function POST(request: NextRequest) {
   if (!ok) {
     return NextResponse.json({ error: 'db_unavailable' }, { status: 503 });
   }
+
+  // Fired after the write succeeds, never before, so the count cannot drift
+  // from the database. Publishing and unpublishing are separate event names
+  // rather than one event with a boolean param: the param sanitiser in
+  // analytics-server.ts coerces booleans to 1/0, which is awkward to segment
+  // on in GA4. No handle is sent — this says that a profile changed state,
+  // not whose.
+  trackServerEvent(
+    request,
+    isPublic
+      ? ANALYTICS_EVENTS.profilePublished
+      : ANALYTICS_EVENTS.profileUnpublished,
+  );
 
   return NextResponse.json({ ok: true, isPublic });
 }
