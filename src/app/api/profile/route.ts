@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { trackServerEvent } from '@/lib/analytics-server';
 import { clearAuthCookies } from '@/lib/auth-cookies';
 import { getAuthSession } from '@/lib/auth-session';
 import { deleteUser, getHandleByUserId } from '@/lib/profiles';
@@ -68,6 +70,17 @@ export async function DELETE(request: NextRequest) {
   if (!deleted) {
     return NextResponse.json({ error: 'db_unavailable' }, { status: 503 });
   }
+
+  // Deliberately parameterless. The obviously interesting details here —
+  // which handle, how long the account lived, how many connections it had —
+  // are all either identifying or one query away from being so, and this is
+  // the one request in the app where the user is asking us to forget them.
+  // A bare count of deletions is the most we should take from it.
+  //
+  // Fired before the response is built so it is not lost if cookie clearing
+  // throws. trackServerEvent registers delivery with waitUntil and returns
+  // immediately, so this does not delay the response.
+  trackServerEvent(request, ANALYTICS_EVENTS.accountDeleted);
 
   const response = NextResponse.json({ ok: true });
   clearAuthCookies(response);
