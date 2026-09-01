@@ -21,7 +21,17 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
+
+      # NEXT_PUBLIC_* variables are inlined into the client bundle at BUILD
+      # time, and the build happens here — `wrangler deploy` below only uploads
+      # the finished output. Setting either of these in the Cloudflare
+      # dashboard has no effect on the browser bundle. This is the trap that
+      # shipped an invisible consent banner on alley-admin for a full deploy
+      # cycle; see #182.
       - run: npm run cf:build
+        env:
+          NEXT_PUBLIC_ANALYTICS_REQUIRE_CONSENT: '1'
+          NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN: ${{ vars.NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN }}
 
       # Migrations run before the deploy so the schema is never behind the code
       # that queries it. `migrations apply` is idempotent — it skips anything
@@ -31,7 +41,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          
+
       - run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

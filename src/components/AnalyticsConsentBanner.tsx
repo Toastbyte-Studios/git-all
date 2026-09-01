@@ -62,7 +62,10 @@ export function AnalyticsConsentBanner() {
 
     return () => {
       document.removeEventListener('zarazConsentAPIReady', hideIfAnswered);
-      document.removeEventListener('zarazConsentChoicesUpdated', hideIfAnswered);
+      document.removeEventListener(
+        'zarazConsentChoicesUpdated',
+        hideIfAnswered,
+      );
       document.removeEventListener(CONSENT_REOPEN_EVENT, reopen);
     };
   }, []);
@@ -115,8 +118,8 @@ export function AnalyticsConsentBanner() {
       >
         Counts visits and records which pages and features get used, through
         Google Analytics. We do not send your GitHub, GitLab, Bitbucket, or
-        Gitea username, and nothing here feeds advertising profiles. Decline
-        and the site works exactly the same.{' '}
+        Gitea username, and nothing here feeds advertising profiles. Decline and
+        the site works exactly the same.{' '}
         <a
           href="/privacy"
           className="hover:underline"
