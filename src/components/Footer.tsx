@@ -1,15 +1,18 @@
 import Link from 'next/link';
+import { ConsentPreferencesButton } from '@/components/ConsentPreferencesButton';
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION;
 
 /**
  * Site-wide footer, rendered from the root layout so every route carries the
- * privacy link — including `/u/[handle]`, which publishes a person's name and
+ * privacy link - including `/u/[handle]`, which publishes a person's name and
  * avatar and therefore has the strongest claim to one.
  *
- * Fully static: no session read, no client hooks. That matters because
- * `/u/[handle]` is edge-cached (see `headers()` in next.config.ts), and a
- * footer that varied per viewer would undermine that.
+ * Still safe for the edge cache that `/u/[handle]` relies on (see `headers()`
+ * in next.config.ts): no session is read and nothing here varies per viewer.
+ * `ConsentPreferencesButton` is a client component, but it renders the same
+ * markup for everyone and reads no per-visitor state - keep it that way. A
+ * footer that varied per viewer would undermine that cache.
  */
 export function Footer() {
   return (
@@ -22,7 +25,8 @@ export function Footer() {
         >
           Privacy
         </Link>
-        {' · '}
+        <ConsentPreferencesButton />
+        {' \u00b7 '}
         Built by{' '}
         <a
           href="https://toastbyte.studio"
