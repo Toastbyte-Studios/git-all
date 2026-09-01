@@ -98,8 +98,9 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   trackServerEvent(request, ANALYTICS_EVENTS.providerDisconnected, {
     provider,
     was_last: false,
-    remaining_connections: Object.values(nextSession.connections).filter(Boolean)
-      .length,
+    remaining_connections: Object.values(nextSession.connections).filter(
+      Boolean,
+    ).length,
   });
 
   const response = NextResponse.json(
