@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
+import { trackServerEvent } from '@/lib/analytics-server';
 import {
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
@@ -64,7 +66,18 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   }
 
   const nextSession = removeConnectionFromSession(session, provider);
+
+  // The provider name is an enum of three values and says nothing about who
+  // the user is. `was_last` distinguishes trimming one account from leaving
+  // entirely — the second is the one worth noticing, and it is invisible if
+  // both cases share an event.
   if (!nextSession) {
+    trackServerEvent(request, ANALYTICS_EVENTS.providerDisconnected, {
+      provider,
+      was_last: true,
+      remaining_connections: 0,
+    });
+
     const response = NextResponse.json(
       { authenticated: false },
       { headers: { 'Cache-Control': 'no-store' } },
@@ -81,6 +94,13 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
+
+  trackServerEvent(request, ANALYTICS_EVENTS.providerDisconnected, {
+    provider,
+    was_last: false,
+    remaining_connections: Object.values(nextSession.connections).filter(Boolean)
+      .length,
+  });
 
   const response = NextResponse.json(
     {
