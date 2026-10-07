@@ -1,6 +1,6 @@
 {
   "name": "git-all",
-  "version": "1.42.2",
+  "version": "1.42.3",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -50,7 +50,7 @@
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.11",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.147.0"
   },
   "engines": {
     "node": ">=20.9.0"
