@@ -10,6 +10,7 @@ import {
   getEdgeCache,
   matchLastGood,
   mergeContributions,
+  PARTIAL_CACHE_CONTROL,
   resolveTheme,
   runAfterResponse,
   storeLastGood,
@@ -205,7 +206,9 @@ export async function GET(
   const response = new Response(svg, {
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',
-      'Cache-Control': CACHE_CONTROL,
+      // Partial render (a provider blipped): short TTL — see
+      // PARTIAL_CACHE_CONTROL.
+      'Cache-Control': hasTransient ? PARTIAL_CACHE_CONTROL : CACHE_CONTROL,
       'X-Robots-Tag': 'noindex',
       // Cloudflare's edge cache only understands `Vary: Accept-Encoding`.
       // Set it explicitly so the RSC negotiation headers OpenNext applies
@@ -219,7 +222,9 @@ export async function GET(
 
   if (cache) {
     runAfterResponse(cache.put(cacheKey, response.clone()));
-    runAfterResponse(storeLastGood(cache, cacheKey, response.clone()));
+    if (!hasTransient) {
+      runAfterResponse(storeLastGood(cache, cacheKey, response.clone()));
+    }
   }
 
   trackEmbedServed(request, platforms, theme, 'miss', 'handle');

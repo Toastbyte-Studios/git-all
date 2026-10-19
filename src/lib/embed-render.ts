@@ -101,6 +101,14 @@ const LAST_GOOD_PATH_PREFIX = '/__gitall_internal/last-good';
 // max-age keeps camo and browsers from re-fetching during the blip.
 const STALE_CACHE_CONTROL = 'public, max-age=300';
 
+// A partial render (some providers succeeded, at least one failed
+// transiently) is still worth showing, but must not be cached for the full
+// TTL — that would pin a heatmap missing a provider's data for up to 24h after
+// the blip. Five minutes absorbs a burst and recovers quickly. Partial renders
+// are also never stored as the last-known-good copy, so a complete fallback is
+// not overwritten by an incomplete one.
+export const PARTIAL_CACHE_CONTROL = 'public, s-maxage=300';
+
 export function buildLastGoodKey(cacheKey: Request): Request {
   const url = new URL(cacheKey.url);
   url.pathname = `${LAST_GOOD_PATH_PREFIX}${url.pathname}`;

@@ -284,6 +284,36 @@ describe('handle embed route GET', () => {
     expect(edgeCache.put).not.toHaveBeenCalled();
   });
 
+  it('caches a partial render briefly and skips the last-known-good copy', async () => {
+    const edgeCache = stubEdgeCache();
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(
+      makeProfile([
+        { provider: 'github', username: 'octocat', avatarUrl: null },
+        { provider: 'gitlab', username: 'jdoe', avatarUrl: null },
+      ]),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(makeContributionResponse({ platform: 'github' }))
+        .mockRejectedValueOnce(new DOMException('Timeout', 'AbortError')),
+    );
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/u/jane-doe.svg'),
+      makeParams('jane-doe.svg'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('public, s-maxage=300');
+    expect(response.headers.get('x-gitall-platforms')).toBe('github');
+    // Primary entry only — no last-known-good write for a partial render.
+    expect(edgeCache.put).toHaveBeenCalledTimes(1);
+    const [, cached] = edgeCache.put.mock.calls[0] as [Request, Response];
+    expect(cached.headers.get('Cache-Control')).toBe('public, s-maxage=300');
+  });
+
   it('serves the last good render for the same profile version on a transient failure', async () => {
     const fallback = new Response('<svg>last good</svg>', {
       status: 200,
