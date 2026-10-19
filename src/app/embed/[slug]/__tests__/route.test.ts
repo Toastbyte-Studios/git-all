@@ -206,7 +206,7 @@ describe('embed route GET', () => {
     expect(body).toMatch(/^<svg /);
   });
 
-  it('returns 404 SVG when all platforms fail', async () => {
+  it('returns 503 no-store SVG when all platforms fail transiently', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockRejectedValue(new Error('network error'));
@@ -217,10 +217,67 @@ describe('embed route GET', () => {
       makeParams('octocat.svg'),
     );
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Retry-After')).toBe('60');
     const body = await response.text();
     expect(body).toMatch(/^<svg /);
+    expect(body).toContain('Data temporarily unavailable');
+  });
+
+  it('returns 503 when an upstream 5xx is the only failure', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('{"error":"boom"}', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/octocat.svg'),
+      makeParams('octocat.svg'),
+    );
+
+    expect(response.status).toBe(503);
+  });
+
+  it('returns cacheable 404 SVG when every platform reports user not found', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response('{"error":"not found"}', { status: 404 }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/nobody.svg'),
+      makeParams('nobody.svg'),
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('Cache-Control')).toBe('public, s-maxage=3600');
+    expect(response.headers.get('Retry-After')).toBeNull();
+    const body = await response.text();
     expect(body).toContain('No contribution data found');
+  });
+
+  it('prefers 503 over 404 when failures are a mix of not-found and transient', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response('{"error":"not found"}', { status: 404 }),
+      )
+      .mockRejectedValueOnce(new DOMException('Timeout', 'AbortError'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(
+      createRequest(
+        'https://gitall.app/embed/myslug?github=octocat&gitlab=jdoe',
+      ),
+      makeParams('myslug'),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('error SVG responses include X-Robots-Tag: noindex', async () => {
