@@ -80,6 +80,67 @@ export function buildEmbedCacheKey(
   return new Request(url.toString(), { method: 'GET' });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAST-KNOWN-GOOD FALLBACK
+//
+// The primary edge entry expires after its s-maxage, and the Workers Cache API
+// does not serve stale entries (stale-while-revalidate is only honoured by
+// downstream caches). So once it expires, a provider blip on the next request
+// would show camo an error image. To avoid that, every successful render is
+// also stored under a derived key with a long TTL, and served — marked stale,
+// short-lived — when all providers fail transiently.
+//
+// Per-colo like the primary cache: a colo that has never rendered the URL has
+// no fallback and still returns 503. The synthetic monitor cache-busts every
+// probe, so it never matches a fallback and still sees real upstream failures.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const LAST_GOOD_TTL_SECONDS = 7 * 24 * 60 * 60;
+const LAST_GOOD_PARAM = '__gitall_last_good';
+// Not stored back into the edge cache, so the next request retries upstream;
+// max-age keeps camo and browsers from re-fetching during the blip.
+const STALE_CACHE_CONTROL = 'public, max-age=300';
+
+export function buildLastGoodKey(cacheKey: Request): Request {
+  const url = new URL(cacheKey.url);
+  url.searchParams.set(LAST_GOOD_PARAM, '1');
+  return new Request(url.toString(), { method: 'GET' });
+}
+
+/** Stores a successful SVG as the fallback. Pass a clone of the response. */
+export function storeLastGood(
+  cache: Cache,
+  cacheKey: Request,
+  response: Response,
+): Promise<void> {
+  const copy = new Response(response.body, response);
+  copy.headers.set(
+    'Cache-Control',
+    `public, s-maxage=${LAST_GOOD_TTL_SECONDS}`,
+  );
+  return cache.put(buildLastGoodKey(cacheKey), copy);
+}
+
+/**
+ * Returns the last successful render for this cache key, re-headed as a
+ * short-lived stale response (`x-gitall-stale: 1`), or null if there is none.
+ */
+export async function matchLastGood(
+  cache: Cache,
+  cacheKey: Request,
+): Promise<Response | null> {
+  try {
+    const hit = await cache.match(buildLastGoodKey(cacheKey));
+    if (!hit) return null;
+    const stale = new Response(hit.body, hit);
+    stale.headers.set('Cache-Control', STALE_CACHE_CONTROL);
+    stale.headers.set('x-gitall-stale', '1');
+    return stale;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Discriminated result from a single upstream platform fetch.
  *
@@ -239,7 +300,7 @@ export function trackEmbedServed(
   request: NextRequest,
   platforms: string | null,
   theme: EmbedTheme,
-  cacheStatus: 'hit' | 'miss',
+  cacheStatus: 'hit' | 'miss' | 'stale',
   source: EmbedSource,
 ): void {
   const refererHost = (() => {

@@ -198,11 +198,21 @@ describe('handle embed route GET', () => {
     expect(response.headers.get('x-gitall-platforms')).toBe('github+gitlab');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(edgeCache.put).toHaveBeenCalledTimes(1);
+    // Primary entry plus the long-lived last-known-good fallback.
+    expect(edgeCache.put).toHaveBeenCalledTimes(2);
     const [cacheRequest, cachedResponse] = edgeCache.put.mock.calls[0] as [
       Request,
       Response,
     ];
+    const [fallbackRequest, fallbackResponse] = edgeCache.put.mock.calls[1] as [
+      Request,
+      Response,
+    ];
+    expect(fallbackRequest.url).toContain('v=1717777777000');
+    expect(fallbackRequest.url).toContain('__gitall_last_good=1');
+    expect(fallbackResponse.headers.get('Cache-Control')).toBe(
+      'public, s-maxage=604800',
+    );
     expect(cacheRequest.url).toContain('theme=light');
     expect(cacheRequest.url).toContain('v=1717777777000');
     const [, cachedBody] = cacheRequest.url.split('/embed/u/');
@@ -269,6 +279,47 @@ describe('handle embed route GET', () => {
     expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(response.headers.get('Retry-After')).toBe('60');
+    expect(edgeCache.put).not.toHaveBeenCalled();
+  });
+
+  it('serves the last good render for the same profile version on a transient failure', async () => {
+    const fallback = new Response('<svg>last good</svg>', {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/svg+xml; charset=utf-8',
+        'Cache-Control': 'public, s-maxage=604800',
+        'x-gitall-platforms': 'github',
+      },
+    });
+    const edgeCache = stubEdgeCache({
+      match: async (request) =>
+        request.url.includes('__gitall_last_good=1')
+          ? fallback.clone()
+          : undefined,
+    });
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(
+      makeProfile(),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockRejectedValue(new DOMException('Timeout', 'AbortError')),
+    );
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/u/jane-doe.svg'),
+      makeParams('jane-doe.svg'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('<svg>last good</svg>');
+    expect(response.headers.get('x-gitall-stale')).toBe('1');
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
+    const fallbackLookup = edgeCache.match.mock.calls
+      .map(([r]) => (r as Request).url)
+      .find((u) => u.includes('__gitall_last_good=1'));
+    expect(fallbackLookup).toContain('v=1717777777000');
     expect(edgeCache.put).not.toHaveBeenCalled();
   });
 

@@ -8,9 +8,11 @@ import {
   contributionFailureResponse,
   fetchContributions,
   getEdgeCache,
+  matchLastGood,
   mergeContributions,
   resolveTheme,
   runAfterResponse,
+  storeLastGood,
   stripSvgExtension,
   svgError,
   trackEmbedServed,
@@ -166,6 +168,22 @@ export async function GET(
   );
 
   if (validResults.length === 0) {
+    // Transient failure: serve the last successful render for this exact
+    // profile version (the key carries `updatedAt`), if this colo has one.
+    if (hasTransient && cache) {
+      const stale = await matchLastGood(cache, cacheKey);
+      if (stale) {
+        trackEmbedServed(
+          request,
+          stale.headers.get('x-gitall-platforms'),
+          theme,
+          'stale',
+          'handle',
+        );
+        return stale;
+      }
+    }
+
     // Only cache when all failures were definitive (404). A transient failure
     // (timeout, 5xx, rate limit) returns 503 no-store so a real user's embed
     // recovers as soon as the upstream does.
@@ -201,6 +219,7 @@ export async function GET(
 
   if (cache) {
     runAfterResponse(cache.put(cacheKey, response.clone()));
+    runAfterResponse(storeLastGood(cache, cacheKey, response.clone()));
   }
 
   trackEmbedServed(request, platforms, theme, 'miss', 'handle');
