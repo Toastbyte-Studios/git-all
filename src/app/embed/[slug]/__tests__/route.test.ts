@@ -41,7 +41,7 @@ function stubMemoryCache() {
   return { cache, store };
 }
 
-const LAST_GOOD_SUFFIX = '__gitall_last_good=1';
+const LAST_GOOD_PATH = '/__gitall_internal/last-good/';
 
 describe('embed route GET', () => {
   beforeEach(() => {
@@ -314,7 +314,7 @@ describe('embed route GET', () => {
       expect(response.status).toBe(200);
       expect(store.has(url)).toBe(true);
       const fallbackKey = [...store.keys()].find((k) =>
-        k.includes(LAST_GOOD_SUFFIX),
+        k.includes(LAST_GOOD_PATH),
       );
       expect(fallbackKey).toBeDefined();
       expect(store.get(fallbackKey!)?.headers.get('Cache-Control')).toBe(
@@ -347,6 +347,35 @@ describe('embed route GET', () => {
       // The stale copy is not written back as the primary entry, so the next
       // request retries the upstream.
       expect(store.has(url)).toBe(false);
+    });
+
+    it('does not treat the reserved query parameter as a fallback cache hit', async () => {
+      const { store } = stubMemoryCache();
+      await renderOnce(
+        vi.fn<typeof fetch>().mockResolvedValue(makeContributionResponse()),
+      );
+
+      const fetchMock = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(makeContributionResponse());
+      vi.stubGlobal('fetch', fetchMock);
+      const response = await GET(
+        createRequest(
+          'https://gitall.app/embed/octocat.svg?__gitall_last_good=1&theme=dark',
+        ),
+        makeParams('octocat.svg'),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-gitall-stale')).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(
+        [...store.keys()].some(
+          (key) =>
+            key.includes(LAST_GOOD_PATH) &&
+            key.includes('__gitall_last_good=1'),
+        ),
+      ).toBe(true);
     });
 
     it('returns 503 when there is no fallback for the URL', async () => {

@@ -96,14 +96,14 @@ export function buildEmbedCacheKey(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const LAST_GOOD_TTL_SECONDS = 7 * 24 * 60 * 60;
-const LAST_GOOD_PARAM = '__gitall_last_good';
+const LAST_GOOD_PATH_PREFIX = '/__gitall_internal/last-good';
 // Not stored back into the edge cache, so the next request retries upstream;
 // max-age keeps camo and browsers from re-fetching during the blip.
 const STALE_CACHE_CONTROL = 'public, max-age=300';
 
 export function buildLastGoodKey(cacheKey: Request): Request {
   const url = new URL(cacheKey.url);
-  url.searchParams.set(LAST_GOOD_PARAM, '1');
+  url.pathname = `${LAST_GOOD_PATH_PREFIX}${url.pathname}`;
   return new Request(url.toString(), { method: 'GET' });
 }
 
@@ -134,6 +134,8 @@ export async function matchLastGood(
     if (!hit) return null;
     const stale = new Response(hit.body, hit);
     stale.headers.set('Cache-Control', STALE_CACHE_CONTROL);
+    stale.headers.delete('Age');
+    stale.headers.set('Date', new Date().toUTCString());
     stale.headers.set('x-gitall-stale', '1');
     return stale;
   } catch {

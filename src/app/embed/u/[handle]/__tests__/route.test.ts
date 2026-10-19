@@ -209,7 +209,9 @@ describe('handle embed route GET', () => {
       Response,
     ];
     expect(fallbackRequest.url).toContain('v=1717777777000');
-    expect(fallbackRequest.url).toContain('__gitall_last_good=1');
+    expect(new URL(fallbackRequest.url).pathname).toBe(
+      '/__gitall_internal/last-good/embed/u/jane-doe.svg',
+    );
     expect(fallbackResponse.headers.get('Cache-Control')).toBe(
       'public, s-maxage=604800',
     );
@@ -293,7 +295,9 @@ describe('handle embed route GET', () => {
     });
     const edgeCache = stubEdgeCache({
       match: async (request) =>
-        request.url.includes('__gitall_last_good=1')
+        new URL(request.url).pathname.startsWith(
+          '/__gitall_internal/last-good/',
+        )
           ? fallback.clone()
           : undefined,
     });
@@ -318,7 +322,9 @@ describe('handle embed route GET', () => {
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
     const fallbackLookup = edgeCache.match.mock.calls
       .map(([r]) => (r as Request).url)
-      .find((u) => u.includes('__gitall_last_good=1'));
+      .find((u) =>
+        new URL(u).pathname.startsWith('/__gitall_internal/last-good/'),
+      );
     expect(fallbackLookup).toContain('v=1717777777000');
     expect(edgeCache.put).not.toHaveBeenCalled();
   });

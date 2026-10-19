@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  buildLastGoodKey,
   fetchContributions,
+  matchLastGood,
   mergeContributions,
   svgError,
   type EmbedPlatformEntry,
@@ -34,6 +36,52 @@ const MULTI_ENTRIES: EmbedPlatformEntry[] = [
   { platform: 'github', username: 'octocat' },
   { platform: 'gitlab', username: 'octolab' },
 ];
+
+describe('last-known-good cache helpers', () => {
+  it('uses an internal path instead of a reserved query parameter', () => {
+    const cacheKey = new Request(
+      'https://gitall.app/embed/octocat.svg?__gitall_last_good=1&theme=dark',
+    );
+    const fallbackKey = buildLastGoodKey(cacheKey);
+
+    expect(new URL(fallbackKey.url).pathname).toBe(
+      '/__gitall_internal/last-good/embed/octocat.svg',
+    );
+    expect(new URL(fallbackKey.url).search).toBe(
+      '?__gitall_last_good=1&theme=dark',
+    );
+    expect(fallbackKey.url).not.toBe(cacheKey.url);
+  });
+
+  it('resets Age and Date when returning an aged fallback', async () => {
+    const now = new Date('2026-10-19T16:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    try {
+      const cachedFallback = new Response('<svg>last good</svg>', {
+        headers: {
+          Age: '86400',
+          Date: 'Mon, 19 Oct 2026 15:00:00 GMT',
+        },
+      });
+      const cache = {
+        match: vi.fn().mockResolvedValue(cachedFallback),
+      } as unknown as Cache;
+
+      const stale = await matchLastGood(
+        cache,
+        new Request('https://gitall.app/embed/octocat.svg'),
+      );
+
+      expect(stale?.headers.get('Age')).toBeNull();
+      expect(stale?.headers.get('Date')).toBe(now.toUTCString());
+      expect(stale?.headers.get('Cache-Control')).toBe('public, max-age=300');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // fetchContributions
