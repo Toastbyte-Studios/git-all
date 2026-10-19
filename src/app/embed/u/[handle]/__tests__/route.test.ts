@@ -248,6 +248,54 @@ describe('handle embed route GET', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('returns 503 no-store and skips the edge cache when every platform fails transiently', async () => {
+    const edgeCache = stubEdgeCache();
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(
+      makeProfile(),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockRejectedValue(new DOMException('Timeout', 'AbortError')),
+    );
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/u/jane-doe.svg'),
+      makeParams('jane-doe.svg'),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Retry-After')).toBe('60');
+    expect(edgeCache.put).not.toHaveBeenCalled();
+  });
+
+  it('returns cacheable 404 when every platform reports the connected user as not found', async () => {
+    const edgeCache = stubEdgeCache();
+    profiles.getPublicProfileWithUpdatedAtByHandle.mockResolvedValue(
+      makeProfile(),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          new Response('{"error":"not found"}', { status: 404 }),
+        ),
+    );
+
+    const response = await GET(
+      createRequest('https://gitall.app/embed/u/jane-doe.svg'),
+      makeParams('jane-doe.svg'),
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('Cache-Control')).toBe('public, s-maxage=3600');
+    expect(edgeCache.put).toHaveBeenCalledTimes(1);
+  });
+
   it('bypasses the edge cache entirely when the profile is missing or private', async () => {
     const edgeCache = stubEdgeCache();
     const fetchMock = vi.fn<typeof fetch>();

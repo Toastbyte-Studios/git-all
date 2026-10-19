@@ -5,6 +5,7 @@ import {
 } from '@/lib/contribution-period';
 import {
   buildEmbedCacheKey,
+  contributionFailureResponse,
   fetchContributions,
   getEdgeCache,
   mergeContributions,
@@ -165,17 +166,14 @@ export async function GET(
   );
 
   if (validResults.length === 0) {
-    // Only cache when all failures were definitive. A transient failure
-    // (timeout, 5xx, rate limit) must stay no-store so a real user's embed
+    // Only cache when all failures were definitive (404). A transient failure
+    // (timeout, 5xx, rate limit) returns 503 no-store so a real user's embed
     // recovers as soon as the upstream does.
-    const errorCacheDirective = hasTransient
-      ? 'no-store'
-      : 'public, s-maxage=3600';
-    const errorResponse = svgError(
-      'No contribution data found',
-      404,
-      errorCacheDirective,
-    );
+    //
+    // The 503 does not weaken the privacy contract above: this point is only
+    // reachable for a profile that is public and has connections, which the
+    // normal 200 response already reveals.
+    const errorResponse = contributionFailureResponse(hasTransient);
     if (cache && !hasTransient) {
       runAfterResponse(cache.put(cacheKey, errorResponse.clone()));
     }

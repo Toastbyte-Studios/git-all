@@ -4,6 +4,7 @@ import {
   getContributionDateRange,
 } from '@/lib/contribution-period';
 import {
+  contributionFailureResponse,
   fetchContributions,
   getEdgeCache,
   mergeContributions,
@@ -150,18 +151,11 @@ export async function GET(
   );
 
   if (validResults.length === 0) {
-    // Only cache the 404 when every failure was definitive (user not found).
+    // 404 (cached) only when every failure was definitive (user not found).
     // If any platform timed out, returned 5xx, or was rate-limited the cause
-    // is transient and we must not cache — doing so would serve broken embeds
-    // to real users during an upstream blip.
-    const errorCacheDirective = hasTransient
-      ? 'no-store'
-      : 'public, s-maxage=3600';
-    const errorResponse = svgError(
-      'No contribution data found',
-      404,
-      errorCacheDirective,
-    );
+    // is transient: respond 503 and do not cache — caching would serve broken
+    // embeds to real users after the upstream has recovered.
+    const errorResponse = contributionFailureResponse(hasTransient);
     if (cache && !hasTransient) {
       runAfterResponse(cache.put(cacheKey, errorResponse.clone()));
     }

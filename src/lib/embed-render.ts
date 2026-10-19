@@ -299,6 +299,30 @@ export function svgError(
   });
 }
 
+/**
+ * Error response for when no platform returned contribution data.
+ *
+ * The status distinguishes the two causes so monitors and logs can tell them
+ * apart:
+ * - every failure was definitive (user not found) → 404, cacheable for 1h;
+ * - at least one failure was transient (timeout, 5xx, rate limit) → 503,
+ *   `no-store` + `Retry-After`, so the next request retries the upstream.
+ *
+ * Reporting a transient upstream blip as 404 made it indistinguishable from a
+ * missing user and tripped the synthetic monitor (toastbyte-ops#20) with a
+ * misleading "embeds are broken" diagnosis.
+ *
+ * Callers decide whether to `cache.put` the result; only the 404 is safe to.
+ */
+export function contributionFailureResponse(hasTransient: boolean): Response {
+  if (hasTransient) {
+    const response = svgError('Data temporarily unavailable', 503, 'no-store');
+    response.headers.set('Retry-After', '60');
+    return response;
+  }
+  return svgError('No contribution data found', 404, 'public, s-maxage=3600');
+}
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
