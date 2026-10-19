@@ -28,6 +28,21 @@ function makeContributionResponse(data: Partial<ContributionData> = {}) {
   });
 }
 
+/** Map-backed stand-in for `caches.default`, keyed by request URL. */
+function stubMemoryCache() {
+  const store = new Map<string, Response>();
+  const cache = {
+    match: vi.fn(async (request: Request) => store.get(request.url)?.clone()),
+    put: vi.fn(async (request: Request, response: Response) => {
+      store.set(request.url, response);
+    }),
+  };
+  vi.stubGlobal('caches', { default: cache });
+  return { cache, store };
+}
+
+const LAST_GOOD_PATH = '/__gitall_internal/last-good/';
+
 describe('embed route GET', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -35,6 +50,7 @@ describe('embed route GET', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -278,6 +294,116 @@ describe('embed route GET', () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  describe('last-known-good fallback', () => {
+    const url = 'https://gitall.app/embed/octocat.svg?theme=dark';
+
+    async function renderOnce(fetchImpl: typeof fetch) {
+      vi.stubGlobal('fetch', fetchImpl);
+      return GET(createRequest(url), makeParams('octocat.svg'));
+    }
+
+    it('stores a long-lived fallback copy alongside the primary entry', async () => {
+      const { store } = stubMemoryCache();
+
+      const response = await renderOnce(
+        vi.fn<typeof fetch>().mockResolvedValue(makeContributionResponse()),
+      );
+
+      expect(response.status).toBe(200);
+      expect(store.has(url)).toBe(true);
+      const fallbackKey = [...store.keys()].find((k) =>
+        k.includes(LAST_GOOD_PATH),
+      );
+      expect(fallbackKey).toBeDefined();
+      expect(store.get(fallbackKey!)?.headers.get('Cache-Control')).toBe(
+        'public, s-maxage=604800',
+      );
+    });
+
+    it('serves the last good SVG as stale when providers fail transiently', async () => {
+      const { store } = stubMemoryCache();
+      const fresh = await renderOnce(
+        vi.fn<typeof fetch>().mockResolvedValue(makeContributionResponse()),
+      );
+      const freshBody = await fresh.text();
+
+      // Primary entry expires; the fallback copy is still there.
+      store.delete(url);
+
+      const response = await renderOnce(
+        vi
+          .fn<typeof fetch>()
+          .mockRejectedValue(new DOMException('Timeout', 'AbortError')),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
+      expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
+      expect(response.headers.get('x-gitall-stale')).toBe('1');
+      expect(response.headers.get('x-gitall-platforms')).toBe('github');
+      expect(await response.text()).toBe(freshBody);
+      // The stale copy is not written back as the primary entry, so the next
+      // request retries the upstream.
+      expect(store.has(url)).toBe(false);
+    });
+
+    it('does not treat the reserved query parameter as a fallback cache hit', async () => {
+      const { store } = stubMemoryCache();
+      await renderOnce(
+        vi.fn<typeof fetch>().mockResolvedValue(makeContributionResponse()),
+      );
+
+      const fetchMock = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(makeContributionResponse());
+      vi.stubGlobal('fetch', fetchMock);
+      const response = await GET(
+        createRequest(
+          'https://gitall.app/embed/octocat.svg?__gitall_last_good=1&theme=dark',
+        ),
+        makeParams('octocat.svg'),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-gitall-stale')).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(
+        [...store.keys()].some(
+          (key) =>
+            key.includes(LAST_GOOD_PATH) &&
+            key.includes('__gitall_last_good=1'),
+        ),
+      ).toBe(true);
+    });
+
+    it('returns 503 when there is no fallback for the URL', async () => {
+      stubMemoryCache();
+      const response = await renderOnce(
+        vi.fn<typeof fetch>().mockRejectedValue(new Error('network error')),
+      );
+      expect(response.status).toBe(503);
+    });
+
+    it('does not serve the fallback when the user is definitively not found', async () => {
+      const { store } = stubMemoryCache();
+      await renderOnce(
+        vi.fn<typeof fetch>().mockResolvedValue(makeContributionResponse()),
+      );
+      store.delete(url);
+
+      const response = await renderOnce(
+        vi
+          .fn<typeof fetch>()
+          .mockResolvedValue(
+            new Response('{"error":"not found"}', { status: 404 }),
+          ),
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.headers.get('x-gitall-stale')).toBeNull();
+    });
   });
 
   it('error SVG responses include X-Robots-Tag: noindex', async () => {
