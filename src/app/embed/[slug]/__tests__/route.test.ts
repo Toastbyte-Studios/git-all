@@ -222,6 +222,55 @@ describe('embed route GET', () => {
     expect(body).toMatch(/^<svg /);
   });
 
+  it('caches a partial heatmap briefly and does not store it as last-known-good', async () => {
+    const { store } = stubMemoryCache();
+    const url = 'https://gitall.app/embed/myslug?github=octocat&gitlab=jdoe';
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(makeContributionResponse({ platform: 'github' }))
+        .mockRejectedValueOnce(new DOMException('Timeout', 'AbortError')),
+    );
+
+    const response = await GET(createRequest(url), makeParams('myslug'));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('public, s-maxage=300');
+    expect(response.headers.get('x-gitall-platforms')).toBe('github');
+    expect(store.get(url)?.headers.get('Cache-Control')).toBe(
+      'public, s-maxage=300',
+    );
+    expect([...store.keys()].some((k) => k.includes(LAST_GOOD_PATH))).toBe(
+      false,
+    );
+  });
+
+  it('keeps the full TTL and stores last-known-good when every platform succeeds', async () => {
+    const { store } = stubMemoryCache();
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(makeContributionResponse({ platform: 'github' }))
+        .mockResolvedValueOnce(
+          makeContributionResponse({ platform: 'gitlab', username: 'jdoe' }),
+        ),
+    );
+
+    const response = await GET(
+      createRequest(
+        'https://gitall.app/embed/myslug?github=octocat&gitlab=jdoe',
+      ),
+      makeParams('myslug'),
+    );
+
+    expect(response.headers.get('Cache-Control')).toContain('s-maxage=86400');
+    expect([...store.keys()].some((k) => k.includes(LAST_GOOD_PATH))).toBe(
+      true,
+    );
+  });
+
   it('returns 503 no-store SVG when all platforms fail transiently', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
