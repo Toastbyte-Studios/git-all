@@ -191,7 +191,6 @@ export async function findAvailableHandle(base: string): Promise<string> {
   let candidate = normalized;
   let suffix = 2;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (await isHandleAvailable(candidate)) {
       return candidate;

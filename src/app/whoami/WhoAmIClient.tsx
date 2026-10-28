@@ -673,6 +673,7 @@ function DeleteAccount({ handle, userId }: DeleteAccountProps) {
       if (res.ok) {
         // Full navigation rather than a router push: the session cookie is gone
         // and every cached RSC payload for this session is now stale.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a same-origin full reload is the point
         window.location.href = '/?deleted=1';
         return;
       }

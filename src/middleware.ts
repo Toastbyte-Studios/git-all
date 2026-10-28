@@ -20,6 +20,12 @@ import type { NextRequest } from 'next/server';
  * the shared edge cache that actually carries the traffic.
  *
  * Anonymous requests are untouched and keep the `next.config.ts` header.
+ *
+ * Still `middleware.ts`, not `proxy.ts`, on Next.js 16 deliberately. `proxy`
+ * always runs on the Node.js runtime, and OpenNext for Cloudflare does not
+ * yet support Node.js middleware; edge `middleware` remains supported (with a
+ * deprecation warning at build time). Rename it once OpenNext supports
+ * Node.js middleware: https://opennext.js.org/cloudflare
  */
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();

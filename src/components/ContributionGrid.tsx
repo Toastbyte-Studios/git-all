@@ -72,7 +72,6 @@ export function ContributionGrid({
     // Use stable primitive fields instead of the object reference so the
     // effect doesn't re-fire on every render when the parent recreates the
     // ContributionData object (e.g. the integrated view's mergeAllContributions).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     data.platform,
     data.username,
