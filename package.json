@@ -1,6 +1,6 @@
 {
   "name": "git-all",
-  "version": "1.43.1",
+  "version": "1.43.2",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -29,7 +29,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "latest",
+    "@opennextjs/cloudflare": "1.20.14",
     "@tailwindcss/postcss": "^4.1.0",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.0.0",
