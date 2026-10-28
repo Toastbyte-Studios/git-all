@@ -12,8 +12,13 @@ vi.mock('next/image', () => ({
   ),
 }));
 
+const viewProps = vi.hoisted(() => [] as Array<Record<string, unknown>>);
+
 vi.mock('@/components/ContributionsView', () => ({
-  ContributionsView: () => <div>ContributionsView</div>,
+  ContributionsView: (props: Record<string, unknown>) => {
+    viewProps.push(props);
+    return <div>ContributionsView</div>;
+  },
 }));
 
 const USER_ID = '01JZZZZZZZZZZZZZZZZZZZZZZZ';
@@ -25,6 +30,7 @@ const PROFILE: Profile = {
   primaryProvider: 'github',
   handleChangedAt: null,
   isPublic: true,
+  showAgentAttribution: false,
   createdAt: Date.now(),
   updatedAt: Date.now(),
   connections: [
@@ -46,5 +52,19 @@ describe('PublicProfileClient navigation buttons', () => {
     expect(
       screen.queryByRole('link', { name: /cd ~ go to homepage/i }),
     ).toBeNull();
+  });
+});
+
+describe('PublicProfileClient agent attribution', () => {
+  it('keeps the agent split hidden from visitors', () => {
+    viewProps.length = 0;
+    render(<PublicProfileClient profile={PROFILE} />);
+    expect(viewProps.at(-1)?.showAgentAttribution).toBe(false);
+  });
+
+  it('shows the agent split to the owner', () => {
+    viewProps.length = 0;
+    render(<PublicProfileClient profile={PROFILE} isOwner />);
+    expect(viewProps.at(-1)?.showAgentAttribution).toBe(true);
   });
 });

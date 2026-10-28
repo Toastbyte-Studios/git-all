@@ -91,10 +91,27 @@ vi.mock('@/lib/db', () => {
     if (q.startsWith('SELECT * FROM connections WHERE user_id')) {
       return store.connections.filter((c) => c.user_id === params[0]);
     }
-    if (q.startsWith('SELECT handle, is_public FROM users WHERE id')) {
+    if (
+      q.startsWith(
+        'SELECT handle, is_public, show_agent_attribution FROM users WHERE id',
+      )
+    ) {
       return store.users
         .filter((u) => u.id === params[0])
-        .map((u) => ({ handle: u.handle, is_public: u.is_public }));
+        .map((u) => ({
+          handle: u.handle,
+          is_public: u.is_public,
+          show_agent_attribution: u.show_agent_attribution,
+        }));
+    }
+    if (q.startsWith('UPDATE users SET show_agent_attribution')) {
+      for (const u of store.users) {
+        if (u.id === params[2]) {
+          u.show_agent_attribution = params[0];
+          u.updated_at = params[1];
+        }
+      }
+      return [];
     }
     if (q.startsWith('SELECT handle FROM users WHERE id')) {
       return store.users
@@ -170,6 +187,7 @@ const {
   normalizeHandle,
   resolvePublicHandleRedirect,
   setHandle,
+  setShowAgentAttribution,
   setVisibility,
   toPublicProfile,
 } = await import('../profiles');
@@ -188,6 +206,7 @@ function seed({ isPublic }: { isPublic: boolean }) {
       primary_provider: 'github',
       handle_changed_at: 1_717_777_777_000,
       is_public: isPublic ? 1 : 0,
+      show_agent_attribution: 0,
       created_at: 1_717_000_000_000,
       updated_at: 1_717_777_777_000,
     },
@@ -480,12 +499,14 @@ describe('setVisibility', () => {
     await expect(getProfileSummaryByUserId(userId)).resolves.toEqual({
       handle: 'jane-doe',
       isPublic: false,
+      showAgentAttribution: false,
     });
 
     await setVisibility(userId, true);
     await expect(getProfileSummaryByUserId(userId)).resolves.toEqual({
       handle: 'jane-doe',
       isPublic: true,
+      showAgentAttribution: false,
     });
   });
 
@@ -495,6 +516,54 @@ describe('setVisibility', () => {
     await expect(
       setVisibility('01J0000000000000000000USER', true),
     ).resolves.toBe(false);
+  });
+});
+
+describe('setShowAgentAttribution', () => {
+  it('is off by default and round-trips through the owner summary', async () => {
+    await expect(getProfileSummaryByUserId(USER_ID)).resolves.toMatchObject({
+      showAgentAttribution: false,
+    });
+    await expect(getProfileByHandle('jane-doe')).resolves.toMatchObject({
+      showAgentAttribution: false,
+    });
+
+    await expect(setShowAgentAttribution(USER_ID, true)).resolves.toBe(true);
+    await expect(getProfileSummaryByUserId(USER_ID)).resolves.toMatchObject({
+      showAgentAttribution: true,
+    });
+    await expect(getProfileByHandle('jane-doe')).resolves.toMatchObject({
+      showAgentAttribution: true,
+    });
+
+    await setShowAgentAttribution(USER_ID, false);
+    await expect(getProfileSummaryByUserId(USER_ID)).resolves.toMatchObject({
+      showAgentAttribution: false,
+    });
+  });
+
+  it('does not change profile visibility', async () => {
+    seed({ isPublic: false });
+    await setShowAgentAttribution(USER_ID, true);
+    await expect(getPublicProfileByHandle('jane-doe')).resolves.toBeNull();
+  });
+
+  it('treats a row from before migration 0005 as off', async () => {
+    delete store.users[0]!.show_agent_attribution;
+    await expect(getProfileSummaryByUserId(USER_ID)).resolves.toMatchObject({
+      showAgentAttribution: false,
+    });
+  });
+
+  it('is not part of the public projection', async () => {
+    await setShowAgentAttribution(USER_ID, true);
+    const profile = await getPublicProfileByHandle('jane-doe');
+    expect(profile).not.toHaveProperty('showAgentAttribution');
+  });
+
+  it('returns false when the database is unavailable', async () => {
+    store.available = false;
+    await expect(setShowAgentAttribution(USER_ID, true)).resolves.toBe(false);
   });
 });
 

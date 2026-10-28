@@ -49,10 +49,17 @@ function ProviderIcon({
 export function PublicProfileClient({
   profile,
   ownerPreview = false,
+  isOwner = false,
 }: {
   profile: PublicProfile;
   /** True when the viewer is the owner and the profile is not published. */
   ownerPreview?: boolean;
+  /**
+   * True when the viewer is the owner, published or not. Turns on the
+   * owner-only agent split. The page is served with `Vary: Cookie` (see
+   * page.tsx), so this never reaches another viewer from a shared cache.
+   */
+  isOwner?: boolean;
 }) {
   const [viewMode, setViewMode] = useState<ViewMode>('side-by-side');
 
@@ -243,6 +250,7 @@ export function PublicProfileClient({
             from={from}
             to={to}
             showVerified
+            showAgentAttribution={isOwner}
           />
         </div>
       </div>

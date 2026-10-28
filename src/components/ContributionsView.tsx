@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AgentAttributionSummary } from '@/components/AgentAttributionSummary';
 import { ContributionGrid } from '@/components/ContributionGrid';
 import { StatsBar } from '@/components/StatsBar';
 import { ViewModeToggle } from '@/components/ViewModeToggle';
@@ -22,6 +23,12 @@ interface ContributionsViewProps {
   showVerified?: boolean;
   /** Called whenever the internal loading state changes. */
   onLoadingChange?: (loading: boolean) => void;
+  /**
+   * Show agent-attributed counts (summary line and tooltips) where the API
+   * returned them. Only for the owner viewing their own data: some platforms
+   * return these fields for anyone, so the view, not the API, is the gate.
+   */
+  showAgentAttribution?: boolean;
 }
 
 export function ContributionsView({
@@ -32,6 +39,7 @@ export function ContributionsView({
   to,
   showVerified,
   onLoadingChange,
+  showAgentAttribution = false,
 }: ContributionsViewProps) {
   const [results, setResults] = useState<UserResult[]>([]);
   const [loading, setLoadingState] = useState(false);
@@ -172,7 +180,11 @@ export function ContributionsView({
                   <ContributionGrid
                     data={result.data}
                     colorKey={result.entry.platform}
+                    showAgentCounts={showAgentAttribution}
                   />
+                  {showAgentAttribution && (
+                    <AgentAttributionSummary data={result.data} ownerOnly />
+                  )}
                   {result.data.platform === 'gitlab' &&
                     result.data.dateRange.from &&
                     result.data.dateRange.to &&
@@ -225,9 +237,9 @@ export function ContributionsView({
                 .map((r) => formatResultLabel(r))
                 .join(' + ')}`}
           </h2>
-          <ContributionGrid
-            data={mergeAllContributions(results.map((r) => r.data))}
-            colorKey="integrated"
+          <IntegratedView
+            sources={results.map((r) => r.data)}
+            showAgentAttribution={showAgentAttribution}
           />
         </div>
       )}
@@ -258,30 +270,73 @@ function formatResultLabel(result: UserResult) {
   return `${getInstanceName(result.entry.instanceUrl)} — @${result.entry.username}`;
 }
 
-function mergeAllContributions(
+function IntegratedView({
+  sources,
+  showAgentAttribution,
+}: {
+  sources: (ContributionData | null)[];
+  showAgentAttribution: boolean;
+}) {
+  const merged = mergeAllContributions(sources);
+  return (
+    <>
+      <ContributionGrid
+        data={merged}
+        colorKey="integrated"
+        showAgentCounts={showAgentAttribution}
+      />
+      {showAgentAttribution && (
+        <AgentAttributionSummary data={merged} ownerOnly />
+      )}
+    </>
+  );
+}
+
+/**
+ * Sums every source's calendar by date. Agent fields are merged only from
+ * sources that reported them, and are left off entirely when none did, so
+ * the combined view keeps the "absent = not checked" rule.
+ */
+export function mergeAllContributions(
   sources: (ContributionData | null)[],
 ): ContributionData {
-  const map = new Map<string, number>();
+  const present = sources.filter(
+    (data): data is ContributionData => data !== null,
+  );
+  const checked = present.filter(
+    (data) => data.agentContributions !== undefined,
+  );
 
-  for (const data of sources) {
-    if (!data) continue;
+  const counts = new Map<string, number>();
+  const agentCounts = new Map<string, number>();
+
+  for (const data of present) {
     for (const entry of data.calendar) {
-      map.set(entry.date, (map.get(entry.date) ?? 0) + entry.count);
+      counts.set(entry.date, (counts.get(entry.date) ?? 0) + entry.count);
+      if (entry.agentCount) {
+        agentCounts.set(
+          entry.date,
+          (agentCounts.get(entry.date) ?? 0) + entry.agentCount,
+        );
+      }
     }
   }
 
-  const calendar = Array.from(map.entries())
+  const hasAgentData = checked.length > 0;
+  const calendar = Array.from(counts.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, count]) => ({ date, count, level: countToLevel(count) }));
+    .map(([date, count]) => ({
+      date,
+      count,
+      level: countToLevel(count),
+      ...(hasAgentData && { agentCount: agentCounts.get(date) ?? 0 }),
+    }));
 
   const totalContributions = calendar.reduce((sum, day) => sum + day.count, 0);
 
-  return {
+  const merged: ContributionData = {
     platform: 'integrated',
-    username: sources
-      .filter((data): data is ContributionData => data !== null)
-      .map((data) => data.username)
-      .join(' + '),
+    username: present.map((data) => data.username).join(' + '),
     totalContributions,
     dateRange: {
       from: calendar[0]?.date ?? null,
@@ -289,6 +344,23 @@ function mergeAllContributions(
     },
     calendar,
   };
+
+  if (hasAgentData) {
+    const agentBreakdown: NonNullable<ContributionData['agentBreakdown']> = {};
+    for (const data of checked) {
+      for (const [agent, n] of Object.entries(data.agentBreakdown ?? {})) {
+        const key = agent as keyof typeof agentBreakdown;
+        agentBreakdown[key] = (agentBreakdown[key] ?? 0) + (n ?? 0);
+      }
+    }
+    merged.agentContributions = checked.reduce(
+      (sum, data) => sum + (data.agentContributions ?? 0),
+      0,
+    );
+    merged.agentBreakdown = agentBreakdown;
+  }
+
+  return merged;
 }
 
 function countToLevel(count: number): number {

@@ -6,6 +6,18 @@ import type { ContributionData } from '@/lib/types';
 interface ContributionGridProps {
   data: ContributionData;
   colorKey: string;
+  /** Adds each day's agent-attributed count to its tooltip, when present. */
+  showAgentCounts?: boolean;
+}
+
+function formatDayTooltip(
+  day: ContributionData['calendar'][number],
+  showAgentCounts: boolean,
+): string {
+  const base = `${day.count} contribution${day.count !== 1 ? 's' : ''} on ${day.date}`;
+  return showAgentCounts && day.agentCount
+    ? `${base} · ${day.agentCount} agent-attributed`
+    : base;
 }
 
 const CELL_SIZE = 11;
@@ -40,7 +52,11 @@ function getLevelColor(level: number, colorKey: string): string {
   return `var(--${prefix}-${level})`;
 }
 
-export function ContributionGrid({ data, colorKey }: ContributionGridProps) {
+export function ContributionGrid({
+  data,
+  colorKey,
+  showAgentCounts = false,
+}: ContributionGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<{
     x: number;
@@ -176,7 +192,7 @@ export function ContributionGrid({ data, colorKey }: ContributionGridProps) {
                   setTooltip({
                     x: rect.left + rect.width / 2,
                     y: rect.top - 8,
-                    text: `${day.count} contribution${day.count !== 1 ? 's' : ''} on ${day.date}`,
+                    text: formatDayTooltip(day, showAgentCounts),
                   });
                 }}
                 onMouseLeave={() => setTooltip(null)}

@@ -379,6 +379,49 @@ function HandleEditor({ initialHandle, userId }: HandleEditorProps) {
   );
 }
 
+// ── Settings switch ──────────────────────────────────────────────────
+
+function ToggleSwitch({
+  checked,
+  label,
+  disabled,
+  onClick,
+}: {
+  checked: boolean;
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="shrink-0 relative rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      style={{
+        width: 36,
+        height: 20,
+        background: checked ? 'var(--accent)' : 'var(--bg)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      <span
+        className="absolute rounded-full transition-all"
+        style={{
+          width: 14,
+          height: 14,
+          top: 2,
+          left: checked ? 18 : 2,
+          background: checked ? '#0d1117' : 'var(--text-secondary)',
+        }}
+      />
+    </button>
+  );
+}
+
 // ── Visibility toggle ────────────────────────────────────────────────
 
 interface VisibilityToggleProps {
@@ -465,32 +508,12 @@ function VisibilityToggle({
           </p>
         </div>
 
-        <button
-          type="button"
-          role="switch"
-          aria-checked={isPublic}
-          aria-label="Publish profile publicly"
+        <ToggleSwitch
+          checked={isPublic}
+          label="Publish profile publicly"
           disabled={saving}
           onClick={handleToggle}
-          className="shrink-0 relative rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{
-            width: 36,
-            height: 20,
-            background: isPublic ? 'var(--accent)' : 'var(--bg)',
-            border: '1px solid var(--border)',
-          }}
-        >
-          <span
-            className="absolute rounded-full transition-all"
-            style={{
-              width: 14,
-              height: 14,
-              top: 2,
-              left: isPublic ? 18 : 2,
-              background: isPublic ? '#0d1117' : 'var(--text-secondary)',
-            }}
-          />
-        </button>
+        />
       </div>
 
       {isPublic && (
@@ -499,6 +522,105 @@ function VisibilityToggle({
           copy of the page for up to a minute.
         </p>
       )}
+
+      {error && (
+        <p className="text-xs" style={{ color: 'var(--error, #f85149)' }}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Agent attribution toggle ─────────────────────────────────────────
+
+interface AgentAttributionToggleProps {
+  initialShowAgentAttribution: boolean;
+  userId: string | null;
+}
+
+/**
+ * Opt-in control for showing agent-attributed commits to visitors. Off by
+ * default, like publishing. It never hides anything from the owner, who
+ * always sees their own split; the copy says so, so turning it off doesn't
+ * read as deleting data.
+ */
+function AgentAttributionToggle({
+  initialShowAgentAttribution,
+  userId,
+}: AgentAttributionToggleProps) {
+  const [enabled, setEnabled] = useState(initialShowAgentAttribution);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleToggle = async () => {
+    const next = !enabled;
+    setSaving(true);
+    setError(null);
+    // Optimistic, rolled back on failure, as with visibility.
+    setEnabled(next);
+
+    try {
+      const res = await fetch('/api/profile/agent-attribution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showAgentAttribution: next }),
+      });
+
+      if (!res.ok) {
+        setEnabled(!next);
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setError(
+          data?.error === 'db_unavailable'
+            ? 'Profile database is unavailable. Run cf:preview or wrangler dev to use D1.'
+            : 'Could not update this setting. Please try again.',
+        );
+      }
+    } catch {
+      setEnabled(!next);
+      setError('Network error. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!userId) return null;
+
+  return (
+    <div
+      className="rounded-lg p-3 space-y-2"
+      style={{
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <p
+            className="text-xs font-semibold uppercase tracking-wide"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Agent-attributed commits
+          </p>
+          <p
+            className="text-xs mt-1"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {enabled
+              ? 'On. Visitors to your public profile see a summary of commits attributed to AI coding agents in your public repositories, as of the last time you viewed your own profile.'
+              : 'Off. Only you see which of your commits are attributed to AI coding agents.'}
+          </p>
+        </div>
+
+        <ToggleSwitch
+          checked={enabled}
+          label="Show agent-attributed commits on public profile"
+          disabled={saving}
+          onClick={handleToggle}
+        />
+      </div>
 
       {error && (
         <p className="text-xs" style={{ color: 'var(--error, #f85149)' }}>
@@ -866,6 +988,11 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
               userId={session.userId}
             />
 
+            <AgentAttributionToggle
+              initialShowAgentAttribution={session.showAgentAttribution}
+              userId={session.userId}
+            />
+
             <ConnectionsPanel
               connections={session.connections}
               availableProviders={session.availableProviders}
@@ -904,6 +1031,7 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
               to={appliedDateRange.to}
               showVerified
               onLoadingChange={setLoading}
+              showAgentAttribution
             />
           </div>
         </div>

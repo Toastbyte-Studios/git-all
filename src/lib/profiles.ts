@@ -126,6 +126,8 @@ interface UserRow {
   primary_provider: string;
   handle_changed_at: number | null;
   is_public: number;
+  /** Added in 0005; `undefined` only if read from a pre-migration database. */
+  show_agent_attribution?: number;
   created_at: number;
   updated_at: number;
 }
@@ -234,10 +236,12 @@ export async function upsertUser(
   // default. Migration 0002 created the column with DEFAULT 1, and that default
   // cannot be changed without rebuilding the table (see 0003 for why we don't).
   // Signing in must never publish a profile, so 0 is written here directly.
+  // `show_agent_attribution` is written as 0 for the same reason, even though
+  // its column default (0005) is already 0.
   await db
     .prepare(
-      `INSERT INTO users (id, handle, display_name, primary_provider, handle_changed_at, is_public, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, NULL, 0, ?5, ?6)`,
+      `INSERT INTO users (id, handle, display_name, primary_provider, handle_changed_at, is_public, show_agent_attribution, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, NULL, 0, 0, ?5, ?6)`,
     )
     .bind(newId, handle, username, primaryProvider, now, now)
     .run();
@@ -363,6 +367,7 @@ export const getProfileByHandle = cache(async function getProfileByHandle(
     primaryProvider: userRow.primary_provider as ConnectionProvider,
     handleChangedAt: userRow.handle_changed_at,
     isPublic: userRow.is_public !== 0,
+    showAgentAttribution: userRow.show_agent_attribution === 1,
     createdAt: userRow.created_at,
     updatedAt: userRow.updated_at,
     connections,
@@ -544,23 +549,53 @@ export async function getHandleByUserId(
 }
 
 /**
- * Returns the handle and visibility flag for a user by their D1 user id, for
- * rendering the owner's own settings UI.
+ * Returns the handle and the owner-controlled flags for a user by their D1
+ * user id, for rendering the owner's own settings UI.
  * Returns `null` if not found or if the DB is unavailable.
  */
-export async function getProfileSummaryByUserId(
-  userId: string,
-): Promise<{ handle: string; isPublic: boolean } | null> {
+export async function getProfileSummaryByUserId(userId: string): Promise<{
+  handle: string;
+  isPublic: boolean;
+  showAgentAttribution: boolean;
+} | null> {
   const db = getDb();
   if (!db) return null;
 
   const row = await db
-    .prepare('SELECT handle, is_public FROM users WHERE id = ?1 LIMIT 1')
+    .prepare(
+      'SELECT handle, is_public, show_agent_attribution FROM users WHERE id = ?1 LIMIT 1',
+    )
     .bind(userId)
-    .first<Pick<UserRow, 'handle' | 'is_public'>>();
+    .first<Pick<UserRow, 'handle' | 'is_public' | 'show_agent_attribution'>>();
 
   if (!row) return null;
-  return { handle: row.handle, isPublic: row.is_public !== 0 };
+  return {
+    handle: row.handle,
+    isPublic: row.is_public !== 0,
+    showAgentAttribution: row.show_agent_attribution === 1,
+  };
+}
+
+/**
+ * Sets whether visitors to the public profile see agent-attributed commits.
+ * The owner always sees their own; this only governs everyone else.
+ * Returns `false` when the DB is unavailable.
+ */
+export async function setShowAgentAttribution(
+  userId: string,
+  showAgentAttribution: boolean,
+): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+
+  await db
+    .prepare(
+      'UPDATE users SET show_agent_attribution = ?1, updated_at = ?2 WHERE id = ?3',
+    )
+    .bind(showAgentAttribution ? 1 : 0, Date.now(), userId)
+    .run();
+
+  return true;
 }
 
 /**

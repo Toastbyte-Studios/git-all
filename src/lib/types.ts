@@ -63,6 +63,8 @@ export interface Profile {
   primaryProvider: ConnectionProvider;
   handleChangedAt: number | null;
   isPublic: boolean;
+  /** Whether visitors see agent-attributed commits. The owner always does. */
+  showAgentAttribution: boolean;
   createdAt: number;
   updatedAt: number;
   connections: StoredConnection[];

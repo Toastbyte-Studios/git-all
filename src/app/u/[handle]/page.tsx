@@ -133,6 +133,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
     <PublicProfileClient
       profile={toPublicProfile(profile)}
       ownerPreview={isOwnerPreview}
+      isOwner={isOwner}
     />
   );
 }
