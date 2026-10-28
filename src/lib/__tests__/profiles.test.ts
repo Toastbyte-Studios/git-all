@@ -8,6 +8,7 @@ const store = vi.hoisted(() => ({
   users: [] as Array<Record<string, unknown>>,
   connections: [] as Array<Record<string, unknown>>,
   handleHistory: [] as Array<Record<string, unknown>>,
+  agentSummaries: [] as Array<Record<string, unknown>>,
   available: true,
 }));
 
@@ -91,10 +92,27 @@ vi.mock('@/lib/db', () => {
     if (q.startsWith('SELECT * FROM connections WHERE user_id')) {
       return store.connections.filter((c) => c.user_id === params[0]);
     }
-    if (q.startsWith('SELECT handle, is_public FROM users WHERE id')) {
+    if (
+      q.startsWith(
+        'SELECT handle, is_public, show_agent_attribution FROM users WHERE id',
+      )
+    ) {
       return store.users
         .filter((u) => u.id === params[0])
-        .map((u) => ({ handle: u.handle, is_public: u.is_public }));
+        .map((u) => ({
+          handle: u.handle,
+          is_public: u.is_public,
+          show_agent_attribution: u.show_agent_attribution,
+        }));
+    }
+    if (q.startsWith('UPDATE users SET show_agent_attribution')) {
+      for (const u of store.users) {
+        if (u.id === params[2]) {
+          u.show_agent_attribution = params[0];
+          u.updated_at = params[1];
+        }
+      }
+      return [];
     }
     if (q.startsWith('SELECT handle FROM users WHERE id')) {
       return store.users
@@ -113,6 +131,36 @@ vi.mock('@/lib/db', () => {
     if (q.startsWith('DELETE FROM connections WHERE user_id')) {
       store.connections = store.connections.filter(
         (c) => c.user_id !== params[0],
+      );
+      return [];
+    }
+    if (q.startsWith('INSERT INTO agent_summaries')) {
+      // Mirrors the statement's `WHERE EXISTS (... show_agent_attribution = 1)`
+      // and its ON CONFLICT upsert.
+      const optedIn = store.users.some(
+        (u) => u.id === params[0] && u.show_agent_attribution === 1,
+      );
+      if (!optedIn) return [];
+      store.agentSummaries = store.agentSummaries.filter(
+        (r) => !(r.user_id === params[0] && r.provider === params[1]),
+      );
+      store.agentSummaries.push({
+        user_id: params[0],
+        provider: params[1],
+        agent_contributions: params[2],
+        agent_breakdown: params[3],
+        range_from: params[4],
+        range_to: params[5],
+        computed_at: params[6],
+      });
+      return [];
+    }
+    if (q.startsWith('SELECT provider, agent_contributions')) {
+      return store.agentSummaries.filter((r) => r.user_id === params[0]);
+    }
+    if (q.startsWith('DELETE FROM agent_summaries WHERE user_id')) {
+      store.agentSummaries = store.agentSummaries.filter(
+        (r) => r.user_id !== params[0],
       );
       return [];
     }
@@ -161,6 +209,7 @@ const {
   RESERVED_HANDLES,
   deleteUser,
   generateId,
+  getAgentSummaries,
   getProfileByHandle,
   getProfileSummaryByUserId,
   getPublicProfileByHandle,
@@ -169,7 +218,9 @@ const {
   isValidHandleFormat,
   normalizeHandle,
   resolvePublicHandleRedirect,
+  saveAgentSummary,
   setHandle,
+  setShowAgentAttribution,
   setVisibility,
   toPublicProfile,
 } = await import('../profiles');
@@ -180,6 +231,7 @@ const OTHER_USER_ID = '01J0000000000000000000OTHR';
 function seed({ isPublic }: { isPublic: boolean }) {
   store.available = true;
   store.handleHistory = [];
+  store.agentSummaries = [];
   store.users = [
     {
       id: '01J0000000000000000000USER',
@@ -188,6 +240,7 @@ function seed({ isPublic }: { isPublic: boolean }) {
       primary_provider: 'github',
       handle_changed_at: 1_717_777_777_000,
       is_public: isPublic ? 1 : 0,
+      show_agent_attribution: 0,
       created_at: 1_717_000_000_000,
       updated_at: 1_717_777_777_000,
     },
@@ -480,12 +533,14 @@ describe('setVisibility', () => {
     await expect(getProfileSummaryByUserId(userId)).resolves.toEqual({
       handle: 'jane-doe',
       isPublic: false,
+      showAgentAttribution: false,
     });
 
     await setVisibility(userId, true);
     await expect(getProfileSummaryByUserId(userId)).resolves.toEqual({
       handle: 'jane-doe',
       isPublic: true,
+      showAgentAttribution: false,
     });
   });
 
@@ -495,6 +550,171 @@ describe('setVisibility', () => {
     await expect(
       setVisibility('01J0000000000000000000USER', true),
     ).resolves.toBe(false);
+  });
+});
+
+describe('setShowAgentAttribution', () => {
+  it('is off by default and round-trips through the owner summary', async () => {
+    await expect(getProfileSummaryByUserId(USER_ID)).resolves.toMatchObject({
+      showAgentAttribution: false,
+    });
+    await expect(getProfileByHandle('jane-doe')).resolves.toMatchObject({
+      showAgentAttribution: false,
+    });
+
+    await expect(setShowAgentAttribution(USER_ID, true)).resolves.toBe(true);
+    await expect(getProfileSummaryByUserId(USER_ID)).resolves.toMatchObject({
+      showAgentAttribution: true,
+    });
+    await expect(getProfileByHandle('jane-doe')).resolves.toMatchObject({
+      showAgentAttribution: true,
+    });
+
+    await setShowAgentAttribution(USER_ID, false);
+    await expect(getProfileSummaryByUserId(USER_ID)).resolves.toMatchObject({
+      showAgentAttribution: false,
+    });
+  });
+
+  it('does not change profile visibility', async () => {
+    seed({ isPublic: false });
+    await setShowAgentAttribution(USER_ID, true);
+    await expect(getPublicProfileByHandle('jane-doe')).resolves.toBeNull();
+  });
+
+  it('treats a row from before migration 0005 as off', async () => {
+    delete store.users[0]!.show_agent_attribution;
+    await expect(getProfileSummaryByUserId(USER_ID)).resolves.toMatchObject({
+      showAgentAttribution: false,
+    });
+  });
+
+  it('is not part of the public projection', async () => {
+    await setShowAgentAttribution(USER_ID, true);
+    const profile = await getPublicProfileByHandle('jane-doe');
+    expect(profile).not.toHaveProperty('showAgentAttribution');
+  });
+
+  it('returns false when the database is unavailable', async () => {
+    store.available = false;
+    await expect(setShowAgentAttribution(USER_ID, true)).resolves.toBe(false);
+  });
+});
+
+describe('saved agent summaries', () => {
+  const SUMMARY = {
+    agentContributions: 5,
+    agentBreakdown: { claude: 3, copilot: 2 },
+    from: '2025-10-28',
+    to: '2026-10-28',
+    computedAt: 1_800_000_000_000,
+  };
+
+  it('does not save anything until the owner opts in', async () => {
+    await expect(saveAgentSummary(USER_ID, 'github', SUMMARY)).resolves.toBe(
+      true,
+    );
+    expect(store.agentSummaries).toHaveLength(0);
+    await expect(getAgentSummaries(USER_ID)).resolves.toEqual({});
+  });
+
+  it('saves and reads back a summary once opted in, replacing the old one', async () => {
+    await setShowAgentAttribution(USER_ID, true);
+    await saveAgentSummary(USER_ID, 'github', SUMMARY);
+    await saveAgentSummary(USER_ID, 'github', {
+      ...SUMMARY,
+      agentContributions: 6,
+      agentBreakdown: { claude: 6 },
+    });
+
+    expect(store.agentSummaries).toHaveLength(1);
+    await expect(getAgentSummaries(USER_ID)).resolves.toEqual({
+      github: {
+        ...SUMMARY,
+        agentContributions: 6,
+        agentBreakdown: { claude: 6 },
+      },
+    });
+  });
+
+  it('deletes saved summaries when the owner opts out', async () => {
+    await setShowAgentAttribution(USER_ID, true);
+    await saveAgentSummary(USER_ID, 'github', SUMMARY);
+
+    await setShowAgentAttribution(USER_ID, false);
+
+    expect(store.agentSummaries).toHaveLength(0);
+    // And a lookup that lands after the opt-out writes nothing.
+    await saveAgentSummary(USER_ID, 'github', SUMMARY);
+    expect(store.agentSummaries).toHaveLength(0);
+  });
+
+  it('drops unknown agents and bad counts from a stored breakdown', async () => {
+    store.agentSummaries = [
+      {
+        user_id: USER_ID,
+        provider: 'github',
+        agent_contributions: 2,
+        agent_breakdown: JSON.stringify({
+          claude: 2,
+          '<script>': 9,
+          copilot: -1,
+          cursor: 1.5,
+          codex: '3',
+        }),
+        range_from: '2025-10-28',
+        range_to: '2026-10-28',
+        computed_at: 1,
+      },
+      {
+        user_id: USER_ID,
+        provider: 'not-a-provider',
+        agent_contributions: 1,
+        agent_breakdown: '{}',
+        range_from: '2025-10-28',
+        range_to: '2026-10-28',
+        computed_at: 1,
+      },
+    ];
+
+    await expect(getAgentSummaries(USER_ID)).resolves.toEqual({
+      github: expect.objectContaining({ agentBreakdown: { claude: 2 } }),
+    });
+  });
+
+  it('treats a corrupt breakdown as empty', async () => {
+    store.agentSummaries = [
+      {
+        user_id: USER_ID,
+        provider: 'github',
+        agent_contributions: 0,
+        agent_breakdown: 'not json',
+        range_from: '2025-10-28',
+        range_to: '2026-10-28',
+        computed_at: 1,
+      },
+    ];
+
+    await expect(getAgentSummaries(USER_ID)).resolves.toMatchObject({
+      github: { agentBreakdown: {} },
+    });
+  });
+
+  it('is removed when the account is deleted', async () => {
+    await setShowAgentAttribution(USER_ID, true);
+    await saveAgentSummary(USER_ID, 'github', SUMMARY);
+
+    await deleteUser(USER_ID);
+
+    expect(store.agentSummaries).toHaveLength(0);
+  });
+
+  it('returns nothing when the database is unavailable', async () => {
+    store.available = false;
+    await expect(saveAgentSummary(USER_ID, 'github', SUMMARY)).resolves.toBe(
+      false,
+    );
+    await expect(getAgentSummaries(USER_ID)).resolves.toEqual({});
   });
 });
 

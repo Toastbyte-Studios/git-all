@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { type AgentId, detectAgents } from '@/lib/agent-attribution';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 import { trackServerEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
@@ -46,7 +47,10 @@ interface BitbucketUser {
 
 interface BitbucketCommit {
   date: string;
+  message?: string;
   author?: {
+    /** The git author line, e.g. `Jane Doe <jane@example.com>`. */
+    raw?: string;
     user?: {
       account_id?: string;
       nickname?: string;
@@ -67,7 +71,17 @@ interface BitbucketContributionResponse {
     date: string;
     count: number;
     level: number;
+    agentCount: number;
   }>;
+  agentContributions: number;
+  agentBreakdown: Partial<Record<AgentId, number>>;
+}
+
+/** Per-day commit counts accumulated across every repository. */
+interface CommitTally {
+  counts: Map<string, number>;
+  agentCounts: Map<string, number>;
+  agentBreakdown: Partial<Record<AgentId, number>>;
 }
 
 const contributionCache = new Map<
@@ -230,34 +244,42 @@ export async function GET(request: NextRequest) {
           workspace,
         };
 
-        const counts = new Map<string, number>();
+        const tally: CommitTally = {
+          counts: new Map(),
+          agentCounts: new Map(),
+          agentBreakdown: {},
+        };
         for (const repo of repositories) {
           await aggregateRepositoryCommits({
             user,
             repoSlug: repo.slug,
             fromMs,
             toExclusiveMs,
-            counts,
+            tally,
           });
         }
 
-        const calendar: Array<{ date: string; count: number; level: number }> =
-          [];
+        const calendar: BitbucketContributionResponse['calendar'] = [];
         const cursor = new Date(fromDate.getTime());
 
         while (cursor.getTime() < toExclusiveMs) {
           const date = formatUtcDate(cursor);
-          const count = counts.get(date) ?? 0;
+          const count = tally.counts.get(date) ?? 0;
           calendar.push({
             date,
             count,
             level: countToLevel(count),
+            agentCount: tally.agentCounts.get(date) ?? 0,
           });
           cursor.setUTCDate(cursor.getUTCDate() + 1);
         }
 
         const totalContributions = calendar.reduce(
           (sum, day) => sum + day.count,
+          0,
+        );
+        const agentContributions = calendar.reduce(
+          (sum, day) => sum + day.agentCount,
           0,
         );
 
@@ -270,6 +292,8 @@ export async function GET(request: NextRequest) {
             to: calendar[calendar.length - 1]?.date ?? null,
           },
           calendar,
+          agentContributions,
+          agentBreakdown: tally.agentBreakdown,
         };
 
         setCachedContribution(cacheKey, responsePayload);
@@ -371,13 +395,13 @@ async function aggregateRepositoryCommits({
   repoSlug,
   fromMs,
   toExclusiveMs,
-  counts,
+  tally,
 }: {
   user: BitbucketUser;
   repoSlug: string;
   fromMs: number;
   toExclusiveMs: number;
-  counts: Map<string, number>;
+  tally: CommitTally;
 }) {
   let nextUrl = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(user.workspace)}/${encodeURIComponent(repoSlug)}/commits?pagelen=${BITBUCKET_PAGE_SIZE}`;
   let pageCount = 0;
@@ -422,7 +446,8 @@ async function aggregateRepositoryCommits({
       }
 
       const date = formatUtcDate(new Date(commitMs));
-      counts.set(date, (counts.get(date) ?? 0) + 1);
+      tally.counts.set(date, (tally.counts.get(date) ?? 0) + 1);
+      tallyAgentAttribution(commit, date, tally);
     }
 
     if (reachedOlderCommits) {
@@ -431,6 +456,35 @@ async function aggregateRepositoryCommits({
 
     nextUrl = page.next ?? '';
   }
+}
+
+/**
+ * Counts a commit the user authored toward the agent tallies when it carries
+ * an agent co-author trailer. This only looks inside commits that already
+ * count for the user: an agent-authored commit with the user as co-author
+ * isn't linked to their Bitbucket account, so `isCommitByUser` skips it
+ * before it gets here.
+ */
+function tallyAgentAttribution(
+  commit: BitbucketCommit,
+  date: string,
+  tally: CommitTally,
+) {
+  const attributions = detectAgents({
+    message: commit.message,
+    authorEmail: parseRawAuthorEmail(commit.author?.raw),
+  });
+  if (attributions.length === 0) return;
+
+  tally.agentCounts.set(date, (tally.agentCounts.get(date) ?? 0) + 1);
+  for (const { agent } of attributions) {
+    tally.agentBreakdown[agent] = (tally.agentBreakdown[agent] ?? 0) + 1;
+  }
+}
+
+/** Extracts the email from a git author line such as `Jane Doe <jane@example.com>`. */
+function parseRawAuthorEmail(raw: string | undefined): string | null {
+  return raw?.match(/<([^<>\s]+)>\s*$/)?.[1] ?? null;
 }
 
 function isCommitByUser(commit: BitbucketCommit, user: BitbucketUser) {

@@ -22,6 +22,8 @@ export interface ClientSession {
   handle: string | null;
   /** Whether the profile is published at /u/<handle>. Defaults to false. */
   isPublic: boolean;
+  /** Whether visitors see agent-attributed commits. Defaults to false. */
+  showAgentAttribution: boolean;
   /** D1 user id, used to authorise handle changes. */
   userId: string | null;
 }
@@ -61,12 +63,14 @@ export default async function WhoAmIPage() {
   // (non-fatal). If this fails we fall back to private — never to public.
   let handle: string | null = null;
   let isPublic = false;
+  let showAgentAttribution = false;
   try {
     if (session.userId) {
       const summary = await getProfileSummaryByUserId(session.userId);
       if (summary) {
         handle = summary.handle;
         isPublic = summary.isPublic;
+        showAgentAttribution = summary.showAgentAttribution;
       }
     }
   } catch {
@@ -79,6 +83,7 @@ export default async function WhoAmIPage() {
     availableProviders: getAvailableOAuthProviders(),
     handle,
     isPublic,
+    showAgentAttribution,
     userId: session.userId ?? null,
   };
 

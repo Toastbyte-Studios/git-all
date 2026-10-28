@@ -1,12 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  AgentAttributionSummary,
+  type AgentAttributionAudience,
+} from '@/components/AgentAttributionSummary';
 import { ContributionGrid } from '@/components/ContributionGrid';
 import { StatsBar } from '@/components/StatsBar';
 import { ViewModeToggle } from '@/components/ViewModeToggle';
 import { getInstanceName } from '@/lib/gitea';
 import type {
   ContributionData,
+  Platform,
+  SavedAgentSummary,
   UserEntry,
   UserResult,
   ViewMode,
@@ -22,6 +28,18 @@ interface ContributionsViewProps {
   showVerified?: boolean;
   /** Called whenever the internal loading state changes. */
   onLoadingChange?: (loading: boolean) => void;
+  /**
+   * Who is viewing, when agent-attributed counts (summary line and
+   * tooltips) should be shown at all; omit to hide them. Some platforms
+   * return these fields for anyone, so the view, not the API, is the gate:
+   * pass `public` only for an owner who has opted in.
+   */
+  agentAttribution?: AgentAttributionAudience;
+  /**
+   * Saved public-repos-only summaries, used for a platform whose live
+   * response has no agent fields (GitHub, for anyone but the owner).
+   */
+  savedAgentSummaries?: Partial<Record<Platform, SavedAgentSummary>>;
 }
 
 export function ContributionsView({
@@ -32,7 +50,14 @@ export function ContributionsView({
   to,
   showVerified,
   onLoadingChange,
+  agentAttribution,
+  savedAgentSummaries,
 }: ContributionsViewProps) {
+  const showAgentAttribution = agentAttribution !== undefined;
+  const withSaved = (data: ContributionData | null, platform: Platform) =>
+    data && showAgentAttribution
+      ? withSavedAgentSummary(data, savedAgentSummaries?.[platform])
+      : data;
   const [results, setResults] = useState<UserResult[]>([]);
   const [loading, setLoadingState] = useState(false);
   const onLoadingChangeRef = useRef(onLoadingChange);
@@ -172,7 +197,14 @@ export function ContributionsView({
                   <ContributionGrid
                     data={result.data}
                     colorKey={result.entry.platform}
+                    showAgentCounts={showAgentAttribution}
                   />
+                  {agentAttribution && (
+                    <AgentAttributionSummary
+                      data={withSaved(result.data, result.entry.platform)!}
+                      audience={agentAttribution}
+                    />
+                  )}
                   {result.data.platform === 'gitlab' &&
                     result.data.dateRange.from &&
                     result.data.dateRange.to &&
@@ -225,9 +257,9 @@ export function ContributionsView({
                 .map((r) => formatResultLabel(r))
                 .join(' + ')}`}
           </h2>
-          <ContributionGrid
-            data={mergeAllContributions(results.map((r) => r.data))}
-            colorKey="integrated"
+          <IntegratedView
+            sources={results.map((r) => withSaved(r.data, r.entry.platform))}
+            agentAttribution={agentAttribution}
           />
         </div>
       )}
@@ -258,30 +290,91 @@ function formatResultLabel(result: UserResult) {
   return `${getInstanceName(result.entry.instanceUrl)} — @${result.entry.username}`;
 }
 
-function mergeAllContributions(
+function IntegratedView({
+  sources,
+  agentAttribution,
+}: {
+  sources: (ContributionData | null)[];
+  agentAttribution?: AgentAttributionAudience;
+}) {
+  const merged = mergeAllContributions(sources);
+  return (
+    <>
+      <ContributionGrid
+        data={merged}
+        colorKey="integrated"
+        showAgentCounts={agentAttribution !== undefined}
+      />
+      {agentAttribution && (
+        <AgentAttributionSummary data={merged} audience={agentAttribution} />
+      )}
+    </>
+  );
+}
+
+/**
+ * Fills in a saved summary's totals when a live response has no agent
+ * fields. A live read always wins: it's fresher, and for the owner it's the
+ * fuller picture.
+ */
+export function withSavedAgentSummary(
+  data: ContributionData,
+  saved: SavedAgentSummary | undefined,
+): ContributionData {
+  if (!saved || data.agentContributions !== undefined) return data;
+  return {
+    ...data,
+    agentContributions: saved.agentContributions,
+    agentBreakdown: saved.agentBreakdown,
+    agentSummaryComputedAt: saved.computedAt,
+  };
+}
+
+/**
+ * Sums every source's calendar by date. Agent fields are merged only from
+ * sources that reported them, and are left off entirely when none did, so
+ * the combined view keeps the "absent = not checked" rule.
+ */
+export function mergeAllContributions(
   sources: (ContributionData | null)[],
 ): ContributionData {
-  const map = new Map<string, number>();
+  const present = sources.filter(
+    (data): data is ContributionData => data !== null,
+  );
+  const checked = present.filter(
+    (data) => data.agentContributions !== undefined,
+  );
 
-  for (const data of sources) {
-    if (!data) continue;
+  const counts = new Map<string, number>();
+  const agentCounts = new Map<string, number>();
+
+  for (const data of present) {
     for (const entry of data.calendar) {
-      map.set(entry.date, (map.get(entry.date) ?? 0) + entry.count);
+      counts.set(entry.date, (counts.get(entry.date) ?? 0) + entry.count);
+      if (entry.agentCount) {
+        agentCounts.set(
+          entry.date,
+          (agentCounts.get(entry.date) ?? 0) + entry.agentCount,
+        );
+      }
     }
   }
 
-  const calendar = Array.from(map.entries())
+  const hasAgentData = checked.length > 0;
+  const calendar = Array.from(counts.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, count]) => ({ date, count, level: countToLevel(count) }));
+    .map(([date, count]) => ({
+      date,
+      count,
+      level: countToLevel(count),
+      ...(hasAgentData && { agentCount: agentCounts.get(date) ?? 0 }),
+    }));
 
   const totalContributions = calendar.reduce((sum, day) => sum + day.count, 0);
 
-  return {
+  const merged: ContributionData = {
     platform: 'integrated',
-    username: sources
-      .filter((data): data is ContributionData => data !== null)
-      .map((data) => data.username)
-      .join(' + '),
+    username: present.map((data) => data.username).join(' + '),
     totalContributions,
     dateRange: {
       from: calendar[0]?.date ?? null,
@@ -289,6 +382,31 @@ function mergeAllContributions(
     },
     calendar,
   };
+
+  const savedAt = checked
+    .map((data) => data.agentSummaryComputedAt)
+    .filter((at): at is number => at !== undefined);
+  if (savedAt.length > 0) {
+    // The oldest, so "as of" never claims fresher data than it has.
+    merged.agentSummaryComputedAt = Math.min(...savedAt);
+  }
+
+  if (hasAgentData) {
+    const agentBreakdown: NonNullable<ContributionData['agentBreakdown']> = {};
+    for (const data of checked) {
+      for (const [agent, n] of Object.entries(data.agentBreakdown ?? {})) {
+        const key = agent as keyof typeof agentBreakdown;
+        agentBreakdown[key] = (agentBreakdown[key] ?? 0) + (n ?? 0);
+      }
+    }
+    merged.agentContributions = checked.reduce(
+      (sum, data) => sum + (data.agentContributions ?? 0),
+      0,
+    );
+    merged.agentBreakdown = agentBreakdown;
+  }
+
+  return merged;
 }
 
 function countToLevel(count: number): number {

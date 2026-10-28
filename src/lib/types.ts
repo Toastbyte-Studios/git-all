@@ -1,7 +1,33 @@
+import type { AgentId } from './agent-attribution';
+
 export interface CalendarDay {
   date: string;
   count: number;
   level: number;
+  /**
+   * How many of `count` are attributed to an AI coding agent (see
+   * `src/lib/agent-attribution.ts`). Present only on platforms that inspect
+   * individual commits: absent means "not checked", 0 means "checked, none".
+   */
+  agentCount?: number;
+}
+
+/** Agent-attributed commit totals for a period, without the per-day split. */
+export interface AgentTotals {
+  agentContributions: number;
+  agentBreakdown: Partial<Record<AgentId, number>>;
+}
+
+/**
+ * An agent summary saved from the owner's own lookup, for visitors. Public
+ * repositories only (see `github-agent-commits.ts`).
+ */
+export interface SavedAgentSummary extends AgentTotals {
+  /** Inclusive `YYYY-MM-DD` range the totals cover. */
+  from: string;
+  to: string;
+  /** Unix ms when the owner's lookup produced it. */
+  computedAt: number;
 }
 
 export interface ContributionData {
@@ -13,6 +39,20 @@ export interface ContributionData {
     to: string | null;
   };
   calendar: CalendarDay[];
+  /** Sum of `agentCount` across the calendar. Same presence rule as `agentCount`. */
+  agentContributions?: number;
+  /**
+   * Commits attributed to each agent. A commit attributed to two agents counts
+   * once in `agentContributions` but once for each agent here, so these can
+   * sum to more than `agentContributions`.
+   */
+  agentBreakdown?: Partial<Record<AgentId, number>>;
+  /**
+   * Set when the agent fields came from a {@link SavedAgentSummary} rather
+   * than a live read: the summary covers public repos only and is as of this
+   * time (unix ms), with no per-day `agentCount`.
+   */
+  agentSummaryComputedAt?: number;
 }
 
 export type ConnectionProvider = 'github' | 'gitlab' | 'bitbucket';
@@ -47,6 +87,8 @@ export interface Profile {
   primaryProvider: ConnectionProvider;
   handleChangedAt: number | null;
   isPublic: boolean;
+  /** Whether visitors see agent-attributed commits. The owner always does. */
+  showAgentAttribution: boolean;
   createdAt: number;
   updatedAt: number;
   connections: StoredConnection[];

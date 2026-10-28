@@ -1,9 +1,11 @@
 import { cache } from 'react';
+import { AGENT_SIGNATURES, type AgentId } from '@/lib/agent-attribution';
 import { getDb } from '@/lib/db';
 import type {
   ConnectionProvider,
   Profile,
   PublicProfile,
+  SavedAgentSummary,
   StoredConnection,
 } from '@/lib/types';
 
@@ -126,6 +128,8 @@ interface UserRow {
   primary_provider: string;
   handle_changed_at: number | null;
   is_public: number;
+  /** Added in 0005; `undefined` only if read from a pre-migration database. */
+  show_agent_attribution?: number;
   created_at: number;
   updated_at: number;
 }
@@ -234,10 +238,12 @@ export async function upsertUser(
   // default. Migration 0002 created the column with DEFAULT 1, and that default
   // cannot be changed without rebuilding the table (see 0003 for why we don't).
   // Signing in must never publish a profile, so 0 is written here directly.
+  // `show_agent_attribution` is written as 0 for the same reason, even though
+  // its column default (0005) is already 0.
   await db
     .prepare(
-      `INSERT INTO users (id, handle, display_name, primary_provider, handle_changed_at, is_public, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, NULL, 0, ?5, ?6)`,
+      `INSERT INTO users (id, handle, display_name, primary_provider, handle_changed_at, is_public, show_agent_attribution, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, NULL, 0, 0, ?5, ?6)`,
     )
     .bind(newId, handle, username, primaryProvider, now, now)
     .run();
@@ -363,6 +369,7 @@ export const getProfileByHandle = cache(async function getProfileByHandle(
     primaryProvider: userRow.primary_provider as ConnectionProvider,
     handleChangedAt: userRow.handle_changed_at,
     isPublic: userRow.is_public !== 0,
+    showAgentAttribution: userRow.show_agent_attribution === 1,
     createdAt: userRow.created_at,
     updatedAt: userRow.updated_at,
     connections,
@@ -495,14 +502,15 @@ export async function setVisibility(
 }
 
 /**
- * Deletes a user, every connection belonging to them, and every handle they
- * have released.
+ * Deletes a user, every connection belonging to them, every handle they
+ * have released, and any saved agent summaries.
  *
- * `connections.user_id` and `handle_history.user_id` are both declared
- * ON DELETE CASCADE, so deleting the `users` row alone *should* be sufficient —
+ * `connections.user_id`, `handle_history.user_id` and
+ * `agent_summaries.user_id` are all declared ON DELETE CASCADE, so deleting
+ * the `users` row alone *should* be sufficient —
  * but SQLite only enforces foreign keys when `PRAGMA foreign_keys = ON`, and
  * D1's behaviour here is not something we want an erasure path to depend on.
- * All three deletes are therefore issued explicitly, in one `batch()` so they
+ * All four deletes are therefore issued explicitly, in one `batch()` so they
  * share a transaction. This is correct whether or not the cascade fires; if it
  * does, the later statements simply remove nothing.
  *
@@ -519,6 +527,7 @@ export async function deleteUser(userId: string): Promise<boolean> {
   await db.batch([
     db.prepare('DELETE FROM connections WHERE user_id = ?1').bind(userId),
     db.prepare('DELETE FROM handle_history WHERE user_id = ?1').bind(userId),
+    db.prepare('DELETE FROM agent_summaries WHERE user_id = ?1').bind(userId),
     db.prepare('DELETE FROM users WHERE id = ?1').bind(userId),
   ]);
 
@@ -544,23 +553,181 @@ export async function getHandleByUserId(
 }
 
 /**
- * Returns the handle and visibility flag for a user by their D1 user id, for
- * rendering the owner's own settings UI.
+ * Returns the handle and the owner-controlled flags for a user by their D1
+ * user id, for rendering the owner's own settings UI.
  * Returns `null` if not found or if the DB is unavailable.
  */
-export async function getProfileSummaryByUserId(
-  userId: string,
-): Promise<{ handle: string; isPublic: boolean } | null> {
+export async function getProfileSummaryByUserId(userId: string): Promise<{
+  handle: string;
+  isPublic: boolean;
+  showAgentAttribution: boolean;
+} | null> {
   const db = getDb();
   if (!db) return null;
 
   const row = await db
-    .prepare('SELECT handle, is_public FROM users WHERE id = ?1 LIMIT 1')
+    .prepare(
+      'SELECT handle, is_public, show_agent_attribution FROM users WHERE id = ?1 LIMIT 1',
+    )
     .bind(userId)
-    .first<Pick<UserRow, 'handle' | 'is_public'>>();
+    .first<Pick<UserRow, 'handle' | 'is_public' | 'show_agent_attribution'>>();
 
   if (!row) return null;
-  return { handle: row.handle, isPublic: row.is_public !== 0 };
+  return {
+    handle: row.handle,
+    isPublic: row.is_public !== 0,
+    showAgentAttribution: row.show_agent_attribution === 1,
+  };
+}
+
+/**
+ * Sets whether visitors to the public profile see agent-attributed commits.
+ * The owner always sees their own; this only governs everyone else.
+ *
+ * Turning it off also deletes any saved summaries in the same batch, so
+ * opting out removes the data rather than only hiding it.
+ *
+ * Returns `false` when the DB is unavailable.
+ */
+export async function setShowAgentAttribution(
+  userId: string,
+  showAgentAttribution: boolean,
+): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+
+  const update = db
+    .prepare(
+      'UPDATE users SET show_agent_attribution = ?1, updated_at = ?2 WHERE id = ?3',
+    )
+    .bind(showAgentAttribution ? 1 : 0, Date.now(), userId);
+
+  if (showAgentAttribution) {
+    await update.run();
+  } else {
+    await db.batch([
+      update,
+      db.prepare('DELETE FROM agent_summaries WHERE user_id = ?1').bind(userId),
+    ]);
+  }
+
+  return true;
+}
+
+// ── Saved agent summaries ────────────────────────────────────────
+
+const KNOWN_AGENTS = new Set<string>(AGENT_SIGNATURES.map((s) => s.agent));
+
+interface AgentSummaryRow {
+  provider: string;
+  agent_contributions: number;
+  agent_breakdown: string;
+  range_from: string;
+  range_to: string;
+  computed_at: number;
+}
+
+/**
+ * Saves the public-repos-only agent summary from the owner's own lookup, for
+ * visitors to see. Written only while the owner has opted in: the opt-in is
+ * checked in the same statement, so a lookup racing an opt-out can't
+ * resurrect a row that the opt-out just deleted.
+ *
+ * The caller is responsible for passing public-repos-only totals; see
+ * `GithubAgentTally.publicTotals`.
+ *
+ * Returns `false` when the DB is unavailable.
+ */
+export async function saveAgentSummary(
+  userId: string,
+  provider: ConnectionProvider,
+  summary: SavedAgentSummary,
+): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+
+  await db
+    .prepare(
+      `INSERT INTO agent_summaries (user_id, provider, agent_contributions, agent_breakdown, range_from, range_to, computed_at)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+       WHERE EXISTS (SELECT 1 FROM users WHERE id = ?1 AND show_agent_attribution = 1)
+       ON CONFLICT (user_id, provider) DO UPDATE SET
+         agent_contributions = excluded.agent_contributions,
+         agent_breakdown = excluded.agent_breakdown,
+         range_from = excluded.range_from,
+         range_to = excluded.range_to,
+         computed_at = excluded.computed_at`,
+    )
+    .bind(
+      userId,
+      provider,
+      summary.agentContributions,
+      JSON.stringify(summary.agentBreakdown),
+      summary.from,
+      summary.to,
+      summary.computedAt,
+    )
+    .run();
+
+  return true;
+}
+
+/**
+ * Returns the saved agent summaries for a user, keyed by provider. Callers
+ * must check the owner's `showAgentAttribution` before showing these:
+ * opting out deletes the rows, but the flag is the source of truth.
+ *
+ * The stored breakdown is re-validated on the way out (known agents,
+ * non-negative integers only), since it's rendered on a public page.
+ */
+export async function getAgentSummaries(
+  userId: string,
+): Promise<Partial<Record<ConnectionProvider, SavedAgentSummary>>> {
+  const db = getDb();
+  if (!db) return {};
+
+  const { results } = await db
+    .prepare(
+      'SELECT provider, agent_contributions, agent_breakdown, range_from, range_to, computed_at FROM agent_summaries WHERE user_id = ?1',
+    )
+    .bind(userId)
+    .all<AgentSummaryRow>();
+
+  const summaries: Partial<Record<ConnectionProvider, SavedAgentSummary>> = {};
+  for (const row of results) {
+    if (!isConnectionProvider(row.provider)) continue;
+    summaries[row.provider] = {
+      agentContributions: row.agent_contributions,
+      agentBreakdown: parseAgentBreakdown(row.agent_breakdown),
+      from: row.range_from,
+      to: row.range_to,
+      computedAt: row.computed_at,
+    };
+  }
+  return summaries;
+}
+
+function parseAgentBreakdown(raw: string): Partial<Record<AgentId, number>> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (!parsed || typeof parsed !== 'object') return {};
+
+  const breakdown: Partial<Record<AgentId, number>> = {};
+  for (const [agent, count] of Object.entries(parsed)) {
+    if (
+      KNOWN_AGENTS.has(agent) &&
+      typeof count === 'number' &&
+      Number.isInteger(count) &&
+      count >= 0
+    ) {
+      breakdown[agent as AgentId] = count;
+    }
+  }
+  return breakdown;
 }
 
 /**

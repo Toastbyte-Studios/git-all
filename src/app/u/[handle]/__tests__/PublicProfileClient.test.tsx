@@ -12,8 +12,13 @@ vi.mock('next/image', () => ({
   ),
 }));
 
+const viewProps = vi.hoisted(() => [] as Array<Record<string, unknown>>);
+
 vi.mock('@/components/ContributionsView', () => ({
-  ContributionsView: () => <div>ContributionsView</div>,
+  ContributionsView: (props: Record<string, unknown>) => {
+    viewProps.push(props);
+    return <div>ContributionsView</div>;
+  },
 }));
 
 const USER_ID = '01JZZZZZZZZZZZZZZZZZZZZZZZ';
@@ -25,6 +30,7 @@ const PROFILE: Profile = {
   primaryProvider: 'github',
   handleChangedAt: null,
   isPublic: true,
+  showAgentAttribution: false,
   createdAt: Date.now(),
   updatedAt: Date.now(),
   connections: [
@@ -46,5 +52,36 @@ describe('PublicProfileClient navigation buttons', () => {
     expect(
       screen.queryByRole('link', { name: /cd ~ go to homepage/i }),
     ).toBeNull();
+  });
+});
+
+describe('PublicProfileClient agent attribution', () => {
+  it('keeps the agent split hidden unless page.tsx allows it', () => {
+    viewProps.length = 0;
+    render(<PublicProfileClient profile={PROFILE} />);
+    expect(viewProps.at(-1)?.agentAttribution).toBeUndefined();
+    expect(viewProps.at(-1)?.savedAgentSummaries).toEqual({});
+  });
+
+  it('passes the audience and saved summaries through', () => {
+    viewProps.length = 0;
+    const summaries = {
+      github: {
+        agentContributions: 3,
+        agentBreakdown: { claude: 3 },
+        from: '2025-10-28',
+        to: '2026-10-28',
+        computedAt: 1,
+      },
+    };
+    render(
+      <PublicProfileClient
+        profile={PROFILE}
+        agentAttribution="public"
+        agentSummaries={summaries}
+      />,
+    );
+    expect(viewProps.at(-1)?.agentAttribution).toBe('public');
+    expect(viewProps.at(-1)?.savedAgentSummaries).toBe(summaries);
   });
 });

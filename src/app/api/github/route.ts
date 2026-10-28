@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { AgentId } from '@/lib/agent-attribution';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 import { trackServerEvent } from '@/lib/analytics-server';
 import { APP_USER_AGENT } from '@/lib/app-metadata';
@@ -7,10 +8,17 @@ import {
   getProviderTokenFromRequest,
 } from '@/lib/auth-session';
 import {
+  DEFAULT_CONTRIBUTION_PERIOD,
+  getContributionDateRange,
   normalizeRequestedContributionRange,
   toExclusiveUpperBoundIso,
   toStartOfDayIso,
 } from '@/lib/contribution-period';
+import {
+  fetchGithubAgentTally,
+  type GithubAgentTally,
+} from '@/lib/github-agent-commits';
+import { saveAgentSummary } from '@/lib/profiles';
 
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -62,7 +70,10 @@ interface GithubContributionResponse {
     date: string;
     count: number;
     level: number;
+    agentCount?: number;
   }>;
+  agentContributions?: number;
+  agentBreakdown?: Partial<Record<AgentId, number>>;
 }
 
 // This cache is intentionally per-instance; move it to Workers Cache or KV
@@ -233,6 +244,20 @@ export async function GET(request: NextRequest) {
     }
 
     const loadContribution = async () => {
+      // Agent attribution reads individual commits with the owner's token,
+      // including private repos, so it only runs on their own uncached
+      // lookup. A failure here drops the agent fields (absent = "not
+      // checked") rather than failing the calendar.
+      const agentTallyRequest =
+        userToken && isSelfLookup
+          ? fetchGithubAgentTally({
+              token: userToken,
+              login: username,
+              from: requestedRange.from,
+              to: requestedRange.to,
+            }).catch(() => null)
+          : Promise.resolve(null);
+
       const response = await fetch(GITHUB_GRAPHQL_URL, {
         method: 'POST',
         headers: {
@@ -278,22 +303,38 @@ export async function GET(request: NextRequest) {
         }) => w.contributionDays,
       );
 
-      const freshPayload: GithubContributionResponse = {
-        platform: 'github',
-        username: user.login,
-        totalContributions: calendar.totalContributions,
-        dateRange: {
-          from: days[0]?.date ?? null,
-          to: days[days.length - 1]?.date ?? null,
+      const agentTally = await agentTallyRequest;
+      const freshPayload: GithubContributionResponse = withAgentTally(
+        {
+          platform: 'github',
+          username: user.login,
+          totalContributions: calendar.totalContributions,
+          dateRange: {
+            from: days[0]?.date ?? null,
+            to: days[days.length - 1]?.date ?? null,
+          },
+          calendar: days.map(
+            (d: {
+              date: string;
+              contributionCount: number;
+              color: string;
+            }) => ({
+              date: d.date,
+              count: d.contributionCount,
+              level: COLOR_TO_LEVEL[d.color.toLowerCase()] ?? 0,
+            }),
+          ),
         },
-        calendar: days.map(
-          (d: { date: string; contributionCount: number; color: string }) => ({
-            date: d.date,
-            count: d.contributionCount,
-            level: COLOR_TO_LEVEL[d.color.toLowerCase()] ?? 0,
-          }),
-        ),
-      };
+        agentTally,
+      );
+
+      if (agentTally && authSession?.userId) {
+        await saveDefaultPeriodAgentSummary(
+          authSession.userId,
+          requestedRange,
+          agentTally,
+        );
+      }
 
       if (!shouldBypassCache) {
         setCachedContribution(cacheKey, freshPayload);
@@ -333,6 +374,58 @@ export async function GET(request: NextRequest) {
       { error: message },
       { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
+  }
+}
+
+/**
+ * Merges an agent tally into the calendar. Each day's `agentCount` is capped
+ * at that day's `count`: the tally reads commits directly, so a commit GitHub
+ * didn't credit (e.g. an unlinked email) must not push agent work above the
+ * day's total.
+ */
+function withAgentTally(
+  payload: GithubContributionResponse,
+  tally: GithubAgentTally | null,
+): GithubContributionResponse {
+  if (!tally) return payload;
+
+  const calendar = payload.calendar.map((day) => ({
+    ...day,
+    agentCount: Math.min(tally.agentCounts.get(day.date) ?? 0, day.count),
+  }));
+
+  return {
+    ...payload,
+    calendar,
+    agentContributions: calendar.reduce((sum, day) => sum + day.agentCount, 0),
+    agentBreakdown: tally.agentBreakdown,
+  };
+}
+
+/**
+ * Saves the public-repos-only agent totals for visitors to the owner's
+ * profile. Only for the default period, since that is the period the public
+ * profile shows; other ranges the owner browses don't overwrite it.
+ * `saveAgentSummary` writes nothing unless the owner has opted in, and a
+ * failure never affects the owner's own response.
+ */
+async function saveDefaultPeriodAgentSummary(
+  userId: string,
+  range: { from: string; to: string },
+  tally: GithubAgentTally,
+) {
+  const defaultRange = getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD);
+  if (range.from !== defaultRange.from || range.to !== defaultRange.to) return;
+
+  try {
+    await saveAgentSummary(userId, 'github', {
+      ...tally.publicTotals,
+      from: range.from,
+      to: range.to,
+      computedAt: Date.now(),
+    });
+  } catch {
+    // D1 unavailable or the write failed: the public summary just stays stale.
   }
 }
 

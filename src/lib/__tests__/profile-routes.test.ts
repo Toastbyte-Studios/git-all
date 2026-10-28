@@ -18,6 +18,7 @@ const store = vi.hoisted(() => ({
   users: [] as Array<Record<string, unknown>>,
   connections: [] as Array<Record<string, unknown>>,
   handleHistory: [] as Array<Record<string, unknown>>,
+  agentSummaries: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('@/lib/db', () => {
@@ -35,6 +36,12 @@ vi.mock('@/lib/db', () => {
       }
       return [];
     }
+    if (q.startsWith('UPDATE users SET show_agent_attribution')) {
+      for (const u of store.users) {
+        if (u.id === params[2]) u.show_agent_attribution = params[0];
+      }
+      return [];
+    }
     if (q.startsWith('DELETE FROM connections WHERE user_id')) {
       store.connections = store.connections.filter(
         (c) => c.user_id !== params[0],
@@ -44,6 +51,12 @@ vi.mock('@/lib/db', () => {
     if (q.startsWith('DELETE FROM handle_history WHERE user_id')) {
       store.handleHistory = store.handleHistory.filter(
         (h) => h.user_id !== params[0],
+      );
+      return [];
+    }
+    if (q.startsWith('DELETE FROM agent_summaries WHERE user_id')) {
+      store.agentSummaries = store.agentSummaries.filter(
+        (r) => r.user_id !== params[0],
       );
       return [];
     }
@@ -87,6 +100,8 @@ vi.mock('@/lib/db', () => {
 const { DELETE } = await import('@/app/api/profile/route');
 const { POST: setVisibilityRoute } =
   await import('@/app/api/profile/visibility/route');
+const { POST: setAgentAttributionRoute } =
+  await import('@/app/api/profile/agent-attribution/route');
 
 function jsonRequest(url: string, method: string, body: unknown) {
   return new NextRequest(url, {
@@ -98,6 +113,9 @@ function jsonRequest(url: string, method: string, body: unknown) {
 
 beforeEach(() => {
   auth.session = { userId: 'USER1' };
+  store.agentSummaries = [
+    { user_id: 'USER1', provider: 'github', agent_contributions: 3 },
+  ];
   store.handleHistory = [
     { handle: 'jane-old', user_id: 'USER1', released_at: 1 },
   ];
@@ -109,6 +127,7 @@ beforeEach(() => {
       primary_provider: 'github',
       handle_changed_at: null,
       is_public: 0,
+      show_agent_attribution: 0,
       created_at: 1,
       updated_at: 1,
     },
@@ -187,6 +206,7 @@ describe('DELETE /api/profile', () => {
     // Erasure has to cover retired handles too, or a deleted account leaves
     // rows behind that keep reserving handles nobody owns any more.
     expect(store.handleHistory).toHaveLength(0);
+    expect(store.agentSummaries).toHaveLength(0);
   });
 
   it('expires the session cookie and every per-provider token cookie', async () => {
@@ -246,5 +266,65 @@ describe('POST /api/profile/visibility', () => {
     );
     expect(unpublish.status).toBe(200);
     expect(store.users[0].is_public).toBe(0);
+  });
+});
+
+describe('POST /api/profile/agent-attribution', () => {
+  const url = 'https://gitall.app/api/profile/agent-attribution';
+
+  it('rejects an unauthenticated request', async () => {
+    auth.session = null;
+
+    const response = await setAgentAttributionRoute(
+      jsonRequest(url, 'POST', { showAgentAttribution: true }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(store.users[0].show_agent_attribution).toBe(0);
+  });
+
+  it('rejects a session without a userId', async () => {
+    auth.session = {};
+
+    const response = await setAgentAttributionRoute(
+      jsonRequest(url, 'POST', { showAgentAttribution: true }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(store.users[0].show_agent_attribution).toBe(0);
+  });
+
+  it.each([{ showAgentAttribution: 'yes' }, {}, null, 'true'])(
+    'rejects the body %j',
+    async (body) => {
+      const response = await setAgentAttributionRoute(
+        jsonRequest(url, 'POST', body),
+      );
+
+      expect(response.status).toBe(400);
+      expect(store.users[0].show_agent_attribution).toBe(0);
+    },
+  );
+
+  it('turns the setting on and off without touching visibility', async () => {
+    const on = await setAgentAttributionRoute(
+      jsonRequest(url, 'POST', { showAgentAttribution: true }),
+    );
+    expect(on.status).toBe(200);
+    await expect(on.json()).resolves.toEqual({
+      ok: true,
+      showAgentAttribution: true,
+    });
+    expect(store.users[0].show_agent_attribution).toBe(1);
+    expect(store.users[0].is_public).toBe(0);
+
+    expect(store.agentSummaries).toHaveLength(1);
+
+    const off = await setAgentAttributionRoute(
+      jsonRequest(url, 'POST', { showAgentAttribution: false }),
+    );
+    expect(off.status).toBe(200);
+    expect(store.users[0].show_agent_attribution).toBe(0);
+    expect(store.agentSummaries).toHaveLength(0);
   });
 });
