@@ -8,6 +8,8 @@ import {
   getProviderTokenFromRequest,
 } from '@/lib/auth-session';
 import {
+  DEFAULT_CONTRIBUTION_PERIOD,
+  getContributionDateRange,
   normalizeRequestedContributionRange,
   toExclusiveUpperBoundIso,
   toStartOfDayIso,
@@ -16,6 +18,7 @@ import {
   fetchGithubAgentTally,
   type GithubAgentTally,
 } from '@/lib/github-agent-commits';
+import { saveAgentSummary } from '@/lib/profiles';
 
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -300,6 +303,7 @@ export async function GET(request: NextRequest) {
         }) => w.contributionDays,
       );
 
+      const agentTally = await agentTallyRequest;
       const freshPayload: GithubContributionResponse = withAgentTally(
         {
           platform: 'github',
@@ -321,8 +325,16 @@ export async function GET(request: NextRequest) {
             }),
           ),
         },
-        await agentTallyRequest,
+        agentTally,
       );
+
+      if (agentTally && authSession?.userId) {
+        await saveDefaultPeriodAgentSummary(
+          authSession.userId,
+          requestedRange,
+          agentTally,
+        );
+      }
 
       if (!shouldBypassCache) {
         setCachedContribution(cacheKey, freshPayload);
@@ -388,6 +400,33 @@ function withAgentTally(
     agentContributions: calendar.reduce((sum, day) => sum + day.agentCount, 0),
     agentBreakdown: tally.agentBreakdown,
   };
+}
+
+/**
+ * Saves the public-repos-only agent totals for visitors to the owner's
+ * profile. Only for the default period, since that is the period the public
+ * profile shows; other ranges the owner browses don't overwrite it.
+ * `saveAgentSummary` writes nothing unless the owner has opted in, and a
+ * failure never affects the owner's own response.
+ */
+async function saveDefaultPeriodAgentSummary(
+  userId: string,
+  range: { from: string; to: string },
+  tally: GithubAgentTally,
+) {
+  const defaultRange = getContributionDateRange(DEFAULT_CONTRIBUTION_PERIOD);
+  if (range.from !== defaultRange.from || range.to !== defaultRange.to) return;
+
+  try {
+    await saveAgentSummary(userId, 'github', {
+      ...tally.publicTotals,
+      from: range.from,
+      to: range.to,
+      computedAt: Date.now(),
+    });
+  } catch {
+    // D1 unavailable or the write failed: the public summary just stays stale.
+  }
 }
 
 function normalizeRequestedRange(request: NextRequest):

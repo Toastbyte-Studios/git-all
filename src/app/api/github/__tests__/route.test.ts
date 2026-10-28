@@ -8,7 +8,16 @@ import {
   getProviderTokenCookieName,
   type AuthSession,
 } from '@/lib/auth-session';
+import {
+  DEFAULT_CONTRIBUTION_PERIOD,
+  getContributionDateRange,
+} from '@/lib/contribution-period';
 import { GET } from '../route';
+
+const profiles = vi.hoisted(() => ({
+  saveAgentSummary: vi.fn(async () => true),
+}));
+vi.mock('@/lib/profiles', () => profiles);
 
 const ORIGINAL_ENV = {
   GITHUB_TOKEN: process.env.GITHUB_TOKEN,
@@ -197,9 +206,10 @@ describe('GitHub contribution route', () => {
   });
 
   describe('agent attribution', () => {
-    async function signedInCookies(login: string) {
+    async function signedInCookies(login: string, userId?: string) {
       const session: AuthSession = {
         primary: 'github',
+        ...(userId && { userId }),
         connections: {
           github: {
             provider: 'github',
@@ -217,14 +227,20 @@ describe('GitHub contribution route', () => {
       };
     }
 
-    /** Calendar of 2 commits on 2025-01-01, plus 3 agent commits that day in history. */
-    function stubGithub({ failAgentLookup = false } = {}) {
+    /**
+     * Calendar of 2 commits on 2025-01-01, plus 3 agent commits in one public
+     * repo's history, dated `commitDay`.
+     */
+    function stubGithub({
+      failAgentLookup = false,
+      commitDay = '2025-01-01',
+    } = {}) {
       const agentCommit = (agent: string) => ({
         message: `x\n\nCo-authored-by: ${agent}`,
         author: {
           name: 'Mona',
           email: 'mona@example.com',
-          date: '2025-01-01T10:00:00+00:00',
+          date: `${commitDay}T10:00:00+00:00`,
           user: { login: 'monalisa' },
         },
         authors: { nodes: [{ user: { login: 'monalisa' } }] },
@@ -249,6 +265,7 @@ describe('GitHub contribution route', () => {
                         repository: {
                           name: 'app',
                           owner: { login: 'monalisa' },
+                          visibility: 'PUBLIC',
                         },
                         contributions: {
                           pageInfo: { hasNextPage: false },
@@ -306,6 +323,84 @@ describe('GitHub contribution route', () => {
       expect(body.agentContributions).toBe(2);
       expect(body.agentBreakdown).toEqual({ claude: 2, cursor: 1 });
       expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('saves the public summary for the default period when signed in with a profile', async () => {
+      profiles.saveAgentSummary.mockClear();
+      const { from, to } = getContributionDateRange(
+        DEFAULT_CONTRIBUTION_PERIOD,
+      );
+      stubGithub({ commitDay: to });
+
+      const response = await GET(
+        createRequest(
+          `https://gitall.app/api/github?username=monalisa&from=${from}&to=${to}`,
+          await signedInCookies('monalisa', 'USER1'),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      expect(profiles.saveAgentSummary).toHaveBeenCalledWith(
+        'USER1',
+        'github',
+        {
+          agentContributions: 3,
+          agentBreakdown: { claude: 2, cursor: 1 },
+          from,
+          to,
+          computedAt: expect.any(Number),
+        },
+      );
+    });
+
+    it('does not save a summary for other periods', async () => {
+      profiles.saveAgentSummary.mockClear();
+      stubGithub();
+
+      await GET(
+        createRequest(
+          'https://gitall.app/api/github?username=monalisa&from=2025-01-01&to=2025-01-01',
+          await signedInCookies('monalisa', 'USER1'),
+        ),
+      );
+
+      expect(profiles.saveAgentSummary).not.toHaveBeenCalled();
+    });
+
+    it('does not save a summary without a stored profile', async () => {
+      profiles.saveAgentSummary.mockClear();
+      const { from, to } = getContributionDateRange(
+        DEFAULT_CONTRIBUTION_PERIOD,
+      );
+      stubGithub({ commitDay: to });
+
+      await GET(
+        createRequest(
+          `https://gitall.app/api/github?username=monalisa&from=${from}&to=${to}`,
+          await signedInCookies('monalisa'),
+        ),
+      );
+
+      expect(profiles.saveAgentSummary).not.toHaveBeenCalled();
+    });
+
+    it('still answers when saving the summary fails', async () => {
+      profiles.saveAgentSummary.mockClear();
+      profiles.saveAgentSummary.mockRejectedValueOnce(new Error('D1 down'));
+      const { from, to } = getContributionDateRange(
+        DEFAULT_CONTRIBUTION_PERIOD,
+      );
+      stubGithub({ commitDay: to });
+
+      const response = await GET(
+        createRequest(
+          `https://gitall.app/api/github?username=monalisa&from=${from}&to=${to}`,
+          await signedInCookies('monalisa', 'USER1'),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      expect(profiles.saveAgentSummary).toHaveBeenCalledTimes(1);
     });
 
     it('does not read commits when the owner looks up someone else', async () => {

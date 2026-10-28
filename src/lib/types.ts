@@ -12,6 +12,24 @@ export interface CalendarDay {
   agentCount?: number;
 }
 
+/** Agent-attributed commit totals for a period, without the per-day split. */
+export interface AgentTotals {
+  agentContributions: number;
+  agentBreakdown: Partial<Record<AgentId, number>>;
+}
+
+/**
+ * An agent summary saved from the owner's own lookup, for visitors. Public
+ * repositories only (see `github-agent-commits.ts`).
+ */
+export interface SavedAgentSummary extends AgentTotals {
+  /** Inclusive `YYYY-MM-DD` range the totals cover. */
+  from: string;
+  to: string;
+  /** Unix ms when the owner's lookup produced it. */
+  computedAt: number;
+}
+
 export interface ContributionData {
   platform: string;
   username: string;
@@ -29,6 +47,12 @@ export interface ContributionData {
    * sum to more than `agentContributions`.
    */
   agentBreakdown?: Partial<Record<AgentId, number>>;
+  /**
+   * Set when the agent fields came from a {@link SavedAgentSummary} rather
+   * than a live read: the summary covers public repos only and is as of this
+   * time (unix ms), with no per-day `agentCount`.
+   */
+  agentSummaryComputedAt?: number;
 }
 
 export type ConnectionProvider = 'github' | 'gitlab' | 'bitbucket';

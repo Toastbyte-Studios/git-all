@@ -1,13 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AgentAttributionSummary } from '@/components/AgentAttributionSummary';
+import {
+  AgentAttributionSummary,
+  type AgentAttributionAudience,
+} from '@/components/AgentAttributionSummary';
 import { ContributionGrid } from '@/components/ContributionGrid';
 import { StatsBar } from '@/components/StatsBar';
 import { ViewModeToggle } from '@/components/ViewModeToggle';
 import { getInstanceName } from '@/lib/gitea';
 import type {
   ContributionData,
+  Platform,
+  SavedAgentSummary,
   UserEntry,
   UserResult,
   ViewMode,
@@ -24,11 +29,17 @@ interface ContributionsViewProps {
   /** Called whenever the internal loading state changes. */
   onLoadingChange?: (loading: boolean) => void;
   /**
-   * Show agent-attributed counts (summary line and tooltips) where the API
-   * returned them. Only for the owner viewing their own data: some platforms
-   * return these fields for anyone, so the view, not the API, is the gate.
+   * Who is viewing, when agent-attributed counts (summary line and
+   * tooltips) should be shown at all; omit to hide them. Some platforms
+   * return these fields for anyone, so the view, not the API, is the gate:
+   * pass `public` only for an owner who has opted in.
    */
-  showAgentAttribution?: boolean;
+  agentAttribution?: AgentAttributionAudience;
+  /**
+   * Saved public-repos-only summaries, used for a platform whose live
+   * response has no agent fields (GitHub, for anyone but the owner).
+   */
+  savedAgentSummaries?: Partial<Record<Platform, SavedAgentSummary>>;
 }
 
 export function ContributionsView({
@@ -39,8 +50,14 @@ export function ContributionsView({
   to,
   showVerified,
   onLoadingChange,
-  showAgentAttribution = false,
+  agentAttribution,
+  savedAgentSummaries,
 }: ContributionsViewProps) {
+  const showAgentAttribution = agentAttribution !== undefined;
+  const withSaved = (data: ContributionData | null, platform: Platform) =>
+    data && showAgentAttribution
+      ? withSavedAgentSummary(data, savedAgentSummaries?.[platform])
+      : data;
   const [results, setResults] = useState<UserResult[]>([]);
   const [loading, setLoadingState] = useState(false);
   const onLoadingChangeRef = useRef(onLoadingChange);
@@ -182,8 +199,11 @@ export function ContributionsView({
                     colorKey={result.entry.platform}
                     showAgentCounts={showAgentAttribution}
                   />
-                  {showAgentAttribution && (
-                    <AgentAttributionSummary data={result.data} ownerOnly />
+                  {agentAttribution && (
+                    <AgentAttributionSummary
+                      data={withSaved(result.data, result.entry.platform)!}
+                      audience={agentAttribution}
+                    />
                   )}
                   {result.data.platform === 'gitlab' &&
                     result.data.dateRange.from &&
@@ -238,8 +258,8 @@ export function ContributionsView({
                 .join(' + ')}`}
           </h2>
           <IntegratedView
-            sources={results.map((r) => r.data)}
-            showAgentAttribution={showAgentAttribution}
+            sources={results.map((r) => withSaved(r.data, r.entry.platform))}
+            agentAttribution={agentAttribution}
           />
         </div>
       )}
@@ -272,10 +292,10 @@ function formatResultLabel(result: UserResult) {
 
 function IntegratedView({
   sources,
-  showAgentAttribution,
+  agentAttribution,
 }: {
   sources: (ContributionData | null)[];
-  showAgentAttribution: boolean;
+  agentAttribution?: AgentAttributionAudience;
 }) {
   const merged = mergeAllContributions(sources);
   return (
@@ -283,13 +303,31 @@ function IntegratedView({
       <ContributionGrid
         data={merged}
         colorKey="integrated"
-        showAgentCounts={showAgentAttribution}
+        showAgentCounts={agentAttribution !== undefined}
       />
-      {showAgentAttribution && (
-        <AgentAttributionSummary data={merged} ownerOnly />
+      {agentAttribution && (
+        <AgentAttributionSummary data={merged} audience={agentAttribution} />
       )}
     </>
   );
+}
+
+/**
+ * Fills in a saved summary's totals when a live response has no agent
+ * fields. A live read always wins: it's fresher, and for the owner it's the
+ * fuller picture.
+ */
+export function withSavedAgentSummary(
+  data: ContributionData,
+  saved: SavedAgentSummary | undefined,
+): ContributionData {
+  if (!saved || data.agentContributions !== undefined) return data;
+  return {
+    ...data,
+    agentContributions: saved.agentContributions,
+    agentBreakdown: saved.agentBreakdown,
+    agentSummaryComputedAt: saved.computedAt,
+  };
 }
 
 /**
@@ -344,6 +382,14 @@ export function mergeAllContributions(
     },
     calendar,
   };
+
+  const savedAt = checked
+    .map((data) => data.agentSummaryComputedAt)
+    .filter((at): at is number => at !== undefined);
+  if (savedAt.length > 0) {
+    // The oldest, so "as of" never claims fresher data than it has.
+    merged.agentSummaryComputedAt = Math.min(...savedAt);
+  }
 
   if (hasAgentData) {
     const agentBreakdown: NonNullable<ContributionData['agentBreakdown']> = {};

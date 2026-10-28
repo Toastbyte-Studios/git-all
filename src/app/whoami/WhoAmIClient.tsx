@@ -537,6 +537,8 @@ function VisibilityToggle({
 interface AgentAttributionToggleProps {
   initialShowAgentAttribution: boolean;
   userId: string | null;
+  /** Called with every change, including rollbacks, so the page's own view stays in step. */
+  onChange?: (enabled: boolean) => void;
 }
 
 /**
@@ -548,8 +550,13 @@ interface AgentAttributionToggleProps {
 function AgentAttributionToggle({
   initialShowAgentAttribution,
   userId,
+  onChange,
 }: AgentAttributionToggleProps) {
-  const [enabled, setEnabled] = useState(initialShowAgentAttribution);
+  const [enabled, setEnabledState] = useState(initialShowAgentAttribution);
+  const setEnabled = (value: boolean) => {
+    setEnabledState(value);
+    onChange?.(value);
+  };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -798,6 +805,9 @@ function DeleteAccount({ handle, userId }: DeleteAccountProps) {
 
 export function WhoAmIClient({ session }: { session: ClientSession }) {
   const [viewMode, setViewMode] = useState<ViewMode>('side-by-side');
+  const [agentAttributionShared, setAgentAttributionShared] = useState(
+    session.showAgentAttribution,
+  );
   const [period, setPeriod] = useState<ContributionPeriod>(
     DEFAULT_CONTRIBUTION_PERIOD,
   );
@@ -991,6 +1001,7 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
             <AgentAttributionToggle
               initialShowAgentAttribution={session.showAgentAttribution}
               userId={session.userId}
+              onChange={setAgentAttributionShared}
             />
 
             <ConnectionsPanel
@@ -1031,7 +1042,9 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
               to={appliedDateRange.to}
               showVerified
               onLoadingChange={setLoading}
-              showAgentAttribution
+              agentAttribution={
+                agentAttributionShared ? 'owner-shared' : 'owner'
+              }
             />
           </div>
         </div>

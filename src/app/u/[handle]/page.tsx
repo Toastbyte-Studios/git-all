@@ -1,10 +1,12 @@
 import { headers } from 'next/headers';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
+import type { AgentAttributionAudience } from '@/components/AgentAttributionSummary';
 import { ANALYTICS_EVENTS } from '@/lib/analytics-events';
 import { trackServerEvent } from '@/lib/analytics-server';
 import { getAuthSession } from '@/lib/auth-session';
 import {
+  getAgentSummaries,
   getProfileByHandle,
   getPublicProfileByHandle,
   resolvePublicHandleRedirect,
@@ -129,11 +131,32 @@ export default async function PublicProfilePage({ params }: PageProps) {
     });
   }
 
+  // Agent attribution: the owner always sees their own (live, from their
+  // token); visitors only when the owner has opted in, and then only the
+  // saved public-repos-only summary. Summaries aren't even loaded otherwise,
+  // so they can't reach the page payload.
+  const agentAttribution: AgentAttributionAudience | undefined = isOwner
+    ? profile.showAgentAttribution
+      ? 'owner-shared'
+      : 'owner'
+    : profile.showAgentAttribution
+      ? 'public'
+      : undefined;
+  let agentSummaries: Awaited<ReturnType<typeof getAgentSummaries>> = {};
+  if (profile.showAgentAttribution) {
+    try {
+      agentSummaries = await getAgentSummaries(profile.id);
+    } catch {
+      // D1 hiccup: show the profile without the saved summary.
+    }
+  }
+
   return (
     <PublicProfileClient
       profile={toPublicProfile(profile)}
       ownerPreview={isOwnerPreview}
-      isOwner={isOwner}
+      agentAttribution={agentAttribution}
+      agentSummaries={agentSummaries}
     />
   );
 }

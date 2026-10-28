@@ -4,6 +4,7 @@ import {
   toExclusiveUpperBoundIso,
   toStartOfDayIso,
 } from '@/lib/contribution-period';
+import type { AgentTotals } from '@/lib/types';
 
 /**
  * Counts a GitHub user's agent-attributed commits per day by reading the
@@ -43,9 +44,14 @@ export const MAX_HISTORY_PAGES = 3;
 const MAX_AUTHORS_PER_COMMIT = 10;
 
 export interface GithubAgentTally {
-  /** Agent-attributed commits per `YYYY-MM-DD`. */
+  /** Agent-attributed commits per `YYYY-MM-DD`, across every repo read. */
   agentCounts: Map<string, number>;
   agentBreakdown: Partial<Record<AgentId, number>>;
+  /**
+   * The same count restricted to public repositories. This is the only part
+   * that may be saved for visitors: the rest includes private repos.
+   */
+  publicTotals: AgentTotals;
 }
 
 export interface FetchGithubAgentTallyOptions {
@@ -60,6 +66,8 @@ export interface FetchGithubAgentTallyOptions {
 interface RepositoryTarget {
   owner: string;
   name: string;
+  /** `visibility === 'PUBLIC'`. Internal (enterprise) repos are not public. */
+  isPublic: boolean;
   /** Commits GitHub credits the user with here, when known; used to stop paging early. */
   expectedCommits: number | null;
   matchedCommits: number;
@@ -93,6 +101,7 @@ const REPOSITORIES_QUERY = `
           repository {
             name
             owner { login }
+            visibility
           }
           contributions(first: 100) {
             pageInfo { hasNextPage }
@@ -113,6 +122,7 @@ export async function fetchGithubAgentTally({
   const tally: GithubAgentTally = {
     agentCounts: new Map(),
     agentBreakdown: {},
+    publicTotals: { agentContributions: 0, agentBreakdown: {} },
   };
   const normalizedLogin = login.toLowerCase();
   const repositories = await fetchRepositoryTargets(token, login, from, to);
@@ -134,7 +144,9 @@ export async function fetchGithubAgentTally({
 
         for (const commit of history?.nodes ?? []) {
           if (!commit || !isCommitByUser(commit, normalizedLogin)) continue;
-          if (tallyCommit(commit, from, to, tally)) repo.matchedCommits += 1;
+          if (tallyCommit(commit, from, to, repo.isPublic, tally)) {
+            repo.matchedCommits += 1;
+          }
         }
 
         repo.cursor = history?.pageInfo.endCursor ?? null;
@@ -161,7 +173,11 @@ async function fetchRepositoryTargets(
     user: {
       contributionsCollection: {
         commitContributionsByRepository: Array<{
-          repository: { name: string; owner: { login: string } };
+          repository: {
+            name: string;
+            owner: { login: string };
+            visibility?: string;
+          };
           contributions: {
             pageInfo: { hasNextPage: boolean };
             nodes: Array<{ commitCount: number } | null>;
@@ -181,6 +197,7 @@ async function fetchRepositoryTargets(
   return entries.map(({ repository, contributions }) => ({
     owner: repository.owner.login,
     name: repository.name,
+    isPublic: repository.visibility === 'PUBLIC',
     // Each node is one day; with more than 100 days the total is unknown.
     expectedCommits: contributions.pageInfo.hasNextPage
       ? null
@@ -275,6 +292,7 @@ function tallyCommit(
   commit: HistoryCommit,
   from: string,
   to: string,
+  isPublicRepository: boolean,
   tally: GithubAgentTally,
 ): boolean {
   const date = commit.author?.date?.slice(0, 10);
@@ -291,6 +309,14 @@ function tallyCommit(
   tally.agentCounts.set(date, (tally.agentCounts.get(date) ?? 0) + 1);
   for (const { agent } of attributions) {
     tally.agentBreakdown[agent] = (tally.agentBreakdown[agent] ?? 0) + 1;
+  }
+
+  if (isPublicRepository) {
+    const totals = tally.publicTotals;
+    totals.agentContributions += 1;
+    for (const { agent } of attributions) {
+      totals.agentBreakdown[agent] = (totals.agentBreakdown[agent] ?? 0) + 1;
+    }
   }
   return true;
 }

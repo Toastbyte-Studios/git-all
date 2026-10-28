@@ -75,6 +75,8 @@ The GitHub route maintains an **in-memory per-instance TTL cache** (15 min TTL, 
 - **Bitbucket** checks every commit it already counts.
 - **GitHub** runs `src/lib/github-agent-commits.ts` only on the signed-in owner's own lookup with their OAuth token (it reads private repos, so the result is never cached). It reads unfiltered default-branch history because `history(author:)` misses commits where the user is only a co-author.
 
+Display is gated in the UI, not the API: `ContributionsView` shows agent data only when given an `agentAttribution` audience (`owner`, `owner-shared` or `public`). Visitors get `public` only when `users.show_agent_attribution` is on. Because visitors can't compute GitHub counts, `/api/github` saves a public-repos-only summary to `agent_summaries` on the owner's default-period lookup (only while opted in; opting out deletes it), and `/u/[handle]` passes it to `ContributionsView` as `savedAgentSummaries`.
+
 ### Two-mode UI
 
 `ContributionExplorer` (`src/components/ContributionExplorer.tsx`) is the main client-side orchestrator. On mount it fetches `/api/auth/session` to determine auth state:

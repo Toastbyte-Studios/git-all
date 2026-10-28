@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
+import type { AgentAttributionAudience } from '@/components/AgentAttributionSummary';
 import { ContributionsView } from '@/components/ContributionsView';
 import { BitbucketIcon } from '@/components/icons/BitbucketIcon';
 import { GitHubIcon } from '@/components/icons/GitHubIcon';
@@ -20,6 +21,7 @@ import {
 import type {
   ConnectionProvider,
   PublicProfile,
+  SavedAgentSummary,
   UserEntry,
   ViewMode,
 } from '@/lib/types';
@@ -49,17 +51,24 @@ function ProviderIcon({
 export function PublicProfileClient({
   profile,
   ownerPreview = false,
-  isOwner = false,
+  agentAttribution,
+  agentSummaries = {},
 }: {
   profile: PublicProfile;
   /** True when the viewer is the owner and the profile is not published. */
   ownerPreview?: boolean;
   /**
-   * True when the viewer is the owner, published or not. Turns on the
-   * owner-only agent split. The page is served with `Vary: Cookie` (see
-   * page.tsx), so this never reaches another viewer from a shared cache.
+   * Who is viewing, for the agent split; omitted when it shouldn't show.
+   * Decided in page.tsx from the session and the owner's opt-in. The page is
+   * served with `Vary: Cookie`, so an owner's view never reaches another
+   * viewer from a shared cache.
    */
-  isOwner?: boolean;
+  agentAttribution?: AgentAttributionAudience;
+  /**
+   * Saved public-repos-only summaries. Like `profile`, these are serialised
+   * into the page, so page.tsx passes them only for an opted-in owner.
+   */
+  agentSummaries?: Partial<Record<ConnectionProvider, SavedAgentSummary>>;
 }) {
   const [viewMode, setViewMode] = useState<ViewMode>('side-by-side');
 
@@ -250,7 +259,8 @@ export function PublicProfileClient({
             from={from}
             to={to}
             showVerified
-            showAgentAttribution={isOwner}
+            agentAttribution={agentAttribution}
+            savedAgentSummaries={agentSummaries}
           />
         </div>
       </div>

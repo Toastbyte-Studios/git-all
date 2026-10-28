@@ -18,6 +18,7 @@ const store = vi.hoisted(() => ({
   users: [] as Array<Record<string, unknown>>,
   connections: [] as Array<Record<string, unknown>>,
   handleHistory: [] as Array<Record<string, unknown>>,
+  agentSummaries: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('@/lib/db', () => {
@@ -50,6 +51,12 @@ vi.mock('@/lib/db', () => {
     if (q.startsWith('DELETE FROM handle_history WHERE user_id')) {
       store.handleHistory = store.handleHistory.filter(
         (h) => h.user_id !== params[0],
+      );
+      return [];
+    }
+    if (q.startsWith('DELETE FROM agent_summaries WHERE user_id')) {
+      store.agentSummaries = store.agentSummaries.filter(
+        (r) => r.user_id !== params[0],
       );
       return [];
     }
@@ -106,6 +113,9 @@ function jsonRequest(url: string, method: string, body: unknown) {
 
 beforeEach(() => {
   auth.session = { userId: 'USER1' };
+  store.agentSummaries = [
+    { user_id: 'USER1', provider: 'github', agent_contributions: 3 },
+  ];
   store.handleHistory = [
     { handle: 'jane-old', user_id: 'USER1', released_at: 1 },
   ];
@@ -196,6 +206,7 @@ describe('DELETE /api/profile', () => {
     // Erasure has to cover retired handles too, or a deleted account leaves
     // rows behind that keep reserving handles nobody owns any more.
     expect(store.handleHistory).toHaveLength(0);
+    expect(store.agentSummaries).toHaveLength(0);
   });
 
   it('expires the session cookie and every per-provider token cookie', async () => {
@@ -307,10 +318,13 @@ describe('POST /api/profile/agent-attribution', () => {
     expect(store.users[0].show_agent_attribution).toBe(1);
     expect(store.users[0].is_public).toBe(0);
 
+    expect(store.agentSummaries).toHaveLength(1);
+
     const off = await setAgentAttributionRoute(
       jsonRequest(url, 'POST', { showAgentAttribution: false }),
     );
     expect(off.status).toBe(200);
     expect(store.users[0].show_agent_attribution).toBe(0);
+    expect(store.agentSummaries).toHaveLength(0);
   });
 });

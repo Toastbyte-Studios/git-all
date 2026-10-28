@@ -56,15 +56,32 @@ describe('PublicProfileClient navigation buttons', () => {
 });
 
 describe('PublicProfileClient agent attribution', () => {
-  it('keeps the agent split hidden from visitors', () => {
+  it('keeps the agent split hidden unless page.tsx allows it', () => {
     viewProps.length = 0;
     render(<PublicProfileClient profile={PROFILE} />);
-    expect(viewProps.at(-1)?.showAgentAttribution).toBe(false);
+    expect(viewProps.at(-1)?.agentAttribution).toBeUndefined();
+    expect(viewProps.at(-1)?.savedAgentSummaries).toEqual({});
   });
 
-  it('shows the agent split to the owner', () => {
+  it('passes the audience and saved summaries through', () => {
     viewProps.length = 0;
-    render(<PublicProfileClient profile={PROFILE} isOwner />);
-    expect(viewProps.at(-1)?.showAgentAttribution).toBe(true);
+    const summaries = {
+      github: {
+        agentContributions: 3,
+        agentBreakdown: { claude: 3 },
+        from: '2025-10-28',
+        to: '2026-10-28',
+        computedAt: 1,
+      },
+    };
+    render(
+      <PublicProfileClient
+        profile={PROFILE}
+        agentAttribution="public"
+        agentSummaries={summaries}
+      />,
+    );
+    expect(viewProps.at(-1)?.agentAttribution).toBe('public');
+    expect(viewProps.at(-1)?.savedAgentSummaries).toBe(summaries);
   });
 });

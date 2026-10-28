@@ -29,6 +29,8 @@ interface FakeRepo {
   creditedDays?: number[];
   /** Pages of history, newest first. `null` repo means no default branch. */
   pages: FakeCommit[][] | null;
+  /** Defaults to PUBLIC. */
+  visibility?: 'PUBLIC' | 'PRIVATE' | 'INTERNAL';
 }
 
 function commit(overrides: Partial<FakeCommit> & { date: string }): FakeCommit {
@@ -81,6 +83,7 @@ function stubGithub(repos: FakeRepo[], extra: { errorsFor?: string[] } = {}) {
                 repository: {
                   name: repo.name,
                   owner: { login: repo.owner ?? OWNER },
+                  visibility: repo.visibility ?? 'PUBLIC',
                 },
                 contributions: {
                   pageInfo: { hasNextPage: false },
@@ -340,12 +343,52 @@ describe('fetchGithubAgentTally', () => {
     expect(tally.agentBreakdown).toEqual({ cursor: 1 });
   });
 
+  it('keeps a separate public-repos-only total', async () => {
+    const claude = (date: string) =>
+      commit({
+        date,
+        message: 'x\n\nCo-Authored-By: Claude <noreply@anthropic.com>',
+      });
+    const cursor = (date: string) =>
+      commit({
+        date,
+        message: 'x\n\nCo-authored-by: Cursor <cursoragent@cursor.com>',
+      });
+    stubGithub([
+      { name: 'open-source', pages: [[claude('2025-05-01T10:00:00Z')]] },
+      {
+        name: 'secret',
+        visibility: 'PRIVATE',
+        pages: [
+          [cursor('2025-05-02T10:00:00Z'), claude('2025-05-02T09:00:00Z')],
+        ],
+      },
+      {
+        name: 'company-internal',
+        visibility: 'INTERNAL',
+        pages: [[cursor('2025-05-03T10:00:00Z')]],
+      },
+    ]);
+
+    const tally = await fetchGithubAgentTally(RANGE);
+
+    expect(tally.agentBreakdown).toEqual({ claude: 2, cursor: 2 });
+    expect(tally.publicTotals).toEqual({
+      agentContributions: 1,
+      agentBreakdown: { claude: 1 },
+    });
+  });
+
   it('returns an empty tally when there are no credited repositories', async () => {
     const fetchMock = stubGithub([]);
     const tally = await fetchGithubAgentTally(RANGE);
 
     expect(tally.agentCounts.size).toBe(0);
     expect(tally.agentBreakdown).toEqual({});
+    expect(tally.publicTotals).toEqual({
+      agentContributions: 0,
+      agentBreakdown: {},
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

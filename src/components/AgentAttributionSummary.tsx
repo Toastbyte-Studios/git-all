@@ -10,6 +10,31 @@ export const AGENT_LABELS: Record<AgentId, string> = {
 };
 
 /**
+ * Who is looking at the agent split, which decides the note after it:
+ * - `owner`: the owner, not opted in. Nobody else sees it.
+ * - `owner-shared`: the owner, opted in. Visitors see a public-repos-only
+ *   version, so the owner is told theirs includes more.
+ * - `public`: a visitor to an opted-in profile.
+ */
+export type AgentAttributionAudience = 'owner' | 'owner-shared' | 'public';
+
+const AUDIENCE_NOTES: Record<AgentAttributionAudience, string> = {
+  owner: ' (only visible to you)',
+  'owner-shared': ' (visitors see public repositories only)',
+  public: '',
+};
+
+/** Fixed format and UTC, so server and client render the same string. */
+function formatAsOf(ms: number): string {
+  return new Date(ms).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/**
  * One line under a heatmap: how many commits in the period are attributed to
  * an AI coding agent, and which agents. Renders nothing when the platform
  * didn't check (`agentContributions` absent), so "not checked" never reads as
@@ -21,11 +46,10 @@ export const AGENT_LABELS: Record<AgentId, string> = {
  */
 export function AgentAttributionSummary({
   data,
-  ownerOnly = false,
+  audience = 'public',
 }: {
   data: ContributionData;
-  /** Adds a note that only the viewer (the owner) can see this line. */
-  ownerOnly?: boolean;
+  audience?: AgentAttributionAudience;
 }) {
   if (data.agentContributions === undefined) return null;
 
@@ -34,6 +58,10 @@ export function AgentAttributionSummary({
     .filter((entry): entry is [AgentId, number] => (entry[1] ?? 0) > 0)
     .sort(([, a], [, b]) => b - a)
     .map(([agent, n]) => `${AGENT_LABELS[agent] ?? agent} ${n}`);
+  const saved =
+    data.agentSummaryComputedAt !== undefined
+      ? ` · public repositories, as of ${formatAsOf(data.agentSummaryComputedAt)}`
+      : '';
 
   return (
     <p
@@ -42,7 +70,7 @@ export function AgentAttributionSummary({
       data-testid="agent-attribution-summary"
     >
       {count === 0 ? (
-        'No agent-attributed commits in this period.'
+        'No agent-attributed commits in this period'
       ) : (
         <>
           <strong style={{ color: 'var(--text-primary)' }}>{count}</strong>{' '}
@@ -50,7 +78,8 @@ export function AgentAttributionSummary({
           {breakdown.length > 0 && ` · ${breakdown.join(' · ')}`}
         </>
       )}
-      {ownerOnly && ' (only visible to you)'}
+      {saved}
+      {AUDIENCE_NOTES[audience]}
     </p>
   );
 }

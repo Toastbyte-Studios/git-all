@@ -61,7 +61,15 @@ describe('WhoAmIClient agent attribution', () => {
   it('always shows the owner their own agent split', () => {
     viewProps.length = 0;
     render(<WhoAmIClient session={SESSION} />);
-    expect(viewProps.at(-1)?.showAgentAttribution).toBe(true);
+    expect(viewProps.at(-1)?.agentAttribution).toBe('owner');
+  });
+
+  it('tells an opted-in owner what visitors see', () => {
+    viewProps.length = 0;
+    render(
+      <WhoAmIClient session={{ ...SESSION, showAgentAttribution: true }} />,
+    );
+    expect(viewProps.at(-1)?.agentAttribution).toBe('owner-shared');
   });
 
   it('starts off and saves when switched on', async () => {
@@ -79,6 +87,7 @@ describe('WhoAmIClient agent attribution', () => {
     await waitFor(() =>
       expect(agentSwitch().getAttribute('aria-checked')).toBe('true'),
     );
+    expect(viewProps.at(-1)?.agentAttribution).toBe('owner-shared');
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/profile/agent-attribution',
       expect.objectContaining({
@@ -103,6 +112,7 @@ describe('WhoAmIClient agent attribution', () => {
       await screen.findByText(/Profile database is unavailable/),
     ).toBeTruthy();
     expect(agentSwitch().getAttribute('aria-checked')).toBe('false');
+    expect(viewProps.at(-1)?.agentAttribution).toBe('owner');
   });
 
   it('is hidden without a stored profile', () => {
