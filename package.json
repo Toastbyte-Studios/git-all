@@ -1,6 +1,6 @@
 {
   "name": "git-all",
-  "version": "1.43.1",
+  "version": "1.43.2",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -45,7 +45,7 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.5",
-    "happy-dom": "^20.10.6",
+    "happy-dom": "^21.0.4",
     "prettier": "^3.8.3",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.0",
