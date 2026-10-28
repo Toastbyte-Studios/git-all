@@ -1,7 +1,15 @@
+import type { AgentId } from './agent-attribution';
+
 export interface CalendarDay {
   date: string;
   count: number;
   level: number;
+  /**
+   * How many of `count` are attributed to an AI coding agent (see
+   * `src/lib/agent-attribution.ts`). Present only on platforms that inspect
+   * individual commits: absent means "not checked", 0 means "checked, none".
+   */
+  agentCount?: number;
 }
 
 export interface ContributionData {
@@ -13,6 +21,14 @@ export interface ContributionData {
     to: string | null;
   };
   calendar: CalendarDay[];
+  /** Sum of `agentCount` across the calendar. Same presence rule as `agentCount`. */
+  agentContributions?: number;
+  /**
+   * Commits attributed to each agent. A commit attributed to two agents counts
+   * once in `agentContributions` but once for each agent here, so these can
+   * sum to more than `agentContributions`.
+   */
+  agentBreakdown?: Partial<Record<AgentId, number>>;
 }
 
 export type ConnectionProvider = 'github' | 'gitlab' | 'bitbucket';
