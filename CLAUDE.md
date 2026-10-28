@@ -68,6 +68,13 @@ Each platform has its own API route that fetches and normalises data to the shar
 
 The GitHub route maintains an **in-memory per-instance TTL cache** (15 min TTL, max 500 entries) with oldest-entry eviction and deduplicates concurrent in-flight requests with a `Map<string, Promise>`. This cache is not shared across Worker instances; there is a comment indicating Workers Cache or KV as a future upgrade path. Authenticated users bypass this cache and use their own OAuth token, which may include private contributions.
 
+### Agent attribution
+
+`src/lib/agent-attribution.ts` flags commits attributed to AI coding agents (author identity or `Co-authored-by` trailers). Routes that read individual commits add optional `agentCount` per calendar day, plus `agentContributions` and `agentBreakdown`; absent means "not checked", 0 means "checked, none".
+
+- **Bitbucket** checks every commit it already counts.
+- **GitHub** runs `src/lib/github-agent-commits.ts` only on the signed-in owner's own lookup with their OAuth token (it reads private repos, so the result is never cached). It reads unfiltered default-branch history because `history(author:)` misses commits where the user is only a co-author.
+
 ### Two-mode UI
 
 `ContributionExplorer` (`src/components/ContributionExplorer.tsx`) is the main client-side orchestrator. On mount it fetches `/api/auth/session` to determine auth state:

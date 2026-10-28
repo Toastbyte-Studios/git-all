@@ -195,4 +195,164 @@ describe('GitHub contribution route', () => {
     );
     expect(cachedRequestHeaders.Authorization).not.toContain('user-token');
   });
+
+  describe('agent attribution', () => {
+    async function signedInCookies(login: string) {
+      const session: AuthSession = {
+        primary: 'github',
+        connections: {
+          github: {
+            provider: 'github',
+            accountId: '123',
+            username: login,
+            avatarUrl: 'https://avatars.githubusercontent.com/u/123',
+            verifiedAt: 1_717_777_777_000,
+          },
+        },
+      };
+      return {
+        [SESSION_COOKIE_NAME]: (await encodeAuthSession(session))!,
+        [getProviderTokenCookieName('github')]:
+          (await encodeProviderToken('user-token'))!,
+      };
+    }
+
+    /** Calendar of 2 commits on 2025-01-01, plus 3 agent commits that day in history. */
+    function stubGithub({ failAgentLookup = false } = {}) {
+      const agentCommit = (agent: string) => ({
+        message: `x\n\nCo-authored-by: ${agent}`,
+        author: {
+          name: 'Mona',
+          email: 'mona@example.com',
+          date: '2025-01-01T10:00:00+00:00',
+          user: { login: 'monalisa' },
+        },
+        authors: { nodes: [{ user: { login: 'monalisa' } }] },
+      });
+
+      const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+        const { query } = JSON.parse(String(init?.body));
+        if (query.includes('contributionCalendar')) {
+          return githubContributionResponse('monalisa', 2);
+        }
+        if (failAgentLookup) {
+          return new Response('', { status: 502 });
+        }
+        if (query.includes('commitContributionsByRepository')) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                user: {
+                  contributionsCollection: {
+                    commitContributionsByRepository: [
+                      {
+                        repository: {
+                          name: 'app',
+                          owner: { login: 'monalisa' },
+                        },
+                        contributions: {
+                          pageInfo: { hasNextPage: false },
+                          nodes: [{ commitCount: 3 }],
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            data: {
+              r0: {
+                defaultBranchRef: {
+                  target: {
+                    history: {
+                      pageInfo: { hasNextPage: false, endCursor: null },
+                      nodes: [
+                        agentCommit('Claude <noreply@anthropic.com>'),
+                        agentCommit('Cursor <cursoragent@cursor.com>'),
+                        agentCommit('Claude <noreply@anthropic.com>'),
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        );
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    it('adds agent counts to the signed-in owner lookup, capped at each day count', async () => {
+      const fetchMock = stubGithub();
+
+      const response = await GET(
+        createRequest(
+          'https://gitall.app/api/github?username=monalisa&from=2025-01-01&to=2025-01-01',
+          await signedInCookies('monalisa'),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      const body = await response.json();
+      expect(body.calendar).toEqual([
+        { date: '2025-01-01', count: 2, level: 2, agentCount: 2 },
+      ]);
+      expect(body.agentContributions).toBe(2);
+      expect(body.agentBreakdown).toEqual({ claude: 2, cursor: 1 });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not read commits when the owner looks up someone else', async () => {
+      const fetchMock = stubGithub();
+
+      const response = await GET(
+        createRequest(
+          'https://gitall.app/api/github?username=octocat&from=2025-01-01&to=2025-01-01',
+          await signedInCookies('monalisa'),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body).not.toHaveProperty('agentContributions');
+      expect(body.calendar[0]).not.toHaveProperty('agentCount');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not read commits for anonymous lookups', async () => {
+      const fetchMock = stubGithub();
+
+      const response = await GET(
+        createRequest(
+          'https://gitall.app/api/github?username=monalisa&from=2025-01-02&to=2025-01-02',
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).not.toHaveProperty('agentContributions');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('still returns the calendar, without agent fields, when the agent lookup fails', async () => {
+      stubGithub({ failAgentLookup: true });
+
+      const response = await GET(
+        createRequest(
+          'https://gitall.app/api/github?username=monalisa&from=2025-01-03&to=2025-01-03',
+          await signedInCookies('monalisa'),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.totalContributions).toBe(2);
+      expect(body).not.toHaveProperty('agentContributions');
+    });
+  });
 });
