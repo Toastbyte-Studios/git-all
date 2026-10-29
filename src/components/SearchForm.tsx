@@ -23,6 +23,8 @@ export function SearchForm({ onSearch, loading }: SearchFormProps) {
   const [bitbucket, setBitbucket] = useState('');
 
   useEffect(() => {
+    // Random, so generated after hydration to keep the server HTML matching.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlaceholders(generatePlaceholderNames(DEFAULT_PLACEHOLDERS.length));
   }, []);
 

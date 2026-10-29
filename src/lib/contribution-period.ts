@@ -192,6 +192,32 @@ export function normalizeRequestedContributionRange(
   return range;
 }
 
+/**
+ * Validation message for the custom range inputs, or null when there is
+ * nothing to flag. Untouched (empty) inputs are only flagged once the user has
+ * tried to apply them, so picking "custom" does not open with an error.
+ */
+export function getCustomRangeError(
+  from: string,
+  to: string,
+  emptySubmitted = false,
+): string | null {
+  if (!from && !to && !emptySubmitted) {
+    return null;
+  }
+
+  const range = normalizeCustomDateRange(from, to);
+  if (!range) {
+    return 'Enter a valid custom date range.';
+  }
+
+  if (!isRangeWithinOneYear(range)) {
+    return 'Custom ranges can span at most 1 year.';
+  }
+
+  return null;
+}
+
 export function isRangeWithinOneYear(range: ContributionDateRange) {
   const fromDate = parseDateInput(range.from);
   const toDate = parseDateInput(range.to);

@@ -17,6 +17,8 @@ export function SignInBanner() {
     const params = new URLSearchParams(window.location.search);
     const signinRequired = params.get('signin') === 'required';
     if (signinRequired) {
+      // The URL is only known on the client, so this runs after hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsProfileRedirect(true);
       setVisible(true);
       return;

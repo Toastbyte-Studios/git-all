@@ -41,7 +41,9 @@ export function AnalyticsConsentBanner() {
     initAnalyticsConsentBridge();
 
     // 'not-required' means the flag is off. 'granted' and 'denied' are both
-    // answered. Only null opens the banner.
+    // answered. Only null opens the banner. The cookie is client-only, so
+    // this runs after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(readAnalyticsConsent() === null);
 
     // The bridge runs asynchronously and may backfill the cookie after the

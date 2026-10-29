@@ -10,7 +10,7 @@ npm run build          # Next.js production build
 npm run test           # Run tests once (Vitest)
 npm run test:watch     # Run tests in watch mode
 npm run test:coverage  # Run tests with coverage (src/lib/**/*.ts only)
-npm run lint           # ESLint check
+npm run lint           # ESLint check (ESLint CLI, flat config in eslint.config.mjs)
 npm run lint:fix       # ESLint auto-fix
 npm run format         # Prettier write (src/**/*.{ts,tsx,css})
 npm run format:check   # Prettier check
@@ -53,7 +53,9 @@ In production (Cloudflare Workers), secrets are stored with `wrangler secret put
 
 ### Deployment stack
 
-Next.js 15 (App Router) deployed to Cloudflare Workers via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare). `npm run cf:build` produces `.open-next/worker.js` and `.open-next/assets/`, which `wrangler.jsonc` references. The worker has a self-reference service binding (`WORKER_SELF_REFERENCE`) required for Next.js incremental caching and Cloudflare's image optimization binding (`IMAGES`).
+Next.js 16 (App Router) deployed to Cloudflare Workers via [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare). `npm run cf:build` produces `.open-next/worker.js` and `.open-next/assets/`, which `wrangler.jsonc` references. The worker has a self-reference service binding (`WORKER_SELF_REFERENCE`) required for Next.js incremental caching and Cloudflare's image optimization binding (`IMAGES`).
+
+`@opennextjs/cloudflare` is pinned to an exact version: it refuses to build Next.js releases outside its supported range, so bump it deliberately alongside `next`. `src/middleware.ts` stays on the deprecated `middleware` convention rather than `proxy`, because `proxy` is Node.js-only and OpenNext for Cloudflare does not support Node.js middleware yet.
 
 ### Contribution data flow
 
