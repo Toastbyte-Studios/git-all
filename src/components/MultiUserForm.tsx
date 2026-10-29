@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DEFAULT_GITEA_INSTANCE_URL,
   GITEA_CUSTOM_INSTANCE_VALUE,
@@ -38,12 +38,13 @@ function createEntry(
 }
 
 export function MultiUserForm({ onSearch, loading }: MultiUserFormProps) {
-  const initialEntry = useRef(createEntry());
-  const [entries, setEntries] = useState<EntryWithPlaceholder[]>([
-    initialEntry.current,
+  const [entries, setEntries] = useState<EntryWithPlaceholder[]>(() => [
+    createEntry(),
   ]);
 
   useEffect(() => {
+    // Random, so generated after hydration to keep the server HTML matching.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntries((prev) =>
       prev.map((entry) =>
         entry.placeholder

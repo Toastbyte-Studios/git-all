@@ -33,6 +33,7 @@ export function ThemeToggle() {
     } catch {
       // localStorage unavailable — fall back to "system"
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setChoice(stored);
   }, []);
 

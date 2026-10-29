@@ -61,25 +61,24 @@ export function ContributionsView({
   const [results, setResults] = useState<UserResult[]>([]);
   const [loading, setLoadingState] = useState(false);
   const onLoadingChangeRef = useRef(onLoadingChange);
-  onLoadingChangeRef.current = onLoadingChange;
+  useEffect(() => {
+    onLoadingChangeRef.current = onLoadingChange;
+  });
 
   const setLoading = (value: boolean) => {
     setLoadingState(value);
     onLoadingChangeRef.current?.(value);
   };
-  const [globalError, setGlobalError] = useState<string | null>(null);
   const requestSequence = useRef(0);
 
   const fetchContributions = useCallback(async () => {
     if (entries.length === 0) {
       setResults([]);
       setLoading(false);
-      setGlobalError(null);
       return;
     }
 
     setLoading(true);
-    setGlobalError(null);
 
     const requestId = ++requestSequence.current;
 
@@ -130,18 +129,16 @@ export function ContributionsView({
   }, [entries, from, to]);
 
   useEffect(() => {
+    // Fetching is what effects are for; the synchronous part only resets the
+    // panels to their loading state before the requests go out.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchContributions();
   }, [fetchContributions]);
 
-  useEffect(() => {
-    if (
-      !loading &&
-      results.length > 0 &&
-      results.every((r) => r.error !== null)
-    ) {
-      setGlobalError('All lookups failed. Check the usernames and try again.');
-    }
-  }, [results, loading]);
+  const globalError =
+    !loading && results.length > 0 && results.every((r) => r.error !== null)
+      ? 'All lookups failed. Check the usernames and try again.'
+      : null;
 
   if (results.length === 0 && !loading) {
     return null;

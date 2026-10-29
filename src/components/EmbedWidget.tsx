@@ -178,12 +178,14 @@ interface EmbedPreviewProps {
  */
 function EmbedPreview({ url }: EmbedPreviewProps) {
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
-    'loading',
-  );
+  // Keyed by URL so a change of `url` reads as loading until that image settles.
+  const [settled, setSettled] = useState<{
+    url: string;
+    status: 'ready' | 'error';
+  } | null>(null);
+  const status = settled?.url === url ? settled.status : 'loading';
 
   useEffect(() => {
-    setStatus('loading');
     const timer = setTimeout(() => setLoadedUrl(url), PREVIEW_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [url]);
@@ -212,8 +214,8 @@ function EmbedPreview({ url }: EmbedPreviewProps) {
             alt="Preview of your contribution heatmap"
             className="max-w-full h-auto rounded"
             style={{ display: status === 'ready' ? 'block' : 'none' }}
-            onLoad={() => setStatus('ready')}
-            onError={() => setStatus('error')}
+            onLoad={() => setSettled({ url: loadedUrl, status: 'ready' })}
+            onError={() => setSettled({ url: loadedUrl, status: 'error' })}
           />
         )}
         {status !== 'ready' && (
@@ -280,9 +282,15 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
   const [profileIsPublic, setProfileIsPublic] = useState(isPublic ?? false);
   const [hasSelectedMode, setHasSelectedMode] = useState(false);
   const eligibleForHandleEmbed = Boolean(profileHandle && profileIsPublic);
-  const [mode, setMode] = useState<'handle' | 'custom'>(
-    eligibleForHandleEmbed ? 'handle' : 'custom',
+  const [selectedMode, setSelectedMode] = useState<'handle' | 'custom'>(
+    'handle',
   );
+  // Handle mode is the default once the profile qualifies, until the user picks.
+  const mode = !eligibleForHandleEmbed
+    ? 'custom'
+    : hasSelectedMode
+      ? selectedMode
+      : 'handle';
   const [placeholders, setPlaceholders] = useState(DEFAULT_PLACEHOLDERS);
   const [github, setGithub] = useState('');
   const [gitlab, setGitlab] = useState('');
@@ -293,6 +301,8 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
   const [theme, setTheme] = useState<EmbedTheme>('auto');
 
   useEffect(() => {
+    // Random, so generated after hydration to keep the server HTML matching.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlaceholders(generatePlaceholderNames(DEFAULT_PLACEHOLDERS.length));
   }, []);
 
@@ -316,19 +326,6 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
       isMounted = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (eligibleForHandleEmbed) {
-      if (!hasSelectedMode) {
-        setMode('handle');
-      }
-      return;
-    }
-
-    if (mode === 'handle') {
-      setMode('custom');
-    }
-  }, [eligibleForHandleEmbed, hasSelectedMode, mode]);
 
   // Handle-keyed embed URL — resolves live from the user's public profile.
   // The link target points at the profile page rather than the site home.
@@ -403,7 +400,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
             type="button"
             onClick={() => {
               setHasSelectedMode(true);
-              setMode('handle');
+              setSelectedMode('handle');
             }}
             aria-pressed={mode === 'handle'}
             className="flex-1 px-3 py-1.5 font-medium transition-colors cursor-pointer"
@@ -419,7 +416,7 @@ export function EmbedWidget({ handle, isPublic }: EmbedWidgetProps = {}) {
             type="button"
             onClick={() => {
               setHasSelectedMode(true);
-              setMode('custom');
+              setSelectedMode('custom');
             }}
             aria-pressed={mode === 'custom'}
             className="flex-1 px-3 py-1.5 font-medium transition-colors cursor-pointer"

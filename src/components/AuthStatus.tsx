@@ -63,6 +63,8 @@ export function AuthStatus() {
     const params = new URLSearchParams(window.location.search);
     const error = params.get('auth_error');
     if (error) {
+      // The URL is only known on the client, so this runs after hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAuthError(error);
       const url = new URL(window.location.href);
       url.searchParams.delete('auth_error');

@@ -30,12 +30,6 @@ export default defineConfig([
   },
   {
     rules: {
-      // New in the React Hooks plugin that eslint-config-next 16 bundles (the
-      // React Compiler rules). Existing effects trip them in 13 components;
-      // fixing those changes component behaviour, so it is tracked separately
-      // from the framework upgrade. Warnings keep them visible meanwhile.
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/refs': 'warn',
       '@typescript-eslint/no-explicit-any': 'error',
       'import/order': [
         'error',

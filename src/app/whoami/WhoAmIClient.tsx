@@ -9,8 +9,8 @@ import { TimePeriodSelector } from '@/components/TimePeriodSelector';
 import {
   DEFAULT_CONTRIBUTION_PERIOD,
   getContributionDateRange,
+  getCustomRangeError,
   getTodayUtc,
-  isRangeWithinOneYear,
   normalizeCustomDateRange,
   type ContributionPeriod,
 } from '@/lib/contribution-period';
@@ -814,7 +814,9 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
   );
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const [rangeError, setRangeError] = useState<string | null>(null);
+  // Set when the user tries to apply the current custom inputs, so an empty
+  // range is flagged then rather than as soon as "custom" is picked.
+  const [rangeApplyAttempted, setRangeApplyAttempted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copyToast, setCopyToast] = useState<CopyToastState>({
     visible: false,
@@ -831,8 +833,11 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
     if (hydrated.current) return;
     hydrated.current = true;
 
+    // Storage is browser-only, so it is read after hydration rather than in
+    // render; reading it during render would mismatch the server HTML.
     const savedMode = readStorage<ViewMode>(LS_VIEW_MODE, 'side-by-side');
     if (savedMode === 'side-by-side' || savedMode === 'integrated') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- post-hydration storage read
       setViewMode(savedMode);
     }
 
@@ -875,29 +880,14 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
     return getContributionDateRange(period, getTodayUtc());
   }, [period, customRange]);
 
-  useEffect(() => {
-    if (period !== 'custom') {
-      setRangeError(null);
-      return;
-    }
-    if (!customFrom && !customTo) {
-      setRangeError(null);
-      return;
-    }
-    if (!customRange) {
-      setRangeError('Enter a valid custom date range.');
-      return;
-    }
-    if (!isRangeWithinOneYear(customRange)) {
-      setRangeError('Custom ranges can span at most 1 year.');
-      return;
-    }
-    setRangeError(null);
-  }, [customFrom, customRange, customTo, period]);
+  const rangeError =
+    period === 'custom'
+      ? getCustomRangeError(customFrom, customTo, rangeApplyAttempted)
+      : null;
 
   const handlePeriodChange = (nextPeriod: ContributionPeriod) => {
     setPeriod(nextPeriod);
-    setRangeError(null);
+    setRangeApplyAttempted(false);
     writeStorage(LS_TIME_RANGE, {
       period: nextPeriod,
       customFrom,
@@ -907,24 +897,21 @@ export function WhoAmIClient({ session }: { session: ClientSession }) {
 
   const handleCustomFromChange = (value: string) => {
     setCustomFrom(value);
+    setRangeApplyAttempted(false);
     writeStorage(LS_TIME_RANGE, { period, customFrom: value, customTo });
   };
 
   const handleCustomToChange = (value: string) => {
     setCustomTo(value);
+    setRangeApplyAttempted(false);
     writeStorage(LS_TIME_RANGE, { period, customFrom, customTo: value });
   };
 
   const handleApplyCustomRange = () => {
-    if (!customRange) {
-      setRangeError('Enter a valid custom date range.');
+    if (getCustomRangeError(customFrom, customTo, true)) {
+      setRangeApplyAttempted(true);
       return;
     }
-    if (!isRangeWithinOneYear(customRange)) {
-      setRangeError('Custom ranges can span at most 1 year.');
-      return;
-    }
-    setRangeError(null);
     // Persist and let appliedDateRange memo update, which flows to ContributionsView.
     writeStorage(LS_TIME_RANGE, { period: 'custom', customFrom, customTo });
   };

@@ -11,9 +11,9 @@ import { ANALYTICS_EVENTS, trackClientEvent } from '@/lib/analytics-client';
 import {
   DEFAULT_CONTRIBUTION_PERIOD,
   getContributionDateRange,
+  getCustomRangeError,
   getPeriodSelectionFromSearchParams,
   getTodayUtc,
-  isRangeWithinOneYear,
   normalizeCustomDateRange,
   type ContributionPeriod,
 } from '@/lib/contribution-period';
@@ -39,7 +39,9 @@ export function ContributionExplorer({ embedSlot }: ContributionExplorerProps) {
   const [entries, setEntries] = useState<UserEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [rangeError, setRangeError] = useState<string | null>(null);
+  // Set when the user tries to apply the current custom inputs, so an empty
+  // range is flagged then rather than as soon as "custom" is picked.
+  const [rangeApplyAttempted, setRangeApplyAttempted] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('side-by-side');
   const [period, setPeriod] = useState<ContributionPeriod>(
     DEFAULT_CONTRIBUTION_PERIOD,
@@ -62,16 +64,20 @@ export function ContributionExplorer({ embedSlot }: ContributionExplorerProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (authenticated !== true) {
-      return;
-    }
-
+  // Re-seed the selector from the URL once signed in and whenever the URL
+  // changes (back/forward). Done during render rather than in an effect so the
+  // selector never paints a stale period first.
+  const [syncedSearchParams, setSyncedSearchParams] = useState<
+    typeof searchParams | null
+  >(null);
+  if (authenticated === true && searchParams !== syncedSearchParams) {
+    setSyncedSearchParams(searchParams);
     const selection = getPeriodSelectionFromSearchParams(searchParams);
     setPeriod(selection.period);
     setCustomFrom(selection.customFrom);
     setCustomTo(selection.customTo);
-  }, [authenticated, searchParams]);
+    setRangeApplyAttempted(false);
+  }
 
   const customRange = useMemo(
     () => normalizeCustomDateRange(customFrom, customTo),
@@ -99,29 +105,10 @@ export function ContributionExplorer({ embedSlot }: ContributionExplorerProps) {
     return getContributionDateRange(appliedSelection.period, getTodayUtc());
   }, [appliedSelection, authenticated]);
 
-  useEffect(() => {
-    if (authenticated !== true || period !== 'custom') {
-      setRangeError(null);
-      return;
-    }
-
-    if (!customFrom && !customTo) {
-      setRangeError(null);
-      return;
-    }
-
-    if (!customRange) {
-      setRangeError('Enter a valid custom date range.');
-      return;
-    }
-
-    if (!isRangeWithinOneYear(customRange)) {
-      setRangeError('Custom ranges can span at most 1 year.');
-      return;
-    }
-
-    setRangeError(null);
-  }, [authenticated, customFrom, customRange, customTo, period]);
+  const rangeError =
+    authenticated === true && period === 'custom'
+      ? getCustomRangeError(customFrom, customTo, rangeApplyAttempted)
+      : null;
 
   const updatePeriodInUrl = (
     nextPeriod: ContributionPeriod,
@@ -201,13 +188,8 @@ export function ContributionExplorer({ embedSlot }: ContributionExplorerProps) {
 
   const handleMultiUserSearch = (newEntries: UserEntry[]) => {
     if (period === 'custom') {
-      if (!customRange) {
-        setRangeError('Enter a valid custom date range.');
-        return;
-      }
-
-      if (!isRangeWithinOneYear(customRange)) {
-        setRangeError('Custom ranges can span at most 1 year.');
+      if (!customRange || getCustomRangeError(customFrom, customTo, true)) {
+        setRangeApplyAttempted(true);
         return;
       }
 
@@ -235,6 +217,7 @@ export function ContributionExplorer({ embedSlot }: ContributionExplorerProps) {
 
   const handlePeriodChange = (nextPeriod: ContributionPeriod) => {
     setPeriod(nextPeriod);
+    setRangeApplyAttempted(false);
     setGlobalError(null);
 
     if (nextPeriod === 'custom') {
@@ -258,13 +241,8 @@ export function ContributionExplorer({ embedSlot }: ContributionExplorerProps) {
       return;
     }
 
-    if (!customRange) {
-      setRangeError('Enter a valid custom date range.');
-      return;
-    }
-
-    if (!isRangeWithinOneYear(customRange)) {
-      setRangeError('Custom ranges can span at most 1 year.');
+    if (!customRange || getCustomRangeError(customFrom, customTo, true)) {
+      setRangeApplyAttempted(true);
       return;
     }
 
@@ -306,8 +284,14 @@ export function ContributionExplorer({ embedSlot }: ContributionExplorerProps) {
         error={rangeError}
         showGitlabLimitNote={showGitlabLimitNote}
         onPeriodChange={handlePeriodChange}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
+        onCustomFromChange={(value) => {
+          setCustomFrom(value);
+          setRangeApplyAttempted(false);
+        }}
+        onCustomToChange={(value) => {
+          setCustomTo(value);
+          setRangeApplyAttempted(false);
+        }}
         onApplyCustomRange={handleApplyCustomRange}
       />
     </>

@@ -7,6 +7,7 @@ import {
   getContributionDateRange,
   normalizeCustomDateRange,
   normalizeRequestedContributionRange,
+  getCustomRangeError,
   isRangeWithinOneYear,
   getPeriodSelectionFromSearchParams,
   toStartOfDayIso,
@@ -304,6 +305,37 @@ describe('getPeriodSelectionFromSearchParams', () => {
       makeParams({ period: 'monthly' }),
     );
     expect(result.period).toBe(DEFAULT_CONTRIBUTION_PERIOD);
+  });
+});
+
+describe('getCustomRangeError', () => {
+  it('returns null for untouched inputs', () => {
+    expect(getCustomRangeError('', '')).toBeNull();
+  });
+
+  it('flags untouched inputs once the user has tried to apply them', () => {
+    expect(getCustomRangeError('', '', true)).toBe(
+      'Enter a valid custom date range.',
+    );
+  });
+
+  it('flags a partial or reversed range', () => {
+    expect(getCustomRangeError('2024-01-01', '')).toBe(
+      'Enter a valid custom date range.',
+    );
+    expect(getCustomRangeError('2024-06-01', '2024-01-01')).toBe(
+      'Enter a valid custom date range.',
+    );
+  });
+
+  it('flags a range longer than one year', () => {
+    expect(getCustomRangeError('2023-01-01', '2024-06-01')).toBe(
+      'Custom ranges can span at most 1 year.',
+    );
+  });
+
+  it('returns null for a valid range', () => {
+    expect(getCustomRangeError('2024-01-01', '2024-06-01')).toBeNull();
   });
 });
 
