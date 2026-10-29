@@ -183,7 +183,8 @@ function EmbedPreview({ url }: EmbedPreviewProps) {
     url: string;
     status: 'ready' | 'error';
   } | null>(null);
-  const status = settled?.url === url ? settled.status : 'loading';
+  const status =
+    settled?.url === url && loadedUrl === url ? settled.status : 'loading';
 
   useEffect(() => {
     const timer = setTimeout(() => setLoadedUrl(url), PREVIEW_DEBOUNCE_MS);
