@@ -1,6 +1,6 @@
 {
   "name": "git-all",
-  "version": "1.44.0",
+  "version": "1.44.1",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -23,7 +23,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "next": "^16.4.3",
+    "next": "^16.4.6",
     "postcss": "8.5.23",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
